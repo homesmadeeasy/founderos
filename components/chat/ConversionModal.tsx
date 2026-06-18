@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Check, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Check, Loader2, Sparkles } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import type { TaskPriority, TaskStatus, RiskSeverity, RiskStatus, RoadmapStatus } from '@/lib/types'
+import type { ExtractResponseBody } from '@/lib/extract'
 
 export type ConversionType = 'task' | 'note' | 'decision' | 'risk' | 'roadmap'
 
@@ -180,11 +181,43 @@ interface Props {
 
 export default function ConversionModal({ type, sourceContent, onClose }: Props) {
   const { addTask, addNote, addDecision, addRisk, addRoadmapItem, roadmapItems } = useProjectContext()
+  // Start with the simple local fallback so fields are never empty.
   const [form, setForm] = useState<Record<string, string>>(getInitialForm(type, sourceContent))
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [extracting, setExtracting] = useState(true)
+  const [usedFallback, setUsedFallback] = useState(false)
 
   const config = MODAL_CONFIG[type]
+
+  // On open: ask the AI to extract clean structured fields. Falls back silently
+  // to the local prefill if the request fails — the user can always edit manually.
+  useEffect(() => {
+    let cancelled = false
+
+    async function extract() {
+      try {
+        const res = await fetch('/api/extract-object', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, content: sourceContent }),
+        })
+        if (!res.ok) throw new Error('extract failed')
+        const data = (await res.json()) as ExtractResponseBody
+        if (!cancelled && data?.fields) {
+          // Merge over the fallback so any missing key keeps a sensible default.
+          setForm((prev) => ({ ...prev, ...data.fields }))
+        }
+      } catch {
+        if (!cancelled) setUsedFallback(true)
+      } finally {
+        if (!cancelled) setExtracting(false)
+      }
+    }
+
+    extract()
+    return () => { cancelled = true }
+  }, [type, sourceContent])
 
   function handleChange(key: string, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -253,14 +286,28 @@ export default function ConversionModal({ type, sourceContent, onClose }: Props)
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-zinc-100 shrink-0">
           <div>
             <h2 className="text-sm font-semibold text-zinc-900">{config.label}</h2>
-            <p className="text-xs text-zinc-400 mt-0.5">Edit before saving. Pre-filled from AI message.</p>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              {extracting
+                ? 'Extracting structured item…'
+                : usedFallback
+                  ? 'Couldn’t auto-extract — edit manually before saving.'
+                  : 'AI pre-filled this. Edit before saving.'}
+            </p>
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors">
             <X size={14} />
           </button>
         </div>
 
-        {success ? (
+        {extracting ? (
+          <div className="px-6 py-16 flex flex-col items-center gap-3 text-center">
+            <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center">
+              <Sparkles size={20} className="text-zinc-400 animate-pulse" />
+            </div>
+            <p className="text-sm font-semibold text-zinc-700">Extracting structured item…</p>
+            <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">FounderOS is reading the AI message and pulling out a clean {type}.</p>
+          </div>
+        ) : success ? (
           <div className="px-6 py-14 flex flex-col items-center gap-3 text-center">
             <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
               <Check size={22} className="text-emerald-600" />
