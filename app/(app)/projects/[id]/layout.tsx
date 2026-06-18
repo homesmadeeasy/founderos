@@ -1,28 +1,44 @@
-import ProjectTabs from '@/components/ProjectTabs'
+import { notFound } from 'next/navigation'
+import ProjectTabs from '@/components/project/ProjectTabs'
+import StatusBadge from '@/components/ui/StatusBadge'
+import { getProject } from '@/lib/mock-data'
 
-export default function ProjectLayout({
+export default async function ProjectLayout({
   children,
   params,
 }: {
   children: React.ReactNode
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
+  const project = getProject(id)
+
+  if (!project) notFound()
+
   return (
-    <div className="-m-6 flex flex-col min-h-full">
+    <div className="flex flex-col min-h-full">
       {/* Project header */}
-      <div className="px-6 pt-6 pb-4 bg-white border-b border-zinc-200">
-        <p className="text-xs text-zinc-400 mb-1">Project</p>
-        <h1 className="text-lg font-semibold text-zinc-900 capitalize">
-          {params.id.replace(/-/g, ' ')}
-        </h1>
+      <div className="bg-white border-b border-zinc-200 px-6 pt-6 pb-4">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-xs text-zinc-400 mb-1">Project</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-lg font-semibold text-zinc-900">{project.title}</h1>
+            <StatusBadge status={project.status} size="md" />
+          </div>
+          {project.goal && (
+            <p className="mt-1.5 text-sm text-zinc-500 max-w-2xl leading-relaxed">{project.goal}</p>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
-      <ProjectTabs projectId={params.id} />
+      <ProjectTabs projectId={id} />
 
-      {/* Page content */}
+      {/* Content */}
       <div className="flex-1 bg-zinc-50 p-6">
-        {children}
+        <div className="max-w-5xl mx-auto">
+          {children}
+        </div>
       </div>
     </div>
   )

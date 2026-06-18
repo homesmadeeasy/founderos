@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FounderOS",
-  description: "A personal AI operating system for builders and founders.",
+  title: { default: 'FounderOS', template: '%s — FounderOS' },
+  description: 'A personal AI operating system for builders, founders, coders and ambitious students.',
 };
 
 export default function RootLayout({

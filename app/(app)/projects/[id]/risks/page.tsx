@@ -1,27 +1,66 @@
+import Link from 'next/link'
+import { getRisksForProject } from '@/lib/mock-data'
+import PageHeader from '@/components/ui/PageHeader'
+import StatusBadge from '@/components/ui/StatusBadge'
 import { Plus, AlertTriangle } from 'lucide-react'
 
-export default function ProjectRisksPage() {
-  return (
-    <div className="max-w-3xl space-y-4">
-      <div className="flex justify-end">
-        <button className="flex items-center gap-2 px-3 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors">
-          <Plus size={14} />
-          Add Risk
-        </button>
-      </div>
+export default async function ProjectRisksPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const risks = getRisksForProject(id)
 
-      <div className="bg-white rounded-xl border border-zinc-200">
-        <div className="px-5 py-4 border-b border-zinc-100">
-          <h2 className="text-sm font-semibold text-zinc-700">Risk Register</h2>
-          <p className="text-xs text-zinc-400 mt-0.5">Track risks, their likelihood, and mitigation plans.</p>
-        </div>
-        <div className="flex flex-col items-center justify-center py-14 gap-3">
-          <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center">
-            <AlertTriangle size={18} className="text-zinc-400" />
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Risks"
+        description="Identify, track, and mitigate what could go wrong."
+        action={
+          <button className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors">
+            <Plus size={13} />
+            Add Risk
+          </button>
+        }
+      />
+
+      {risks.length === 0 ? (
+        <div className="bg-white rounded-xl border border-zinc-200 flex flex-col items-center justify-center py-20 gap-3 text-center">
+          <AlertTriangle size={22} className="text-zinc-300" />
+          <div>
+            <p className="text-sm font-medium text-zinc-700">No risks identified yet</p>
+            <p className="text-sm text-zinc-400 mt-1 max-w-xs leading-relaxed">
+              Ask AI in{' '}
+              <Link href={`/projects/${id}/chat`} className="text-zinc-600 underline underline-offset-2 hover:text-zinc-800">
+                Chat
+              </Link>{' '}
+              to identify potential risks for this project, then log them here.
+            </p>
           </div>
-          <p className="text-sm text-zinc-400">No risks identified yet.</p>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100">
+          {risks.map((risk) => (
+            <div key={risk.id} className="px-5 py-5 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-sm font-semibold text-zinc-800">{risk.title}</p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatusBadge status={risk.severity} />
+                  <StatusBadge status={risk.status} />
+                </div>
+              </div>
+              <p className="text-sm text-zinc-500 leading-relaxed">{risk.description}</p>
+              {risk.mitigation && (
+                <div className="bg-zinc-50 rounded-lg px-4 py-3 border border-zinc-200">
+                  <p className="text-xs font-semibold text-zinc-500 mb-1">Mitigation</p>
+                  <p className="text-sm text-zinc-600 leading-relaxed">{risk.mitigation}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
