@@ -1,16 +1,13 @@
+'use client'
+
 import Link from 'next/link'
-import { getRisksForProject } from '@/lib/mock-data'
+import { useProjectContext } from '@/contexts/ProjectContext'
 import PageHeader from '@/components/ui/PageHeader'
 import StatusBadge from '@/components/ui/StatusBadge'
 import { Plus, AlertTriangle } from 'lucide-react'
 
-export default async function ProjectRisksPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
-  const risks = getRisksForProject(id)
+export default function ProjectRisksPage() {
+  const { project, risks } = useProjectContext()
 
   return (
     <div className="space-y-5">
@@ -19,8 +16,7 @@ export default async function ProjectRisksPage({
         description="Identify, track, and mitigate what could go wrong."
         action={
           <button className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors">
-            <Plus size={13} />
-            Add Risk
+            <Plus size={13} /> Add Risk
           </button>
         }
       />
@@ -32,10 +28,8 @@ export default async function ProjectRisksPage({
             <p className="text-sm font-medium text-zinc-700">No risks identified yet</p>
             <p className="text-sm text-zinc-400 mt-1 max-w-xs leading-relaxed">
               Ask AI in{' '}
-              <Link href={`/projects/${id}/chat`} className="text-zinc-600 underline underline-offset-2 hover:text-zinc-800">
-                Chat
-              </Link>{' '}
-              to identify potential risks for this project, then log them here.
+              <Link href={`/projects/${project.id}/chat`} className="text-zinc-600 underline underline-offset-2">Chat</Link>
+              {' '}to identify potential risks, then click <strong>Risk</strong> to add them here.
             </p>
           </div>
         </div>

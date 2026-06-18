@@ -1,15 +1,12 @@
+'use client'
+
 import Link from 'next/link'
-import { getDecisionsForProject } from '@/lib/mock-data'
+import { useProjectContext } from '@/contexts/ProjectContext'
 import PageHeader from '@/components/ui/PageHeader'
 import { Plus, GitBranch } from 'lucide-react'
 
-export default async function ProjectDecisionsPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
-  const decisions = getDecisionsForProject(id)
+export default function ProjectDecisionsPage() {
+  const { project, decisions } = useProjectContext()
 
   return (
     <div className="space-y-5">
@@ -18,8 +15,7 @@ export default async function ProjectDecisionsPage({
         description="Log key choices and the reasoning behind them."
         action={
           <button className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors">
-            <Plus size={13} />
-            Log Decision
+            <Plus size={13} /> Log Decision
           </button>
         }
       />
@@ -31,10 +27,8 @@ export default async function ProjectDecisionsPage({
             <p className="text-sm font-medium text-zinc-700">No decisions logged yet</p>
             <p className="text-sm text-zinc-400 mt-1 max-w-xs leading-relaxed">
               Use{' '}
-              <Link href={`/projects/${id}/chat`} className="text-zinc-600 underline underline-offset-2 hover:text-zinc-800">
-                Chat
-              </Link>{' '}
-              to think through decisions with AI, then log the outcome and reasoning here.
+              <Link href={`/projects/${project.id}/chat`} className="text-zinc-600 underline underline-offset-2">Chat</Link>
+              {' '}to think through decisions with AI, then click <strong>Decision</strong> to log them here.
             </p>
           </div>
         </div>

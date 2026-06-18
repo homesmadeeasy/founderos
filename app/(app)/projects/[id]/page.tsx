@@ -1,8 +1,7 @@
+'use client'
+
 import Link from 'next/link'
-import {
-  getProject, getTasksForProject, getNotesForProject,
-  getDecisionsForProject, getRisksForProject, getRoadmapForProject,
-} from '@/lib/mock-data'
+import { useProjectContext } from '@/contexts/ProjectContext'
 import DashboardCard from '@/components/ui/DashboardCard'
 import StatusBadge from '@/components/ui/StatusBadge'
 import { CheckSquare, StickyNote, GitBranch, AlertTriangle, MessageSquare, Map, ArrowRight } from 'lucide-react'
@@ -16,63 +15,43 @@ const subpages = [
   { label: 'Roadmap',   slug: 'roadmap',   icon: Map,           desc: 'Phases and milestones' },
 ]
 
-export default async function ProjectOverviewPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id }       = await params
-  const project      = getProject(id)!
-  const allTasks     = getTasksForProject(id)
-  const allNotes     = getNotesForProject(id)
-  const allDecisions = getDecisionsForProject(id)
-  const allRisks     = getRisksForProject(id)
-  const allRoadmap   = getRoadmapForProject(id)
+export default function ProjectOverviewPage() {
+  const { project, tasks, notes, decisions, risks, roadmapItems } = useProjectContext()
 
-  const openTasks  = allTasks.filter((t) => t.status !== 'done')
-  const doneTasks  = allTasks.filter((t) => t.status === 'done')
-  const inProgress = allTasks.filter((t) => t.status === 'in_progress')
-  const openRisks  = allRisks.filter((r) => r.status === 'open')
-
-  // Progress: % of tasks marked done
-  const progress = allTasks.length > 0
-    ? Math.round((doneTasks.length / allTasks.length) * 100)
-    : 0
+  const doneTasks  = tasks.filter((t) => t.status === 'done')
+  const openTasks  = tasks.filter((t) => t.status !== 'done')
+  const inProgress = tasks.filter((t) => t.status === 'in_progress')
+  const openRisks  = risks.filter((r) => r.status === 'open')
+  const progress   = tasks.length > 0 ? Math.round((doneTasks.length / tasks.length) * 100) : 0
 
   const stats = [
-    { label: 'Open Tasks',  value: openTasks.length,   icon: CheckSquare,   href: `${id}/tasks` },
-    { label: 'Notes',       value: allNotes.length,    icon: StickyNote,    href: `${id}/notes` },
-    { label: 'Decisions',   value: allDecisions.length,icon: GitBranch,     href: `${id}/decisions` },
-    { label: 'Open Risks',  value: openRisks.length,   icon: AlertTriangle, href: `${id}/risks` },
+    { label: 'Open Tasks',  value: openTasks.length,    icon: CheckSquare,   href: `${project.id}/tasks` },
+    { label: 'Notes',       value: notes.length,        icon: StickyNote,    href: `${project.id}/notes` },
+    { label: 'Decisions',   value: decisions.length,    icon: GitBranch,     href: `${project.id}/decisions` },
+    { label: 'Open Risks',  value: openRisks.length,    icon: AlertTriangle, href: `${project.id}/risks` },
   ]
 
   return (
     <div className="space-y-6">
-
-      {/* Progress bar */}
-      {allTasks.length > 0 && (
+      {/* Progress */}
+      {tasks.length > 0 && (
         <div className="bg-white rounded-xl border border-zinc-200 p-5 space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-zinc-700">Overall progress</span>
             <span className="font-semibold text-zinc-900">{progress}%</span>
           </div>
           <div className="w-full h-2 bg-zinc-100 rounded-full overflow-hidden">
-            <div
-              className="h-2 bg-zinc-900 rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
+            <div className="h-2 bg-zinc-900 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
           <p className="text-xs text-zinc-400">
-            {doneTasks.length} of {allTasks.length} tasks complete · {inProgress.length} in progress
+            {doneTasks.length} of {tasks.length} tasks complete · {inProgress.length} in progress
           </p>
         </div>
       )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <DashboardCard key={s.label} {...s} />
-        ))}
+        {stats.map((s) => <DashboardCard key={s.label} {...s} />)}
       </div>
 
       {/* Description + Goal */}
@@ -94,7 +73,7 @@ export default async function ProjectOverviewPage({
           {subpages.map(({ label, slug, icon: Icon, desc }) => (
             <Link
               key={slug}
-              href={`/projects/${id}/${slug}`}
+              href={`/projects/${project.id}/${slug}`}
               className="bg-white rounded-xl border border-zinc-200 p-4 hover:border-zinc-300 transition-colors group flex items-start gap-3"
             >
               <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shrink-0 group-hover:bg-zinc-200 transition-colors">
@@ -114,7 +93,7 @@ export default async function ProjectOverviewPage({
         <div className="bg-white rounded-xl border border-zinc-200">
           <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-zinc-700">In progress</h2>
-            <Link href={`/projects/${id}/tasks`} className="text-xs text-zinc-400 hover:text-zinc-600 flex items-center gap-1 transition-colors">
+            <Link href={`/projects/${project.id}/tasks`} className="text-xs text-zinc-400 hover:text-zinc-600 flex items-center gap-1">
               All tasks <ArrowRight size={11} />
             </Link>
           </div>
@@ -135,24 +114,20 @@ export default async function ProjectOverviewPage({
         </div>
       )}
 
-      {/* Recent roadmap */}
-      {allRoadmap.length > 0 && (
+      {/* Roadmap snapshot */}
+      {roadmapItems.length > 0 && (
         <div className="bg-white rounded-xl border border-zinc-200">
           <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-zinc-700">Roadmap snapshot</h2>
-            <Link href={`/projects/${id}/roadmap`} className="text-xs text-zinc-400 hover:text-zinc-600 flex items-center gap-1 transition-colors">
+            <Link href={`/projects/${project.id}/roadmap`} className="text-xs text-zinc-400 hover:text-zinc-600 flex items-center gap-1">
               Full roadmap <ArrowRight size={11} />
             </Link>
           </div>
           <div className="divide-y divide-zinc-100">
-            {allRoadmap.map((item) => (
+            {roadmapItems.map((item) => (
               <div key={item.id} className="px-5 py-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  {item.stage && (
-                    <span className="shrink-0 text-xs font-medium text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded">
-                      {item.stage}
-                    </span>
-                  )}
+                  {item.stage && <span className="shrink-0 text-xs font-medium text-zinc-400 bg-zinc-100 px-2 py-0.5 rounded">{item.stage}</span>}
                   <span className="text-sm text-zinc-700 truncate">{item.title}</span>
                 </div>
                 <StatusBadge status={item.status} />
