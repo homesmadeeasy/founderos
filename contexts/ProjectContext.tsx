@@ -5,16 +5,16 @@
  *
  * Provides:
  *  - All project-scoped data (tasks, notes, etc.) filtered by projectId
- *  - sendMessage (mock AI chat)
+ *  - sendMessage (real OpenAI chat via /api/chat)
+ *  - aiError + retryLastMessage for graceful failure handling
  *  - add* helpers with projectId pre-filled
  *
  * ProjectProvider is rendered by app/(app)/projects/[id]/layout.tsx.
- * Sub-pages call useProjectContext() and get everything they need.
  */
 
 import { createContext, useContext, useState, useCallback } from 'react'
 import { useAppContext } from './AppContext'
-import { generateMockAiResponse } from '@/lib/mock-ai'
+import { buildChatContext, buildChatHistory } from '@/lib/ai'
 import type {
   Project, Task, Note, Decision, Risk, RoadmapItem, Message,
   TaskStatus, TaskPriority, RiskSeverity, RiskStatus, RoadmapStatus,
@@ -37,8 +37,11 @@ interface ProjectContextValue {
   roadmapItems: RoadmapItem[]
   messages:     Message[]
   isAiTyping:   boolean
+  aiError:      string | null
 
   sendMessage:     (content: string) => void
+  retryLastMessage:() => void
+  dismissError:    () => void
   addTask:         (data: NewTask)        => Task
   addNote:         (data: NewNote)        => Note
   addDecision:     (data: NewDecision)    => Decision
@@ -68,7 +71,9 @@ export function ProjectProvider({
 }) {
   const app = useAppContext()
   const pid = project.id
-  const [isAiTyping, setIsAiTyping] = useState(false)
+  const [isAiTyping, setIsAiTyping]           = useState(false)
+  const [aiError, setAiError]                 = useState<string | null>(null)
+  const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null)
 
   // Derive data from global AppContext
   const tasks        = app.appState.tasks.filter(t => t.projectId === pid)
@@ -80,25 +85,60 @@ export function ProjectProvider({
     .sort((a, b) => a.sortOrder - b.sortOrder)
   const messages     = app.appState.chatMessages[pid] ?? []
 
-  // ── Chat ────────────────────────────────────────────────────────────────────
+  // ── AI call ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Calls /api/chat with the user's message + project context + recent history.
+   * `history` should be the conversation BEFORE the message being answered.
+   */
+  const callAi = useCallback(async (userText: string, history: Message[]) => {
+    setIsAiTyping(true)
+    setAiError(null)
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userText,
+          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems),
+          history: buildChatHistory(history),
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'The AI request failed. Please try again.')
+      }
+
+      const data = await res.json() as { reply: string }
+      app.addMessage(pid, { id: uid(), role: 'assistant', content: data.reply, createdAt: now() })
+      setLastFailedMessage(null)
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      setLastFailedMessage(userText)
+    } finally {
+      setIsAiTyping(false)
+    }
+  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems])
 
   const sendMessage = useCallback((content: string) => {
     const userMsg: Message = { id: uid(), role: 'user', content, createdAt: now() }
     app.addMessage(pid, userMsg)
-    setIsAiTyping(true)
+    // history = conversation so far (before this new message)
+    callAi(content, messages)
+  }, [app, pid, messages, callAi])
 
-    const delay = 600 + Math.random() * 600
-    setTimeout(() => {
-      const aiMsg: Message = {
-        id: uid(),
-        role: 'assistant',
-        content: generateMockAiResponse(content, project),
-        createdAt: now(),
-      }
-      app.addMessage(pid, aiMsg)
-      setIsAiTyping(false)
-    }, delay)
-  }, [app, pid, project])
+  const retryLastMessage = useCallback(() => {
+    if (!lastFailedMessage) return
+    // The failed user message is already the last item in state — exclude it from history.
+    const history = messages[messages.length - 1]?.role === 'user'
+      ? messages.slice(0, -1)
+      : messages
+    callAi(lastFailedMessage, history)
+  }, [lastFailedMessage, messages, callAi])
+
+  const dismissError = useCallback(() => setAiError(null), [])
 
   // ── Converters (pre-fill projectId) ─────────────────────────────────────────
 
@@ -110,8 +150,9 @@ export function ProjectProvider({
 
   return (
     <ProjectContext.Provider value={{
-      project, tasks, notes, decisions, risks, roadmapItems, messages, isAiTyping,
-      sendMessage, addTask, addNote, addDecision, addRisk, addRoadmapItem,
+      project, tasks, notes, decisions, risks, roadmapItems, messages, isAiTyping, aiError,
+      sendMessage, retryLastMessage, dismissError,
+      addTask, addNote, addDecision, addRisk, addRoadmapItem,
     }}>
       {children}
     </ProjectContext.Provider>

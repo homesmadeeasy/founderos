@@ -1,20 +1,20 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, AlertCircle, RotateCcw, X } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import ChatMessage from '@/components/chat/ChatMessage'
 import ChatInput from '@/components/chat/ChatInput'
 import ProjectContextPanel from '@/components/project/ProjectContextPanel'
 
 export default function ProjectChatPage() {
-  const { messages, isAiTyping, sendMessage } = useProjectContext()
+  const { messages, isAiTyping, aiError, sendMessage, retryLastMessage, dismissError } = useProjectContext()
   const bottomRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to latest message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isAiTyping])
+  }, [messages, isAiTyping, aiError])
 
   return (
     /* -m-6 cancels the layout's p-6 so the chat fills edge-to-edge */
@@ -49,12 +49,36 @@ export default function ProjectChatPage() {
                   <div className="w-7 h-7 shrink-0 rounded-full bg-zinc-100 flex items-center justify-center mt-0.5">
                     <Sparkles size={12} className="text-zinc-400" />
                   </div>
-                  <div className="bg-white border border-zinc-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-                    <div className="flex gap-1 items-center h-4">
+                  <div className="bg-white border border-zinc-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm flex items-center gap-2.5">
+                    <div className="flex gap-1 items-center">
                       <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:0ms]" />
                       <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:150ms]" />
                       <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce [animation-delay:300ms]" />
                     </div>
+                    <span className="text-xs text-zinc-400">FounderOS is thinking…</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Error banner with retry */}
+              {aiError && !isAiTyping && (
+                <div className="flex gap-3">
+                  <div className="w-7 h-7 shrink-0 rounded-full bg-red-50 flex items-center justify-center mt-0.5">
+                    <AlertCircle size={13} className="text-red-500" />
+                  </div>
+                  <div className="flex-1 bg-red-50 border border-red-100 rounded-2xl rounded-tl-sm px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm text-red-700 leading-relaxed">{aiError}</p>
+                      <button onClick={dismissError} className="shrink-0 text-red-300 hover:text-red-500 transition-colors" title="Dismiss">
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <button
+                      onClick={retryLastMessage}
+                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 bg-white border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <RotateCcw size={11} /> Try again
+                    </button>
                   </div>
                 </div>
               )}
