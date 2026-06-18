@@ -1,183 +1,126 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, X, Check, Loader2 } from 'lucide-react'
-
-type Status = 'active' | 'paused'
+import { useRouter } from 'next/navigation'
+import { Plus, X, Loader2 } from 'lucide-react'
+import { useAppContext } from '@/contexts/AppContext'
+import type { ProjectStatus, ProjectPriority } from '@/lib/types'
 
 interface FormState {
   title: string
   description: string
   goal: string
-  status: Status
+  status: ProjectStatus
+  priority: ProjectPriority
+  progress: number
 }
 
-const EMPTY_FORM: FormState = {
-  title: '',
-  description: '',
-  goal: '',
-  status: 'active',
+const EMPTY: FormState = {
+  title: '', description: '', goal: '',
+  status: 'idea', priority: 'medium', progress: 0,
 }
+
+const inputCls  = 'w-full px-3 py-2.5 text-sm border border-zinc-200 rounded-lg outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 transition-colors'
+const selectCls = `${inputCls} bg-white`
 
 export default function CreateProjectModal() {
-  const [open, setOpen]         = useState(false)
-  const [form, setForm]         = useState<FormState>(EMPTY_FORM)
-  const [loading, setLoading]   = useState(false)
-  const [success, setSuccess]   = useState(false)
+  const router = useRouter()
+  const { createProject } = useAppContext()
+  const [open, setOpen]     = useState(false)
+  const [form, setForm]     = useState<FormState>(EMPTY)
+  const [loading, setLoading] = useState(false)
 
-  function close() {
-    setOpen(false)
-    setForm(EMPTY_FORM)
-    setSuccess(false)
-  }
+  function close() { setOpen(false); setForm(EMPTY) }
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  function set(k: keyof FormState, v: string | number) {
+    setForm(prev => ({ ...prev, [k]: v }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim()) return
     setLoading(true)
-    // Simulate async save — replace with Supabase call later
-    await new Promise((r) => setTimeout(r, 800))
-    setLoading(false)
-    setSuccess(true)
-    setTimeout(close, 1400)
+    await new Promise(r => setTimeout(r, 400))
+    const project = createProject(form)
+    close()
+    router.push(`/projects/${project.id}`)
   }
 
   return (
     <>
-      {/* Trigger button */}
       <button
         onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors"
       >
-        <Plus size={13} />
-        New Project
+        <Plus size={13} /> New Project
       </button>
 
-      {/* Backdrop + modal */}
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={(e) => { if (e.target === e.currentTarget) close() }}
+          onClick={e => { if (e.target === e.currentTarget) close() }}
         >
           <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl">
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-zinc-100">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-zinc-100">
               <div>
-                <h2 className="text-base font-semibold text-zinc-900">Create new project</h2>
-                <p className="text-xs text-zinc-400 mt-0.5">Start with a name and a goal.</p>
+                <h2 className="text-sm font-semibold text-zinc-900">Create new project</h2>
+                <p className="text-xs text-zinc-400 mt-0.5">You'll be taken to the project page after creating.</p>
               </div>
-              <button
-                onClick={close}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
-              >
-                <X size={15} />
+              <button onClick={close} className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors">
+                <X size={14} />
               </button>
             </div>
 
-            {success ? (
-              /* Success state */
-              <div className="px-6 py-14 flex flex-col items-center gap-3 text-center">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <Check size={22} className="text-emerald-600" />
-                </div>
-                <p className="text-sm font-semibold text-zinc-800">Project created!</p>
-                <p className="text-xs text-zinc-400">"{form.title}" is ready. Connect Supabase to save permanently.</p>
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+              {/* Title */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-600">Project name <span className="text-red-400">*</span></label>
+                <input className={inputCls} value={form.title} onChange={e => set('title', e.target.value)} placeholder="e.g. My SaaS, Pitch Deck, Landing Page" required />
               </div>
-            ) : (
-              /* Form */
-              <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
 
-                {/* Title */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600" htmlFor="title">
-                    Project name <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    id="title"
-                    name="title"
-                    type="text"
-                    required
-                    value={form.title}
-                    onChange={handleChange}
-                    placeholder="e.g. FounderOS, My SaaS, Pitch Deck"
-                    className="w-full px-3 py-2.5 text-sm border border-zinc-200 rounded-lg outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 transition-colors placeholder:text-zinc-400"
-                  />
-                </div>
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-600">Description</label>
+                <textarea className={`${inputCls} resize-none`} rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder="What is this project about?" />
+              </div>
 
-                {/* Description */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600" htmlFor="description">
-                    Description
-                  </label>
-                  <textarea
-                    id="description"
-                    name="description"
-                    rows={2}
-                    value={form.description}
-                    onChange={handleChange}
-                    placeholder="What is this project about?"
-                    className="w-full px-3 py-2.5 text-sm border border-zinc-200 rounded-lg outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 transition-colors resize-none placeholder:text-zinc-400"
-                  />
-                </div>
+              {/* Goal */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-600">V1 Goal</label>
+                <textarea className={`${inputCls} resize-none`} rows={2} value={form.goal} onChange={e => set('goal', e.target.value)} placeholder="What does success look like?" />
+              </div>
 
-                {/* Goal */}
+              {/* Status + Priority */}
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600" htmlFor="goal">
-                    V1 Goal
-                  </label>
-                  <textarea
-                    id="goal"
-                    name="goal"
-                    rows={2}
-                    value={form.goal}
-                    onChange={handleChange}
-                    placeholder="What does success look like for V1?"
-                    className="w-full px-3 py-2.5 text-sm border border-zinc-200 rounded-lg outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 transition-colors resize-none placeholder:text-zinc-400"
-                  />
-                </div>
-
-                {/* Status */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600" htmlFor="status">
-                    Status
-                  </label>
-                  <select
-                    id="status"
-                    name="status"
-                    value={form.status}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2.5 text-sm border border-zinc-200 rounded-lg outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 transition-colors bg-white"
-                  >
-                    <option value="active">Active</option>
+                  <label className="text-xs font-semibold text-zinc-600">Status</label>
+                  <select className={selectCls} value={form.status} onChange={e => set('status', e.target.value as ProjectStatus)}>
+                    <option value="idea">Idea</option>
+                    <option value="planning">Planning</option>
+                    <option value="building">Building</option>
+                    <option value="testing">Testing</option>
+                    <option value="launched">Launched</option>
                     <option value="paused">Paused</option>
                   </select>
                 </div>
-
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={close}
-                    className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading || !form.title.trim()}
-                    className="flex items-center gap-2 px-5 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {loading && <Loader2 size={13} className="animate-spin" />}
-                    {loading ? 'Creating…' : 'Create project'}
-                  </button>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-zinc-600">Priority</label>
+                  <select className={selectCls} value={form.priority} onChange={e => set('priority', e.target.value as ProjectPriority)}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
                 </div>
-              </form>
-            )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button type="button" onClick={close} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 rounded-lg transition-colors">Cancel</button>
+                <button type="submit" disabled={loading || !form.title.trim()} className="flex items-center gap-2 px-5 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  {loading && <Loader2 size={13} className="animate-spin" />}
+                  {loading ? 'Creating…' : 'Create project'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

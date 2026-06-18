@@ -1,55 +1,69 @@
 'use client'
 
 import Link from 'next/link'
+import { MessageSquare, Trash2, GitFork } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
-import PageHeader from '@/components/ui/PageHeader'
-import { Plus, GitBranch } from 'lucide-react'
+import { useAppContext } from '@/contexts/AppContext'
 
-export default function ProjectDecisionsPage() {
+export default function DecisionsPage() {
   const { project, decisions } = useProjectContext()
+  const { deleteDecision }      = useAppContext()
+
+  if (decisions.length === 0) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="bg-white rounded-xl border border-zinc-100 py-20 flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-full bg-zinc-50 flex items-center justify-center">
+            <GitFork size={20} className="text-zinc-300" />
+          </div>
+          <p className="text-sm font-semibold text-zinc-700">No decisions logged</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Use the AI chat to explore options, then save key decisions here to build your decision log.</p>
+          <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
+            <MessageSquare size={12} /> Open chat
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Decisions"
-        description="Log key choices and the reasoning behind them."
-        action={
-          <button className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors">
-            <Plus size={13} /> Log Decision
-          </button>
-        }
-      />
+    <div className="p-6 max-w-4xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-zinc-900">Decisions <span className="text-zinc-400 font-normal">({decisions.length})</span></h2>
+        <Link href={`/projects/${project.id}/chat`} className="text-xs text-zinc-400 hover:text-zinc-700 flex items-center gap-1 transition-colors">
+          <MessageSquare size={11} /> Add via chat
+        </Link>
+      </div>
 
-      {decisions.length === 0 ? (
-        <div className="bg-white rounded-xl border border-zinc-200 flex flex-col items-center justify-center py-20 gap-3 text-center">
-          <GitBranch size={22} className="text-zinc-300" />
-          <div>
-            <p className="text-sm font-medium text-zinc-700">No decisions logged yet</p>
-            <p className="text-sm text-zinc-400 mt-1 max-w-xs leading-relaxed">
-              Use{' '}
-              <Link href={`/projects/${project.id}/chat`} className="text-zinc-600 underline underline-offset-2">Chat</Link>
-              {' '}to think through decisions with AI, then click <strong>Decision</strong> to log them here.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100">
-          {decisions.map((d, i) => (
-            <div key={d.id} className="px-5 py-5 flex gap-4">
-              <span className="shrink-0 mt-0.5 text-xs font-semibold text-zinc-300 w-6 tabular-nums">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <div className="space-y-1.5">
-                <p className="text-sm font-semibold text-zinc-800">{d.decision}</p>
-                <p className="text-sm text-zinc-500 leading-relaxed">{d.reasoning}</p>
-                <p className="text-xs text-zinc-400">
-                  {new Date(d.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </p>
+      <div className="space-y-3">
+        {decisions.map((d, i) => (
+          <div key={d.id} className="bg-white rounded-xl border border-zinc-100 p-5 hover:border-zinc-200 transition-colors group relative">
+            <button
+              onClick={() => deleteDecision(d.id)}
+              className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
+              title="Delete decision"
+            >
+              <Trash2 size={11} />
+            </button>
+
+            <div className="flex items-start gap-3 pr-6">
+              <div className="w-6 h-6 rounded-full bg-zinc-100 text-zinc-500 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                {i + 1}
+              </div>
+              <div className="flex-1 space-y-2">
+                <p className="text-sm font-semibold text-zinc-800 leading-snug">{d.decision}</p>
+                {d.reasoning && (
+                  <div className="rounded-lg bg-zinc-50 border border-zinc-100 px-3 py-2">
+                    <p className="text-xs font-medium text-zinc-400 mb-1">Reasoning</p>
+                    <p className="text-xs text-zinc-600 leading-relaxed">{d.reasoning}</p>
+                  </div>
+                )}
+                <p className="text-xs text-zinc-300">{new Date(d.createdAt).toLocaleDateString()}</p>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

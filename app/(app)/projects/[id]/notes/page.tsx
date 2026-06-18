@@ -1,50 +1,56 @@
 'use client'
 
 import Link from 'next/link'
+import { MessageSquare, Trash2 } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
-import PageHeader from '@/components/ui/PageHeader'
-import { Plus, StickyNote } from 'lucide-react'
+import { useAppContext } from '@/contexts/AppContext'
 
-export default function ProjectNotesPage() {
+export default function NotesPage() {
   const { project, notes } = useProjectContext()
+  const { deleteNote }      = useAppContext()
+
+  if (notes.length === 0) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="bg-white rounded-xl border border-zinc-100 py-20 flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-full bg-zinc-50 flex items-center justify-center">
+            <MessageSquare size={20} className="text-zinc-300" />
+          </div>
+          <p className="text-sm font-semibold text-zinc-700">No notes yet</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Chat with the AI and use the &ldquo;Save as Note&rdquo; button to capture useful insights here.</p>
+          <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
+            <MessageSquare size={12} /> Open chat
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Notes"
-        description="Capture ideas, context, and anything worth remembering."
-        action={
-          <button className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors">
-            <Plus size={13} /> New Note
-          </button>
-        }
-      />
+    <div className="p-6 max-w-4xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-zinc-900">Notes <span className="text-zinc-400 font-normal">({notes.length})</span></h2>
+        <Link href={`/projects/${project.id}/chat`} className="text-xs text-zinc-400 hover:text-zinc-700 flex items-center gap-1 transition-colors">
+          <MessageSquare size={11} /> Add via chat
+        </Link>
+      </div>
 
-      {notes.length === 0 ? (
-        <div className="bg-white rounded-xl border border-zinc-200 flex flex-col items-center justify-center py-20 gap-3 text-center">
-          <StickyNote size={22} className="text-zinc-300" />
-          <div>
-            <p className="text-sm font-medium text-zinc-700">No notes yet</p>
-            <p className="text-sm text-zinc-400 mt-1 max-w-xs leading-relaxed">
-              Use{' '}
-              <Link href={`/projects/${project.id}/chat`} className="text-zinc-600 underline underline-offset-2">Chat</Link>
-              {' '}to brainstorm ideas, then click <strong>Note</strong> under any AI message to save it here.
-            </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {notes.map(note => (
+          <div key={note.id} className="bg-white rounded-xl border border-zinc-100 p-5 hover:border-zinc-200 transition-colors group relative">
+            <button
+              onClick={() => deleteNote(note.id)}
+              className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
+              title="Delete note"
+            >
+              <Trash2 size={11} />
+            </button>
+            <h3 className="text-sm font-semibold text-zinc-800 mb-2 pr-6">{note.title}</h3>
+            <p className="text-xs text-zinc-500 leading-relaxed whitespace-pre-wrap">{note.content}</p>
+            <p className="text-xs text-zinc-300 mt-3">{new Date(note.createdAt).toLocaleDateString()}</p>
           </div>
-        </div>
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-4">
-          {notes.map((note) => (
-            <div key={note.id} className="bg-white rounded-xl border border-zinc-200 p-5 space-y-2.5 hover:border-zinc-300 transition-colors cursor-pointer">
-              <h3 className="text-sm font-semibold text-zinc-800">{note.title}</h3>
-              <p className="text-sm text-zinc-500 leading-relaxed line-clamp-4">{note.content}</p>
-              <p className="text-xs text-zinc-400">
-                {new Date(note.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   )
 }

@@ -1,97 +1,147 @@
+'use client'
+
 import Link from 'next/link'
-import { FolderKanban, CheckSquare, StickyNote, GitBranch, ArrowRight } from 'lucide-react'
-import { projects, tasks, notes, decisions, chatMessages } from '@/lib/mock-data'
-import DashboardCard from '@/components/ui/DashboardCard'
-import ProjectCard from '@/components/ui/ProjectCard'
-import PageHeader from '@/components/ui/PageHeader'
+import { useAppContext } from '@/contexts/AppContext'
 import StatusBadge from '@/components/ui/StatusBadge'
 import CreateProjectModal from '@/components/ui/CreateProjectModal'
 
 export default function DashboardPage() {
-  const openTasks = tasks.filter((t) => t.status !== 'done')
+  const { appState, isHydrated } = useAppContext()
+  if (!isHydrated) return null
 
-  const stats = [
-    {
-      label: 'Active Projects',
-      value: projects.filter((p) => p.status === 'active').length,
-      icon: FolderKanban,
-      href: '/projects',
-    },
-    {
-      label: 'Open Tasks',
-      value: openTasks.length,
-      icon: CheckSquare,
-      href: '/projects',
-    },
-    {
-      label: 'Notes',
-      value: notes.length,
-      icon: StickyNote,
-      href: '/projects',
-    },
-    {
-      label: 'Decisions Made',
-      value: decisions.length,
-      icon: GitBranch,
-      href: '/projects',
-    },
-  ]
+  const { projects, tasks, decisions, risks } = appState
+
+  const activeProjects = projects.filter(p => !['archived', 'paused'].includes(p.status))
+  const openTasks      = tasks.filter(t => t.status !== 'done')
+  const openRisks      = risks.filter(r => r.status === 'open')
+  const openDecisions  = decisions.length
+
+  const nextTasks = tasks
+    .filter(t => t.status !== 'done')
+    .sort((a, b) => {
+      const priority = { high: 0, medium: 1, low: 2 }
+      return priority[a.priority] - priority[b.priority]
+    })
+    .slice(0, 4)
+
+  const recentProjects = [...projects]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 4)
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8">
-      <PageHeader
-        title="Good morning 👋"
-        description="Here's where things stand across your projects."
-        action={<CreateProjectModal />}
-      />
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-900">Dashboard</h1>
+          <p className="text-sm text-zinc-500 mt-0.5">Your FounderOS overview.</p>
+        </div>
+        <CreateProjectModal />
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {stats.map((card) => (
-          <DashboardCard key={card.label} {...card} />
+        {[
+          { label: 'Active projects',  value: activeProjects.length,  color: 'text-blue-600' },
+          { label: 'Open tasks',       value: openTasks.length,       color: 'text-orange-600' },
+          { label: 'Decisions logged', value: openDecisions,          color: 'text-emerald-600' },
+          { label: 'Open risks',       value: openRisks.length,       color: 'text-red-600' },
+        ].map(stat => (
+          <div key={stat.label} className="bg-white rounded-xl border border-zinc-100 p-4">
+            <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+            <p className="text-xs text-zinc-500 mt-1">{stat.label}</p>
+          </div>
         ))}
       </div>
 
-      {/* Recent projects */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-zinc-700">Your projects</h2>
-          <Link href="/projects" className="text-xs text-zinc-400 hover:text-zinc-600 flex items-center gap-1 transition-colors">
-            View all <ArrowRight size={11} />
-          </Link>
+      {/* Two columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent projects */}
+        <div className="bg-white rounded-xl border border-zinc-100">
+          <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-900">Recent projects</h2>
+            <Link href="/projects" className="text-xs text-zinc-400 hover:text-zinc-700 transition-colors">View all →</Link>
+          </div>
+          <div className="divide-y divide-zinc-50">
+            {recentProjects.length === 0 ? (
+              <div className="px-5 py-10 text-center text-sm text-zinc-400">No projects yet.</div>
+            ) : recentProjects.map(p => (
+              <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center justify-between px-5 py-3.5 hover:bg-zinc-50 transition-colors group">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span className="text-sm font-medium text-zinc-800 group-hover:text-zinc-900 truncate">{p.title}</span>
+                  {p.goal && <span className="text-xs text-zinc-400 truncate">{p.goal}</span>}
+                </div>
+                <div className="flex items-center gap-3 ml-3 shrink-0">
+                  {p.progress > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-16 h-1 bg-zinc-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-zinc-700 rounded-full" style={{ width: `${p.progress}%` }} />
+                      </div>
+                      <span className="text-xs text-zinc-400">{p.progress}%</span>
+                    </div>
+                  )}
+                  <StatusBadge status={p.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((project) => {
-            const open = tasks.filter((t) => t.projectId === project.id && t.status !== 'done').length
-            const msgs = (chatMessages[project.id] ?? []).length
-            return (
-              <ProjectCard key={project.id} project={project} openTasks={open} messageCount={msgs} />
-            )
-          })}
+
+        {/* Next tasks */}
+        <div className="bg-white rounded-xl border border-zinc-100">
+          <div className="px-5 py-4 border-b border-zinc-100">
+            <h2 className="text-sm font-semibold text-zinc-900">Next tasks to work on</h2>
+          </div>
+          <div className="divide-y divide-zinc-50">
+            {nextTasks.length === 0 ? (
+              <div className="px-5 py-10 text-center text-sm text-zinc-400">All caught up — no open tasks.</div>
+            ) : nextTasks.map(t => {
+              const project = projects.find(p => p.id === t.projectId)
+              return (
+                <Link key={t.id} href={`/projects/${t.projectId}/tasks`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-zinc-50 transition-colors group">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${t.priority === 'high' ? 'bg-orange-400' : t.priority === 'medium' ? 'bg-yellow-400' : 'bg-zinc-300'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-zinc-800 group-hover:text-zinc-900 truncate">{t.title}</p>
+                    {project && <p className="text-xs text-zinc-400">{project.title}</p>}
+                  </div>
+                  <StatusBadge status={t.status} />
+                </Link>
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Open tasks list */}
-      <div>
-        <h2 className="text-sm font-semibold text-zinc-700 mb-3">Open tasks</h2>
-        <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100">
-          {openTasks.slice(0, 7).map((task) => {
-            const project = projects.find((p) => p.id === task.projectId)
-            return (
-              <div key={task.id} className="px-5 py-3 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-300 shrink-0" />
-                  <span className="text-sm text-zinc-700 truncate">{task.title}</span>
-                </div>
-                <div className="flex items-center gap-2.5 shrink-0">
-                  <StatusBadge status={task.priority} />
-                  <span className="text-xs text-zinc-400">{project?.title}</span>
-                </div>
-              </div>
-            )
-          })}
+      {/* All projects quick view */}
+      {projects.length > 0 && (
+        <div className="bg-white rounded-xl border border-zinc-100">
+          <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-zinc-900">All projects</h2>
+            <span className="text-xs text-zinc-400">{projects.length} total</span>
+          </div>
+          <div className="divide-y divide-zinc-50">
+            {projects.map(p => {
+              const projectTasks = tasks.filter(t => t.projectId === p.id)
+              const doneTasks    = projectTasks.filter(t => t.status === 'done').length
+              return (
+                <Link key={p.id} href={`/projects/${p.id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-50 transition-colors group">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-800 group-hover:text-zinc-900 truncate">{p.title}</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">{projectTasks.length} tasks · {doneTasks} done</p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <StatusBadge status={p.priority} />
+                    <StatusBadge status={p.status} />
+                    {p.progress > 0 && (
+                      <span className="text-xs text-zinc-500 font-medium w-8 text-right">{p.progress}%</span>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
