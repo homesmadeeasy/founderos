@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight } from 'lucide-react'
+import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import EditProjectModal from '@/components/project/EditProjectModal'
@@ -15,8 +15,9 @@ const TASK_PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, l
 
 export default function ProjectOverviewPage() {
   const router = useRouter()
-  const { project, tasks, notes, decisions, risks, roadmapItems, messages } = useProjectContext()
+  const { project, tasks, notes, decisions, risks, roadmapItems, messages, reviews, reviewsLoading } = useProjectContext()
   const { deleteProject } = useAppContext()
+  const latestReview = reviews[0]
   const [showEdit,   setShowEdit]   = useState(false)
   const [showDelete, setShowDelete] = useState(false)
 
@@ -70,6 +71,12 @@ export default function ProjectOverviewPage() {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href={`/projects/${project.id}/review`}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-700 transition-colors"
+          >
+            <Sparkles size={12} /> Review Project
+          </Link>
           <button
             onClick={() => setShowEdit(true)}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-600 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 hover:border-zinc-300 transition-colors"
@@ -107,6 +114,47 @@ export default function ProjectOverviewPage() {
           <p className="text-sm text-zinc-700 leading-relaxed">{project.goal}</p>
         </div>
       )}
+
+      {/* Latest Project Review */}
+      <div className="bg-white rounded-xl border border-zinc-100 p-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Sparkles size={13} className="text-zinc-400" />
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Latest Project Review</p>
+          </div>
+          {latestReview && (
+            <Link href={`/projects/${project.id}/review`} className="text-zinc-300 hover:text-zinc-600 transition-colors">
+              <ArrowRight size={14} />
+            </Link>
+          )}
+        </div>
+        {reviewsLoading ? (
+          <p className="text-xs text-zinc-400 py-1">Loading…</p>
+        ) : latestReview ? (
+          <div className="space-y-2">
+            <p className="text-[11px] text-zinc-400">{new Date(latestReview.createdAt).toLocaleString()}</p>
+            <p className="text-sm text-zinc-700 leading-relaxed line-clamp-3">
+              {latestReview.summary || 'Review generated.'}
+            </p>
+            <Link
+              href={`/projects/${project.id}/review`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+            >
+              View full review <ArrowRight size={12} />
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-400 leading-relaxed">No project review yet.</p>
+            <Link
+              href={`/projects/${project.id}/review`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-700 transition-colors"
+            >
+              <Sparkles size={12} /> Generate first review
+            </Link>
+          </div>
+        )}
+      </div>
 
       {/* Progress */}
       <div className="bg-white rounded-xl border border-zinc-100 p-5">

@@ -11,11 +11,13 @@
  *  - add* converters with projectId (and optional source message link) pre-filled
  */
 
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
 import { useAppContext } from './AppContext'
+import { createClient } from '@/lib/supabase/client'
+import * as db from '@/lib/db'
 import { buildChatContext, buildChatHistory } from '@/lib/ai'
 import type {
-  Project, Task, Note, Decision, Risk, RoadmapItem, Message,
+  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectReview,
   TaskStatus, TaskPriority, RiskSeverity, RiskStatus, RoadmapStatus,
 } from '@/lib/types'
 
@@ -37,6 +39,13 @@ interface ProjectContextValue {
   messages:     Message[]
   isAiTyping:   boolean
   aiError:      string | null
+
+  // Project reviews
+  reviews:        ProjectReview[]
+  reviewsLoading: boolean
+  reviewsError:   string | null
+  prependReview:  (review: ProjectReview) => void
+  reloadReviews:  () => Promise<void>
 
   sendMessage:     (content: string) => void
   retryLastMessage:() => void
@@ -67,9 +76,34 @@ export function ProjectProvider({
 }) {
   const app = useAppContext()
   const pid = project.id
+  const supabase = useMemo(() => createClient(), [])
   const [isAiTyping, setIsAiTyping]           = useState(false)
   const [aiError, setAiError]                 = useState<string | null>(null)
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null)
+
+  // ── Project reviews ──────────────────────────────────────────────────────────
+  const [reviews, setReviews]               = useState<ProjectReview[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
+  const [reviewsError, setReviewsError]     = useState<string | null>(null)
+
+  const reloadReviews = useCallback(async () => {
+    setReviewsLoading(true)
+    setReviewsError(null)
+    try {
+      setReviews(await db.loadProjectReviews(supabase, pid))
+    } catch (err) {
+      console.error('[FounderOS] failed to load project reviews:', err)
+      setReviewsError(err instanceof Error ? err.message : 'Failed to load reviews.')
+    } finally {
+      setReviewsLoading(false)
+    }
+  }, [supabase, pid])
+
+  useEffect(() => { void reloadReviews() }, [reloadReviews])
+
+  const prependReview = useCallback((review: ProjectReview) => {
+    setReviews(prev => [review, ...prev])
+  }, [])
 
   // Derive data from global AppContext
   const tasks        = app.appState.tasks.filter(t => t.projectId === pid)
@@ -148,6 +182,7 @@ export function ProjectProvider({
   return (
     <ProjectContext.Provider value={{
       project, tasks, notes, decisions, risks, roadmapItems, messages, isAiTyping, aiError,
+      reviews, reviewsLoading, reviewsError, prependReview, reloadReviews,
       sendMessage, retryLastMessage, dismissError,
       addTask, addNote, addDecision, addRisk, addRoadmapItem,
     }}>

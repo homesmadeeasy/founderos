@@ -102,6 +102,39 @@ export interface Message {
   createdAt: string
 }
 
+// ─── Project Review ─────────────────────────────────────────────────────────
+
+/** A task suggested by the Project Review Engine. Priority uses the
+ *  human-readable casing returned by the model ("Low" | "Medium" | "High"). */
+export interface SuggestedReviewTask {
+  title: string
+  description: string
+  priority: 'Low' | 'Medium' | 'High'
+}
+
+/** A roadmap item suggested by the Project Review Engine. */
+export interface SuggestedReviewRoadmapItem {
+  title: string
+  description: string
+  stage: string   // e.g. "Now" | "Next" | "Later"
+  status: string  // e.g. "Planned"
+}
+
+export interface ProjectReview {
+  id: string
+  projectId: string
+  summary: string
+  progressReview: string
+  completedWork: string
+  blockers: string
+  keyRisks: string
+  keyDecisions: string
+  next7DayPlan: string
+  suggestedTasks: SuggestedReviewTask[]
+  suggestedRoadmapItems: SuggestedReviewRoadmapItem[]
+  createdAt: string
+}
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 export interface AppState {

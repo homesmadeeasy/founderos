@@ -15,12 +15,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message,
+  ProjectReview,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
   RiskSeverity, RiskStatus, RoadmapStatus, MessageRole,
 } from './types'
 import type {
   NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem,
 } from '@/contexts/AppContext'
+import {
+  normalizeSuggestedTasks, normalizeSuggestedRoadmapItems,
+  type NormalizedReviewFields, type ReviewContextInput,
+} from './review'
 
 // ─── DB row types (snake_case) ──────────────────────────────────────────────
 
@@ -31,6 +36,13 @@ interface DecisionRow { id: string; project_id: string; decision: string; reason
 interface RiskRow     { id: string; project_id: string; title: string; description: string | null; severity: string; mitigation: string | null; status: string; created_at: string }
 interface RoadmapRow  { id: string; project_id: string; title: string; description: string | null; stage: string | null; status: string; sort_order: number; created_at: string }
 interface MessageRow  { id: string; project_id: string; role: string; content: string; created_at: string }
+interface ProjectReviewRow {
+  id: string; project_id: string
+  summary: string | null; progress_review: string | null; completed_work: string | null
+  blockers: string | null; key_risks: string | null; key_decisions: string | null
+  next_7_day_plan: string | null; suggested_tasks: unknown; suggested_roadmap_items: unknown
+  created_at: string
+}
 
 // ─── Row → app mappers ──────────────────────────────────────────────────────
 
@@ -67,6 +79,17 @@ const toRoadmap = (r: RoadmapRow): RoadmapItem => ({
 
 const toMessage = (r: MessageRow): Message => ({
   id: r.id, role: r.role as MessageRole, content: r.content, createdAt: r.created_at,
+})
+
+const toProjectReview = (r: ProjectReviewRow): ProjectReview => ({
+  id: r.id, projectId: r.project_id,
+  summary: r.summary ?? '', progressReview: r.progress_review ?? '',
+  completedWork: r.completed_work ?? '', blockers: r.blockers ?? '',
+  keyRisks: r.key_risks ?? '', keyDecisions: r.key_decisions ?? '',
+  next7DayPlan: r.next_7_day_plan ?? '',
+  suggestedTasks: normalizeSuggestedTasks(r.suggested_tasks),
+  suggestedRoadmapItems: normalizeSuggestedRoadmapItems(r.suggested_roadmap_items),
+  createdAt: r.created_at,
 })
 
 // ─── Load everything for the signed-in user ───────────────────────────────────
@@ -255,4 +278,76 @@ export async function createMessage(
   }).select('*').single()
   if (error) throw error
   return toMessage(data as MessageRow)
+}
+
+// ─── Project context (server-side, for review generation) ────────────────────
+
+/**
+ * Fetch a single project plus all of its related data, mapped to app types.
+ * Returns null if the project doesn't exist or isn't visible to the caller
+ * (RLS scopes everything to the signed-in user). Used by /api/project-review.
+ */
+export async function loadProjectContext(
+  supabase: SupabaseClient, projectId: string,
+): Promise<ReviewContextInput | null> {
+  const { data: projectData, error: projectError } = await supabase
+    .from('projects').select('*').eq('id', projectId).maybeSingle()
+  if (projectError) throw projectError
+  if (!projectData) return null
+
+  const [tasks, notes, decisions, risks, roadmap, messages] = await Promise.all([
+    supabase.from('tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('notes').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('decisions').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('risks').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase.from('roadmap_items').select('*').eq('project_id', projectId).order('sort_order', { ascending: true }),
+    supabase.from('messages').select('*').eq('project_id', projectId).order('created_at', { ascending: true }),
+  ])
+
+  const firstError = tasks.error || notes.error || decisions.error || risks.error || roadmap.error || messages.error
+  if (firstError) throw firstError
+
+  return {
+    project:      toProject(projectData as ProjectRow),
+    tasks:        (tasks.data    ?? []).map(toTask),
+    notes:        (notes.data    ?? []).map(toNote),
+    decisions:    (decisions.data ?? []).map(toDecision),
+    risks:        (risks.data    ?? []).map(toRisk),
+    roadmapItems: (roadmap.data  ?? []).map(toRoadmap),
+    messages:     (messages.data ?? []).map(toMessage),
+  }
+}
+
+// ─── Project Reviews ──────────────────────────────────────────────────────────
+
+/** Load every review for a project, newest first. RLS scopes to the owner. */
+export async function loadProjectReviews(supabase: SupabaseClient, projectId: string): Promise<ProjectReview[]> {
+  const { data, error } = await supabase
+    .from('project_reviews')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(r => toProjectReview(r as ProjectReviewRow))
+}
+
+/** Insert a generated review and return the saved, mapped row. */
+export async function createProjectReview(
+  supabase: SupabaseClient, userId: string, projectId: string, fields: NormalizedReviewFields,
+): Promise<ProjectReview> {
+  const { data, error } = await supabase.from('project_reviews').insert({
+    user_id: userId,
+    project_id: projectId,
+    summary: fields.summary,
+    progress_review: fields.progressReview,
+    completed_work: fields.completedWork,
+    blockers: fields.blockers,
+    key_risks: fields.keyRisks,
+    key_decisions: fields.keyDecisions,
+    next_7_day_plan: fields.next7DayPlan,
+    suggested_tasks: fields.suggestedTasks,
+    suggested_roadmap_items: fields.suggestedRoadmapItems,
+  }).select('*').single()
+  if (error) throw error
+  return toProjectReview(data as ProjectReviewRow)
 }
