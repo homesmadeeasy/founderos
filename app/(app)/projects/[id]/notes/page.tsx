@@ -1,13 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { MessageSquare, Trash2 } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import type { Note } from '@/lib/types'
 
 export default function NotesPage() {
   const { project, notes } = useProjectContext()
   const { deleteNote }      = useAppContext()
+  const [pendingDelete, setPendingDelete] = useState<Note | null>(null)
 
   if (notes.length === 0) {
     return (
@@ -17,7 +21,7 @@ export default function NotesPage() {
             <MessageSquare size={20} className="text-zinc-300" />
           </div>
           <p className="text-sm font-semibold text-zinc-700">No notes yet</p>
-          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Chat with the AI and use the &ldquo;Save as Note&rdquo; button to capture useful insights here.</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Save useful AI responses or write your first note.</p>
           <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
             <MessageSquare size={12} /> Open chat
           </Link>
@@ -39,7 +43,7 @@ export default function NotesPage() {
         {notes.map(note => (
           <div key={note.id} className="bg-white rounded-xl border border-zinc-100 p-5 hover:border-zinc-200 transition-colors group relative">
             <button
-              onClick={() => deleteNote(note.id)}
+              onClick={() => setPendingDelete(note)}
               className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
               title="Delete note"
             >
@@ -51,6 +55,15 @@ export default function NotesPage() {
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this note?"
+        description={pendingDelete ? `“${pendingDelete.title}” will be permanently removed.` : ''}
+        confirmLabel="Delete note"
+        onConfirm={async () => { if (pendingDelete) { await deleteNote(pendingDelete.id); setPendingDelete(null) } }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

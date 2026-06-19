@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { MessageSquare, Trash2, Map } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import StatusBadge from '@/components/ui/StatusBadge'
-import type { RoadmapStatus } from '@/lib/types'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import type { RoadmapItem, RoadmapStatus } from '@/lib/types'
 
 const STATUS_CYCLE: Record<RoadmapStatus, RoadmapStatus> = {
   planned: 'in_progress',
@@ -28,6 +30,10 @@ const STATUS_DOT: Record<RoadmapStatus, string> = {
 export default function RoadmapPage() {
   const { project, roadmapItems } = useProjectContext()
   const { updateRoadmapItem, deleteRoadmapItem } = useAppContext()
+  const [pendingDelete, setPendingDelete] = useState<RoadmapItem | null>(null)
+
+  const cycleStatus = (item: RoadmapItem) =>
+    void updateRoadmapItem(item.id, { status: STATUS_CYCLE[item.status] }).catch(() => {})
 
   if (roadmapItems.length === 0) {
     return (
@@ -37,7 +43,7 @@ export default function RoadmapPage() {
             <Map size={20} className="text-zinc-300" />
           </div>
           <p className="text-sm font-semibold text-zinc-700">No roadmap yet</p>
-          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Use the AI chat to plan phases and milestones, then save them to your roadmap.</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Build your roadmap from the project chat.</p>
           <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
             <MessageSquare size={12} /> Open chat
           </Link>
@@ -74,7 +80,7 @@ export default function RoadmapPage() {
                     <div className={`absolute -left-[11px] top-5 w-3 h-3 rounded-full border-2 border-white ${STATUS_DOT[item.status]}`} />
 
                     <button
-                      onClick={() => deleteRoadmapItem(item.id)}
+                      onClick={() => setPendingDelete(item)}
                       className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
                       title="Delete roadmap item"
                     >
@@ -89,7 +95,7 @@ export default function RoadmapPage() {
                       <p className="text-xs text-zinc-500 leading-relaxed mb-2">{item.description}</p>
                     )}
                     <button
-                      onClick={() => updateRoadmapItem(item.id, { status: STATUS_CYCLE[item.status] })}
+                      onClick={() => cycleStatus(item)}
                       className="text-xs text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50 px-2 py-1 rounded-md transition-colors"
                     >
                       {STATUS_ACTION[item.status]}
@@ -101,6 +107,15 @@ export default function RoadmapPage() {
           </div>
         )
       })}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this roadmap item?"
+        description={pendingDelete ? `“${pendingDelete.title}” will be permanently removed.` : ''}
+        confirmLabel="Delete item"
+        onConfirm={async () => { if (pendingDelete) { await deleteRoadmapItem(pendingDelete.id); setPendingDelete(null) } }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

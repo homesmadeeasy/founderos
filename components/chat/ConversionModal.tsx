@@ -90,7 +90,7 @@ function TaskForm({ form, onChange }: { form: Record<string, string>; onChange: 
 function NoteForm({ form, onChange }: { form: Record<string, string>; onChange: (k: string, v: string) => void }) {
   return (
     <>
-      <Field label="Title">
+      <Field label="Title *">
         <input className={inputCls} value={form.title} onChange={(e) => onChange('title', e.target.value)} placeholder="Note title" />
       </Field>
       <Field label="Content *">
@@ -227,6 +227,7 @@ export default function ConversionModal({ type, sourceContent, sourceMessageId, 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!isValid) return
     setLoading(true)
     setSaveError(null)
 
@@ -276,11 +277,18 @@ export default function ConversionModal({ type, sourceContent, sourceMessageId, 
     }
   }
 
-  const isValid = type === 'task' ? !!form.title?.trim()
-    : type === 'note' ? !!form.content?.trim()
-    : type === 'decision' ? !!form.decision?.trim()
-    : type === 'risk' ? !!form.title?.trim()
-    : !!form.title?.trim()
+  // Required-field checks per type. Returns the message to show when invalid.
+  const validationMsg: string | null = (() => {
+    switch (type) {
+      case 'task':     return form.title?.trim() ? null : 'Add a task title to save.'
+      case 'note':     return !form.title?.trim() ? 'Add a note title to save.'
+                            : !form.content?.trim() ? 'Add note content to save.' : null
+      case 'decision': return form.decision?.trim() ? null : 'Describe the decision to save.'
+      case 'risk':     return form.title?.trim() ? null : 'Add a risk title to save.'
+      case 'roadmap':  return form.title?.trim() ? null : 'Add a milestone title to save.'
+    }
+  })()
+  const isValid = validationMsg === null
 
   return (
     <div
@@ -332,7 +340,9 @@ export default function ConversionModal({ type, sourceContent, sourceMessageId, 
             </div>
 
             <div className="px-6 py-4 border-t border-zinc-100 flex items-center justify-end gap-3 shrink-0">
-              {saveError && <p className="mr-auto text-xs text-red-600 leading-snug">{saveError}</p>}
+              {saveError
+                ? <p className="mr-auto text-xs text-red-600 leading-snug">{saveError}</p>
+                : validationMsg && <p className="mr-auto text-xs text-amber-600 leading-snug">{validationMsg}</p>}
               <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 rounded-lg transition-colors">
                 Cancel
               </button>

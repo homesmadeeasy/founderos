@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { MessageSquare, Trash2, RotateCcw } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import StatusBadge from '@/components/ui/StatusBadge'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import type { Task, TaskStatus } from '@/lib/types'
 
 const STATUS_CYCLE: Record<TaskStatus, TaskStatus> = {
@@ -24,6 +26,10 @@ const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 }
 export default function TasksPage() {
   const { project, tasks } = useProjectContext()
   const { updateTask, deleteTask } = useAppContext()
+  const [pendingDelete, setPendingDelete] = useState<Task | null>(null)
+
+  const cycleStatus = (task: Task) =>
+    void updateTask(task.id, { status: STATUS_CYCLE[task.status] }).catch(() => {})
 
   const groups: { label: string; status: TaskStatus; items: Task[] }[] = [
     { label: 'In Progress', status: 'in_progress', items: tasks.filter(t => t.status === 'in_progress').sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]) },
@@ -39,7 +45,7 @@ export default function TasksPage() {
             <MessageSquare size={20} className="text-zinc-300" />
           </div>
           <p className="text-sm font-semibold text-zinc-700">No tasks yet</p>
-          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Open the AI chat and ask it to help you plan tasks for this project.</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Start in Chat and convert AI suggestions into tasks.</p>
           <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
             <MessageSquare size={12} /> Open chat
           </Link>
@@ -68,7 +74,7 @@ export default function TasksPage() {
               <div key={task.id} className={`bg-white rounded-xl border px-4 py-3.5 flex items-center gap-3 group transition-colors ${task.status === 'done' ? 'border-zinc-100 opacity-60' : 'border-zinc-100 hover:border-zinc-200'}`}>
                 {/* Status toggle */}
                 <button
-                  onClick={() => updateTask(task.id, { status: STATUS_CYCLE[task.status] })}
+                  onClick={() => cycleStatus(task)}
                   title={`Mark as ${STATUS_CYCLE[task.status]}`}
                   className={`w-4 h-4 rounded shrink-0 border-2 flex items-center justify-center transition-colors ${
                     task.status === 'done'        ? 'bg-emerald-500 border-emerald-500' :
@@ -96,13 +102,13 @@ export default function TasksPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <StatusBadge status={task.priority} />
                   <button
-                    onClick={() => updateTask(task.id, { status: STATUS_CYCLE[task.status] })}
+                    onClick={() => cycleStatus(task)}
                     className="hidden group-hover:flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700 px-2 py-1 rounded-md hover:bg-zinc-50 transition-colors"
                   >
                     <RotateCcw size={10} /> {STATUS_LABEL[task.status]}
                   </button>
                   <button
-                    onClick={() => deleteTask(task.id)}
+                    onClick={() => setPendingDelete(task)}
                     className="hidden group-hover:flex items-center justify-center w-6 h-6 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
                     title="Delete task"
                   >
@@ -114,6 +120,15 @@ export default function TasksPage() {
           </div>
         </div>
       ))}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this task?"
+        description={pendingDelete ? `“${pendingDelete.title}” will be permanently removed.` : ''}
+        confirmLabel="Delete task"
+        onConfirm={async () => { if (pendingDelete) { await deleteTask(pendingDelete.id); setPendingDelete(null) } }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

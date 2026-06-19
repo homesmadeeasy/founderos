@@ -59,6 +59,7 @@ interface AppContextValue {
   appState: AppState
   isHydrated: boolean
   loadError: string | null
+  reload: () => Promise<void>
 
   // Projects
   createProject:    (data: NewProject) => Promise<Project>
@@ -122,6 +123,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
         const state = await db.loadAppState(supabase)
         if (!cancelled) setAppState(state)
       } catch (err) {
+        console.error('[FounderOS] failed to load data from Supabase:', err)
         if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Failed to load your data.')
       } finally {
         if (!cancelled) setIsHydrated(true)
@@ -132,127 +134,202 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
 
   const patch = useCallback((updater: (prev: AppState) => AppState) => setAppState(updater), [])
 
+  /** Refetch everything from Supabase (used to resync after a failed mutation). */
+  const reload = useCallback(async () => {
+    try {
+      const state = await db.loadAppState(supabase)
+      setAppState(state)
+      setLoadError(null)
+    } catch (err) {
+      console.error('[FounderOS] reload failed:', err)
+    }
+  }, [supabase])
+
+  /**
+   * Optimistic update/delete helper: apply the local change immediately, then
+   * persist. If persistence fails, log it, resync from the DB to undo the
+   * optimistic change, and rethrow so callers can surface a message.
+   */
+  const mutate = useCallback(async (
+    optimistic: (prev: AppState) => AppState,
+    persist: () => Promise<void>,
+  ) => {
+    patch(optimistic)
+    try {
+      await persist()
+    } catch (err) {
+      console.error('[FounderOS] mutation failed, resyncing:', err)
+      await reload()
+      throw err
+    }
+  }, [patch, reload])
+
   // ── Projects ──────────────────────────────────────────────────────────────
 
   const createProject = useCallback(async (data: NewProject): Promise<Project> => {
-    const project = await db.createProject(supabase, userId, data)
-    patch(s => ({ ...s, projects: [project, ...s.projects] }))
-    return project
+    try {
+      const project = await db.createProject(supabase, userId, data)
+      patch(s => ({ ...s, projects: [project, ...s.projects] }))
+      return project
+    } catch (err) {
+      console.error('[FounderOS] createProject failed:', err)
+      throw err
+    }
   }, [supabase, userId, patch])
 
-  const updateProject = useCallback(async (id: string, data: Partial<Omit<Project, 'id' | 'createdAt'>>) => {
-    patch(s => ({ ...s, projects: s.projects.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p) }))
-    await db.updateProject(supabase, id, data)
-  }, [supabase, patch])
+  const updateProject = useCallback((id: string, data: Partial<Omit<Project, 'id' | 'createdAt'>>) =>
+    mutate(
+      s => ({ ...s, projects: s.projects.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p) }),
+      () => db.updateProject(supabase, id, data),
+    ), [supabase, mutate])
 
-  const deleteProject = useCallback(async (id: string) => {
-    patch(s => ({
-      ...s,
-      projects:     s.projects.filter(p => p.id !== id),
-      tasks:        s.tasks.filter(t => t.projectId !== id),
-      notes:        s.notes.filter(n => n.projectId !== id),
-      decisions:    s.decisions.filter(d => d.projectId !== id),
-      risks:        s.risks.filter(r => r.projectId !== id),
-      roadmapItems: s.roadmapItems.filter(r => r.projectId !== id),
-      chatMessages: Object.fromEntries(Object.entries(s.chatMessages).filter(([k]) => k !== id)),
-    }))
-    await db.deleteProject(supabase, id)
-  }, [supabase, patch])
+  const deleteProject = useCallback((id: string) =>
+    mutate(
+      s => ({
+        ...s,
+        projects:     s.projects.filter(p => p.id !== id),
+        tasks:        s.tasks.filter(t => t.projectId !== id),
+        notes:        s.notes.filter(n => n.projectId !== id),
+        decisions:    s.decisions.filter(d => d.projectId !== id),
+        risks:        s.risks.filter(r => r.projectId !== id),
+        roadmapItems: s.roadmapItems.filter(r => r.projectId !== id),
+        chatMessages: Object.fromEntries(Object.entries(s.chatMessages).filter(([k]) => k !== id)),
+      }),
+      () => db.deleteProject(supabase, id),
+    ), [supabase, mutate])
 
   // ── Tasks ──────────────────────────────────────────────────────────────────
 
   const addTask = useCallback(async (data: NewTask): Promise<Task> => {
-    const item = await db.createTask(supabase, userId, data)
-    patch(s => ({ ...s, tasks: [item, ...s.tasks] }))
-    return item
+    try {
+      const item = await db.createTask(supabase, userId, data)
+      patch(s => ({ ...s, tasks: [item, ...s.tasks] }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] addTask failed:', err)
+      throw err
+    }
   }, [supabase, userId, patch])
 
-  const updateTask = useCallback(async (id: string, data: Partial<Task>) => {
-    patch(s => ({ ...s, tasks: s.tasks.map(t => t.id === id ? { ...t, ...data } : t) }))
-    await db.updateTask(supabase, id, data)
-  }, [supabase, patch])
+  const updateTask = useCallback((id: string, data: Partial<Task>) =>
+    mutate(
+      s => ({ ...s, tasks: s.tasks.map(t => t.id === id ? { ...t, ...data } : t) }),
+      () => db.updateTask(supabase, id, data),
+    ), [supabase, mutate])
 
-  const deleteTask = useCallback(async (id: string) => {
-    patch(s => ({ ...s, tasks: s.tasks.filter(t => t.id !== id) }))
-    await db.deleteTask(supabase, id)
-  }, [supabase, patch])
+  const deleteTask = useCallback((id: string) =>
+    mutate(
+      s => ({ ...s, tasks: s.tasks.filter(t => t.id !== id) }),
+      () => db.deleteTask(supabase, id),
+    ), [supabase, mutate])
 
   // ── Notes ──────────────────────────────────────────────────────────────────
 
   const addNote = useCallback(async (data: NewNote): Promise<Note> => {
-    const item = await db.createNote(supabase, userId, data)
-    patch(s => ({ ...s, notes: [item, ...s.notes] }))
-    return item
+    try {
+      const item = await db.createNote(supabase, userId, data)
+      patch(s => ({ ...s, notes: [item, ...s.notes] }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] addNote failed:', err)
+      throw err
+    }
   }, [supabase, userId, patch])
 
-  const deleteNote = useCallback(async (id: string) => {
-    patch(s => ({ ...s, notes: s.notes.filter(n => n.id !== id) }))
-    await db.deleteNote(supabase, id)
-  }, [supabase, patch])
+  const deleteNote = useCallback((id: string) =>
+    mutate(
+      s => ({ ...s, notes: s.notes.filter(n => n.id !== id) }),
+      () => db.deleteNote(supabase, id),
+    ), [supabase, mutate])
 
   // ── Decisions ─────────────────────────────────────────────────────────────
 
   const addDecision = useCallback(async (data: NewDecision): Promise<Decision> => {
-    const item = await db.createDecision(supabase, userId, data)
-    patch(s => ({ ...s, decisions: [item, ...s.decisions] }))
-    return item
+    try {
+      const item = await db.createDecision(supabase, userId, data)
+      patch(s => ({ ...s, decisions: [item, ...s.decisions] }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] addDecision failed:', err)
+      throw err
+    }
   }, [supabase, userId, patch])
 
-  const deleteDecision = useCallback(async (id: string) => {
-    patch(s => ({ ...s, decisions: s.decisions.filter(d => d.id !== id) }))
-    await db.deleteDecision(supabase, id)
-  }, [supabase, patch])
+  const deleteDecision = useCallback((id: string) =>
+    mutate(
+      s => ({ ...s, decisions: s.decisions.filter(d => d.id !== id) }),
+      () => db.deleteDecision(supabase, id),
+    ), [supabase, mutate])
 
   // ── Risks ──────────────────────────────────────────────────────────────────
 
   const addRisk = useCallback(async (data: NewRisk): Promise<Risk> => {
-    const item = await db.createRisk(supabase, userId, data)
-    patch(s => ({ ...s, risks: [item, ...s.risks] }))
-    return item
+    try {
+      const item = await db.createRisk(supabase, userId, data)
+      patch(s => ({ ...s, risks: [item, ...s.risks] }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] addRisk failed:', err)
+      throw err
+    }
   }, [supabase, userId, patch])
 
-  const updateRisk = useCallback(async (id: string, data: Partial<Risk>) => {
-    patch(s => ({ ...s, risks: s.risks.map(r => r.id === id ? { ...r, ...data } : r) }))
-    await db.updateRisk(supabase, id, data)
-  }, [supabase, patch])
+  const updateRisk = useCallback((id: string, data: Partial<Risk>) =>
+    mutate(
+      s => ({ ...s, risks: s.risks.map(r => r.id === id ? { ...r, ...data } : r) }),
+      () => db.updateRisk(supabase, id, data),
+    ), [supabase, mutate])
 
-  const deleteRisk = useCallback(async (id: string) => {
-    patch(s => ({ ...s, risks: s.risks.filter(r => r.id !== id) }))
-    await db.deleteRisk(supabase, id)
-  }, [supabase, patch])
+  const deleteRisk = useCallback((id: string) =>
+    mutate(
+      s => ({ ...s, risks: s.risks.filter(r => r.id !== id) }),
+      () => db.deleteRisk(supabase, id),
+    ), [supabase, mutate])
 
   // ── Roadmap ───────────────────────────────────────────────────────────────
 
   const addRoadmapItem = useCallback(async (data: NewRoadmapItem): Promise<RoadmapItem> => {
-    const item = await db.createRoadmapItem(supabase, userId, data)
-    patch(s => ({ ...s, roadmapItems: [...s.roadmapItems, item] }))
-    return item
+    try {
+      const item = await db.createRoadmapItem(supabase, userId, data)
+      patch(s => ({ ...s, roadmapItems: [...s.roadmapItems, item] }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] addRoadmapItem failed:', err)
+      throw err
+    }
   }, [supabase, userId, patch])
 
-  const updateRoadmapItem = useCallback(async (id: string, data: Partial<RoadmapItem>) => {
-    patch(s => ({ ...s, roadmapItems: s.roadmapItems.map(r => r.id === id ? { ...r, ...data } : r) }))
-    await db.updateRoadmapItem(supabase, id, data)
-  }, [supabase, patch])
+  const updateRoadmapItem = useCallback((id: string, data: Partial<RoadmapItem>) =>
+    mutate(
+      s => ({ ...s, roadmapItems: s.roadmapItems.map(r => r.id === id ? { ...r, ...data } : r) }),
+      () => db.updateRoadmapItem(supabase, id, data),
+    ), [supabase, mutate])
 
-  const deleteRoadmapItem = useCallback(async (id: string) => {
-    patch(s => ({ ...s, roadmapItems: s.roadmapItems.filter(r => r.id !== id) }))
-    await db.deleteRoadmapItem(supabase, id)
-  }, [supabase, patch])
+  const deleteRoadmapItem = useCallback((id: string) =>
+    mutate(
+      s => ({ ...s, roadmapItems: s.roadmapItems.filter(r => r.id !== id) }),
+      () => db.deleteRoadmapItem(supabase, id),
+    ), [supabase, mutate])
 
   // ── Chat ──────────────────────────────────────────────────────────────────
 
   const addMessage = useCallback(async (projectId: string, role: MessageRole, content: string): Promise<Message> => {
-    const message = await db.createMessage(supabase, userId, projectId, role, content)
-    patch(s => ({
-      ...s,
-      chatMessages: { ...s.chatMessages, [projectId]: [...(s.chatMessages[projectId] ?? []), message] },
-    }))
-    return message
+    try {
+      const message = await db.createMessage(supabase, userId, projectId, role, content)
+      patch(s => ({
+        ...s,
+        chatMessages: { ...s.chatMessages, [projectId]: [...(s.chatMessages[projectId] ?? []), message] },
+      }))
+      return message
+    } catch (err) {
+      console.error('[FounderOS] addMessage failed:', err)
+      throw err
+    }
   }, [supabase, userId, patch])
 
   return (
     <AppContext.Provider value={{
-      appState, isHydrated, loadError,
+      appState, isHydrated, loadError, reload,
       createProject, updateProject, deleteProject,
       addTask, updateTask, deleteTask,
       addNote, deleteNote,

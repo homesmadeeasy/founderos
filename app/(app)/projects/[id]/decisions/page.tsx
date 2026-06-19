@@ -1,13 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { MessageSquare, Trash2, GitFork } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import type { Decision } from '@/lib/types'
 
 export default function DecisionsPage() {
   const { project, decisions } = useProjectContext()
   const { deleteDecision }      = useAppContext()
+  const [pendingDelete, setPendingDelete] = useState<Decision | null>(null)
 
   if (decisions.length === 0) {
     return (
@@ -17,7 +21,7 @@ export default function DecisionsPage() {
             <GitFork size={20} className="text-zinc-300" />
           </div>
           <p className="text-sm font-semibold text-zinc-700">No decisions logged</p>
-          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Use the AI chat to explore options, then save key decisions here to build your decision log.</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Track important choices so the project has memory.</p>
           <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
             <MessageSquare size={12} /> Open chat
           </Link>
@@ -39,7 +43,7 @@ export default function DecisionsPage() {
         {decisions.map((d, i) => (
           <div key={d.id} className="bg-white rounded-xl border border-zinc-100 p-5 hover:border-zinc-200 transition-colors group relative">
             <button
-              onClick={() => deleteDecision(d.id)}
+              onClick={() => setPendingDelete(d)}
               className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
               title="Delete decision"
             >
@@ -64,6 +68,15 @@ export default function DecisionsPage() {
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this decision?"
+        description={pendingDelete ? `“${pendingDelete.decision}” will be permanently removed.` : ''}
+        confirmLabel="Delete decision"
+        onConfirm={async () => { if (pendingDelete) { await deleteDecision(pendingDelete.id); setPendingDelete(null) } }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

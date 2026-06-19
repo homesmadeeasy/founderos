@@ -3,35 +3,53 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2 } from 'lucide-react'
+import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import EditProjectModal from '@/components/project/EditProjectModal'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import StatusBadge from '@/components/ui/StatusBadge'
+import type { TaskPriority } from '@/lib/types'
+
+const TASK_PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 }
 
 export default function ProjectOverviewPage() {
   const router = useRouter()
-  const { project, tasks, notes, decisions, risks, roadmapItems } = useProjectContext()
+  const { project, tasks, notes, decisions, risks, roadmapItems, messages } = useProjectContext()
   const { deleteProject } = useAppContext()
-  const [showEdit,    setShowEdit]    = useState(false)
-  const [showDelete,  setShowDelete]  = useState(false)
+  const [showEdit,   setShowEdit]   = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
 
   const doneTasks       = tasks.filter(t => t.status === 'done').length
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length
   const openRisks       = risks.filter(r => r.status === 'open').length
 
-  async function handleDelete() {
-    await deleteProject(project.id)
-    router.replace('/projects')
-  }
+  // Derived previews
+  const nextTasks = tasks
+    .filter(t => t.status !== 'done')
+    .sort((a, b) => TASK_PRIORITY_RANK[a.priority] - TASK_PRIORITY_RANK[b.priority])
+    .slice(0, 4)
+
+  const SEVERITY_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 }
+  const keyRisks = risks
+    .filter(r => r.status === 'open')
+    .sort((a, b) => (SEVERITY_RANK[a.severity] ?? 9) - (SEVERITY_RANK[b.severity] ?? 9))
+    .slice(0, 3)
+
+  const recentDecisions = [...decisions]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3)
+
+  const roadmapPreview = roadmapItems.slice(0, 4)
+  const recentMessages = messages.slice(-3)
 
   const sections = [
-    { icon: MessageSquare, label: 'Chat',      href: 'chat',      stat: null,                 color: 'text-blue-500',    bg: 'bg-blue-50' },
-    { icon: CheckSquare,   label: 'Tasks',     href: 'tasks',     stat: `${tasks.length} total · ${doneTasks} done`,         color: 'text-orange-500',  bg: 'bg-orange-50' },
-    { icon: FileText,      label: 'Notes',     href: 'notes',     stat: `${notes.length} notes`,                              color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { icon: GitFork,       label: 'Decisions', href: 'decisions', stat: `${decisions.length} logged`,                         color: 'text-purple-500',  bg: 'bg-purple-50' },
-    { icon: AlertTriangle, label: 'Risks',     href: 'risks',     stat: `${openRisks} open`,                                  color: 'text-red-500',     bg: 'bg-red-50' },
-    { icon: Map,           label: 'Roadmap',   href: 'roadmap',   stat: `${roadmapItems.length} items`,                       color: 'text-indigo-500',  bg: 'bg-indigo-50' },
+    { icon: MessageSquare, label: 'Chat',      href: 'chat',      stat: `${messages.length} messages`,                color: 'text-blue-500',    bg: 'bg-blue-50' },
+    { icon: CheckSquare,   label: 'Tasks',     href: 'tasks',     stat: `${tasks.length} total · ${doneTasks} done`,  color: 'text-orange-500',  bg: 'bg-orange-50' },
+    { icon: FileText,      label: 'Notes',     href: 'notes',     stat: `${notes.length} notes`,                      color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { icon: GitFork,       label: 'Decisions', href: 'decisions', stat: `${decisions.length} logged`,                 color: 'text-purple-500',  bg: 'bg-purple-50' },
+    { icon: AlertTriangle, label: 'Risks',     href: 'risks',     stat: `${openRisks} open`,                          color: 'text-red-500',     bg: 'bg-red-50' },
+    { icon: Map,           label: 'Roadmap',   href: 'roadmap',   stat: `${roadmapItems.length} items`,               color: 'text-indigo-500',  bg: 'bg-indigo-50' },
   ]
 
   return (
@@ -46,9 +64,7 @@ export default function ProjectOverviewPage() {
       {/* Header + actions */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-xl font-bold text-zinc-900">{project.title}</h1>
-          </div>
+          <h1 className="text-xl font-bold text-zinc-900">{project.title}</h1>
           {project.description && (
             <p className="text-sm text-zinc-600 max-w-2xl leading-relaxed">{project.description}</p>
           )}
@@ -93,23 +109,21 @@ export default function ProjectOverviewPage() {
       )}
 
       {/* Progress */}
-      {project.progress > 0 && (
-        <div className="bg-white rounded-xl border border-zinc-100 p-5">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Progress</p>
-            <p className="text-sm font-bold text-zinc-800">{project.progress}%</p>
-          </div>
-          <div className="h-3 w-full bg-zinc-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${
-                project.progress >= 100 ? 'bg-emerald-500' :
-                project.progress >= 60  ? 'bg-blue-500' : 'bg-zinc-700'
-              }`}
-              style={{ width: `${project.progress}%` }}
-            />
-          </div>
+      <div className="bg-white rounded-xl border border-zinc-100 p-5">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Progress</p>
+          <p className="text-sm font-bold text-zinc-800">{project.progress}%</p>
         </div>
-      )}
+        <div className="h-3 w-full bg-zinc-100 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${
+              project.progress >= 100 ? 'bg-emerald-500' :
+              project.progress >= 60  ? 'bg-blue-500' : 'bg-zinc-700'
+            }`}
+            style={{ width: `${Math.min(100, Math.max(0, project.progress))}%` }}
+          />
+        </div>
+      </div>
 
       {/* Quick links */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -130,28 +144,103 @@ export default function ProjectOverviewPage() {
         ))}
       </div>
 
+      {/* Detail previews */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Next tasks */}
+        <PreviewCard title="Next tasks" icon={CheckSquare} href={`/projects/${project.id}/tasks`} empty={nextTasks.length === 0} emptyText="No open tasks. Plan some in chat.">
+          {nextTasks.map(t => (
+            <div key={t.id} className="flex items-center gap-2 py-1.5">
+              <StatusBadge status={t.priority} />
+              <span className="text-sm text-zinc-700 truncate flex-1">{t.title}</span>
+            </div>
+          ))}
+        </PreviewCard>
+
+        {/* Key risks */}
+        <PreviewCard title="Key risks" icon={AlertTriangle} href={`/projects/${project.id}/risks`} empty={keyRisks.length === 0} emptyText="No open risks identified.">
+          {keyRisks.map(r => (
+            <div key={r.id} className="flex items-center gap-2 py-1.5">
+              <StatusBadge status={r.severity} />
+              <span className="text-sm text-zinc-700 truncate flex-1">{r.title}</span>
+            </div>
+          ))}
+        </PreviewCard>
+
+        {/* Recent decisions */}
+        <PreviewCard title="Recent decisions" icon={GitFork} href={`/projects/${project.id}/decisions`} empty={recentDecisions.length === 0} emptyText="No decisions logged yet.">
+          {recentDecisions.map(d => (
+            <div key={d.id} className="py-1.5">
+              <p className="text-sm text-zinc-700 truncate">{d.decision}</p>
+              <p className="text-[11px] text-zinc-400">{new Date(d.createdAt).toLocaleDateString()}</p>
+            </div>
+          ))}
+        </PreviewCard>
+
+        {/* Roadmap preview */}
+        <PreviewCard title="Roadmap" icon={Map} href={`/projects/${project.id}/roadmap`} empty={roadmapPreview.length === 0} emptyText="No roadmap items yet.">
+          {roadmapPreview.map(r => (
+            <div key={r.id} className="flex items-center gap-2 py-1.5">
+              <StatusBadge status={r.status} />
+              <span className="text-sm text-zinc-700 truncate flex-1">{r.title}</span>
+            </div>
+          ))}
+        </PreviewCard>
+      </div>
+
+      {/* Recent chat activity */}
+      <PreviewCard title="Recent chat activity" icon={MessageSquare} href={`/projects/${project.id}/chat`} empty={recentMessages.length === 0} emptyText="No conversation yet — open chat to start planning.">
+        {recentMessages.map(m => (
+          <div key={m.id} className="py-1.5">
+            <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">{m.role === 'user' ? 'You' : 'AI'}</p>
+            <p className="text-sm text-zinc-700 line-clamp-2 leading-relaxed">{m.content}</p>
+          </div>
+        ))}
+      </PreviewCard>
+
       {/* Edit modal */}
       {showEdit && <EditProjectModal project={project} onClose={() => setShowEdit(false)} />}
 
       {/* Delete confirmation */}
-      {showDelete && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={e => { if (e.target === e.currentTarget) setShowDelete(false) }}
-        >
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
-            <div className="space-y-1">
-              <h2 className="text-sm font-semibold text-zinc-900">Delete &ldquo;{project.title}&rdquo;?</h2>
-              <p className="text-xs text-zinc-500 leading-relaxed">
-                This will permanently remove the project and all its tasks, notes, decisions, risks and roadmap items. This cannot be undone.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 justify-end pt-1">
-              <button onClick={() => setShowDelete(false)} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 rounded-lg transition-colors">Cancel</button>
-              <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors">Delete project</button>
-            </div>
-          </div>
+      <ConfirmDialog
+        open={showDelete}
+        title={`Delete “${project.title}”?`}
+        description="This permanently removes the project and all its tasks, notes, decisions, risks and roadmap items. This cannot be undone."
+        confirmLabel="Delete project"
+        onConfirm={async () => {
+          await deleteProject(project.id)
+          router.replace('/projects')
+        }}
+        onCancel={() => setShowDelete(false)}
+      />
+    </div>
+  )
+}
+
+function PreviewCard({
+  title, icon: Icon, href, empty, emptyText, children,
+}: {
+  title: string
+  icon: React.ComponentType<{ size?: number; className?: string }>
+  href: string
+  empty: boolean
+  emptyText: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-zinc-100 p-5">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Icon size={13} className="text-zinc-400" />
+          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">{title}</p>
         </div>
+        <Link href={href} className="text-zinc-300 hover:text-zinc-600 transition-colors">
+          <ArrowRight size={14} />
+        </Link>
+      </div>
+      {empty ? (
+        <p className="text-xs text-zinc-400 leading-relaxed py-1">{emptyText}</p>
+      ) : (
+        <div className="divide-y divide-zinc-50">{children}</div>
       )}
     </div>
   )

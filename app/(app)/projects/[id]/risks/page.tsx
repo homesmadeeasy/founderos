@@ -1,11 +1,13 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { MessageSquare, Trash2, AlertTriangle } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import StatusBadge from '@/components/ui/StatusBadge'
-import type { RiskStatus } from '@/lib/types'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import type { Risk, RiskStatus } from '@/lib/types'
 
 const STATUS_CYCLE: Record<RiskStatus, RiskStatus> = {
   open: 'mitigated',
@@ -22,6 +24,10 @@ const STATUS_ACTION: Record<RiskStatus, string> = {
 export default function RisksPage() {
   const { project, risks }  = useProjectContext()
   const { updateRisk, deleteRisk } = useAppContext()
+  const [pendingDelete, setPendingDelete] = useState<Risk | null>(null)
+
+  const cycleStatus = (risk: Risk) =>
+    void updateRisk(risk.id, { status: STATUS_CYCLE[risk.status] }).catch(() => {})
 
   const open      = risks.filter(r => r.status === 'open')
   const mitigated = risks.filter(r => r.status === 'mitigated')
@@ -35,7 +41,7 @@ export default function RisksPage() {
             <AlertTriangle size={20} className="text-zinc-300" />
           </div>
           <p className="text-sm font-semibold text-zinc-700">No risks identified</p>
-          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Ask the AI to help identify risks for this project and save them here to track and mitigate.</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Identify risks early so you can avoid problems.</p>
           <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
             <MessageSquare size={12} /> Open chat
           </Link>
@@ -48,7 +54,7 @@ export default function RisksPage() {
     return (
       <div className={`bg-white rounded-xl border px-5 py-4 group relative transition-colors ${risk.status === 'closed' ? 'border-zinc-100 opacity-60' : 'border-zinc-100 hover:border-zinc-200'}`}>
         <button
-          onClick={() => deleteRisk(risk.id)}
+          onClick={() => setPendingDelete(risk)}
           className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
           title="Delete risk"
         >
@@ -71,7 +77,7 @@ export default function RisksPage() {
           </div>
         )}
         <button
-          onClick={() => updateRisk(risk.id, { status: STATUS_CYCLE[risk.status] })}
+          onClick={() => cycleStatus(risk)}
           className="text-xs text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50 px-2 py-1 rounded-md transition-colors"
         >
           {STATUS_ACTION[risk.status]}
@@ -113,6 +119,15 @@ export default function RisksPage() {
           {closed.map(r => <RiskCard key={r.id} risk={r} />)}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this risk?"
+        description={pendingDelete ? `“${pendingDelete.title}” will be permanently removed.` : ''}
+        confirmLabel="Delete risk"
+        onConfirm={async () => { if (pendingDelete) { await deleteRisk(pendingDelete.id); setPendingDelete(null) } }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }
