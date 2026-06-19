@@ -11,12 +11,19 @@ export default function DashboardPage() {
   if (!isHydrated) return <div className="p-6"><LoadingScreen label="Loading your dashboard…" /></div>
   if (loadError)   return <div className="p-6"><ErrorScreen message={loadError} /></div>
 
-  const { projects, tasks, decisions, risks } = appState
+  const { projects, tasks, decisions, risks, ideas } = appState
 
   const activeProjects = projects.filter(p => !['archived', 'paused'].includes(p.status))
   const openTasks      = tasks.filter(t => t.status !== 'done')
   const openRisks      = risks.filter(r => r.status === 'open')
   const openDecisions  = decisions.length
+
+  const rawIdeas       = ideas.filter(i => i.status === 'Raw').length
+  const exploringIdeas = ideas.filter(i => i.status === 'Exploring').length
+  const turnedIdeas    = ideas.filter(i => i.status === 'Turned Into Project').length
+  const recentIdeas    = [...ideas]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 4)
 
   const nextTasks = tasks
     .filter(t => t.status !== 'done')
@@ -54,6 +61,43 @@ export default function DashboardPage() {
             <p className="text-xs text-zinc-500 mt-1">{stat.label}</p>
           </div>
         ))}
+      </div>
+
+      {/* Idea Vault */}
+      <div className="bg-white rounded-xl border border-zinc-100">
+        <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-zinc-900">Idea Vault</h2>
+          <Link href="/ideas" className="text-xs text-zinc-400 hover:text-zinc-700 transition-colors">Open vault →</Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-zinc-50">
+          {[
+            { label: 'Total ideas',       value: ideas.length,   color: 'text-zinc-800' },
+            { label: 'Raw',               value: rawIdeas,       color: 'text-yellow-600' },
+            { label: 'Exploring',         value: exploringIdeas, color: 'text-blue-600' },
+            { label: 'Turned into projects', value: turnedIdeas, color: 'text-emerald-600' },
+          ].map(stat => (
+            <div key={stat.label} className="px-5 py-4">
+              <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+              <p className="text-xs text-zinc-500 mt-1">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+        {recentIdeas.length > 0 && (
+          <div className="divide-y divide-zinc-50 border-t border-zinc-100">
+            {recentIdeas.map(idea => (
+              <Link key={idea.id} href={`/ideas/${idea.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors group">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span className="text-sm font-medium text-zinc-800 group-hover:text-zinc-900 truncate">{idea.title}</span>
+                  {idea.description && <span className="text-xs text-zinc-400 truncate">{idea.description}</span>}
+                </div>
+                <div className="flex items-center gap-3 ml-3 shrink-0">
+                  <span className="text-xs text-emerald-600">{idea.potentialScore}/10</span>
+                  <StatusBadge status={idea.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Two columns */}

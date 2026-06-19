@@ -24,9 +24,9 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import * as db from '@/lib/db'
 import type {
-  AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message,
+  AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message, Idea,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
-  RiskSeverity, RiskStatus, RoadmapStatus, MessageRole,
+  RiskSeverity, RiskStatus, RoadmapStatus, MessageRole, IdeaStatus,
 } from '@/lib/types'
 
 // ─── Insert payload types ───────────────────────────────────────────────────
@@ -54,6 +54,10 @@ export type NewNote      = { projectId: string; title: string; content: string; 
 export type NewDecision  = { projectId: string; decision: string; reasoning: string; sourceMessageId?: string }
 export type NewRisk      = { projectId: string; title: string; description: string; severity: RiskSeverity; mitigation: string; status: RiskStatus }
 export type NewRoadmapItem = { projectId: string; title: string; description: string; stage: string; status: RoadmapStatus; sortOrder: number }
+export type NewIdea      = {
+  title: string; description: string; targetUser: string; problem: string; solution: string
+  potentialScore: number; difficultyScore: number; status: IdeaStatus; tags: string[]
+}
 
 interface AppContextValue {
   appState: AppState
@@ -89,6 +93,11 @@ interface AppContextValue {
   updateRoadmapItem:(id: string, data: Partial<RoadmapItem>) => Promise<void>
   deleteRoadmapItem:(id: string) => Promise<void>
 
+  // Ideas
+  createIdea:       (data: NewIdea) => Promise<Idea>
+  updateIdea:       (id: string, data: Partial<Omit<Idea, 'id' | 'createdAt'>>) => Promise<void>
+  deleteIdea:       (id: string) => Promise<void>
+
   // Chat
   addMessage:       (projectId: string, role: MessageRole, content: string) => Promise<Message>
 }
@@ -96,7 +105,7 @@ interface AppContextValue {
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const EMPTY_STATE: AppState = {
-  projects: [], tasks: [], notes: [], decisions: [], risks: [], roadmapItems: [], chatMessages: {},
+  projects: [], tasks: [], notes: [], decisions: [], risks: [], roadmapItems: [], ideas: [], chatMessages: {},
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -311,6 +320,31 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
       () => db.deleteRoadmapItem(supabase, id),
     ), [supabase, mutate])
 
+  // ── Ideas ──────────────────────────────────────────────────────────────────
+
+  const createIdea = useCallback(async (data: NewIdea): Promise<Idea> => {
+    try {
+      const item = await db.createIdea(supabase, userId, data)
+      patch(s => ({ ...s, ideas: [item, ...s.ideas] }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] createIdea failed:', err)
+      throw err
+    }
+  }, [supabase, userId, patch])
+
+  const updateIdea = useCallback((id: string, data: Partial<Omit<Idea, 'id' | 'createdAt'>>) =>
+    mutate(
+      s => ({ ...s, ideas: s.ideas.map(i => i.id === id ? { ...i, ...data, updatedAt: new Date().toISOString() } : i) }),
+      () => db.updateIdea(supabase, id, data),
+    ), [supabase, mutate])
+
+  const deleteIdea = useCallback((id: string) =>
+    mutate(
+      s => ({ ...s, ideas: s.ideas.filter(i => i.id !== id) }),
+      () => db.deleteIdea(supabase, id),
+    ), [supabase, mutate])
+
   // ── Chat ──────────────────────────────────────────────────────────────────
 
   const addMessage = useCallback(async (projectId: string, role: MessageRole, content: string): Promise<Message> => {
@@ -336,6 +370,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
       addDecision, deleteDecision,
       addRisk, updateRisk, deleteRisk,
       addRoadmapItem, updateRoadmapItem, deleteRoadmapItem,
+      createIdea, updateIdea, deleteIdea,
       addMessage,
     }}>
       {children}

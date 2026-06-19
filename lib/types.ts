@@ -135,6 +135,84 @@ export interface ProjectReview {
   createdAt: string
 }
 
+// ─── Idea Vault ─────────────────────────────────────────────────────────────
+
+export type IdeaStatus =
+  | 'Raw'
+  | 'Exploring'
+  | 'Validated'
+  | 'Turned Into Project'
+  | 'Archived'
+
+export const IDEA_STATUSES: IdeaStatus[] = [
+  'Raw', 'Exploring', 'Validated', 'Turned Into Project', 'Archived',
+]
+
+export interface Idea {
+  id: string
+  title: string
+  description: string
+  targetUser: string
+  problem: string
+  solution: string
+  potentialScore: number   // 1–10
+  difficultyScore: number  // 1–10
+  status: IdeaStatus
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+/** A project suggested by the Idea Architect (human-readable casing). */
+export interface SuggestedProject {
+  title: string
+  description: string
+  goal: string
+  status: string    // e.g. "Planning"
+  priority: string  // e.g. "Medium"
+  progress: number
+}
+
+export interface SuggestedIdeaTask {
+  title: string
+  description: string
+  priority: 'Low' | 'Medium' | 'High'
+}
+
+export interface SuggestedIdeaRisk {
+  title: string
+  description: string
+  severity: 'Low' | 'Medium' | 'High'
+  mitigation: string
+  status: string  // e.g. "Open"
+}
+
+export interface SuggestedIdeaRoadmapItem {
+  title: string
+  description: string
+  stage: string   // e.g. "Now" | "Next" | "Later"
+  status: string  // e.g. "Planned"
+}
+
+export interface IdeaAnalysis {
+  id: string
+  ideaId: string
+  summary: string
+  targetUserAnalysis: string
+  problemAnalysis: string
+  marketPotential: string
+  difficultyAnalysis: string
+  risks: string
+  mvpSuggestion: string
+  validationPlan: string
+  nextSteps: string
+  suggestedProject: SuggestedProject | null
+  suggestedTasks: SuggestedIdeaTask[]
+  suggestedRisks: SuggestedIdeaRisk[]
+  suggestedRoadmapItems: SuggestedIdeaRoadmapItem[]
+  createdAt: string
+}
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 export interface AppState {
@@ -144,5 +222,6 @@ export interface AppState {
   decisions: Decision[]
   risks: Risk[]
   roadmapItems: RoadmapItem[]
+  ideas: Idea[]
   chatMessages: Record<string, Message[]>
 }
