@@ -176,10 +176,11 @@ function RoadmapForm({ form, onChange }: { form: Record<string, string>; onChang
 interface Props {
   type: ConversionType
   sourceContent: string
+  sourceMessageId?: string
   onClose: () => void
 }
 
-export default function ConversionModal({ type, sourceContent, onClose }: Props) {
+export default function ConversionModal({ type, sourceContent, sourceMessageId, onClose }: Props) {
   const { addTask, addNote, addDecision, addRisk, addRoadmapItem, roadmapItems } = useProjectContext()
   // Start with the simple local fallback so fields are never empty.
   const [form, setForm] = useState<Record<string, string>>(getInitialForm(type, sourceContent))
@@ -187,6 +188,7 @@ export default function ConversionModal({ type, sourceContent, onClose }: Props)
   const [success, setSuccess] = useState(false)
   const [extracting, setExtracting] = useState(true)
   const [usedFallback, setUsedFallback] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const config = MODAL_CONFIG[type]
 
@@ -226,48 +228,52 @@ export default function ConversionModal({ type, sourceContent, onClose }: Props)
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
+    setSaveError(null)
 
-    // Simulate async — replace with DB call later
-    await new Promise((r) => setTimeout(r, 500))
+    try {
+      switch (type) {
+        case 'task':
+          await addTask({
+            title: form.title,
+            description: form.description,
+            priority: form.priority as TaskPriority,
+            status: form.status as TaskStatus,
+            sourceMessageId,
+          })
+          break
+        case 'note':
+          await addNote({ title: form.title, content: form.content, sourceMessageId })
+          break
+        case 'decision':
+          await addDecision({ decision: form.decision, reasoning: form.reasoning, sourceMessageId })
+          break
+        case 'risk':
+          await addRisk({
+            title: form.title,
+            description: form.description,
+            severity: form.severity as RiskSeverity,
+            mitigation: form.mitigation,
+            status: form.status as RiskStatus,
+          })
+          break
+        case 'roadmap':
+          await addRoadmapItem({
+            title: form.title,
+            description: form.description,
+            stage: form.stage,
+            status: form.status as RoadmapStatus,
+            sortOrder: roadmapItems.length + 1,
+          })
+          break
+      }
 
-    switch (type) {
-      case 'task':
-        addTask({
-          title: form.title,
-          description: form.description,
-          priority: form.priority as TaskPriority,
-          status: form.status as TaskStatus,
-        })
-        break
-      case 'note':
-        addNote({ title: form.title, content: form.content })
-        break
-      case 'decision':
-        addDecision({ decision: form.decision, reasoning: form.reasoning })
-        break
-      case 'risk':
-        addRisk({
-          title: form.title,
-          description: form.description,
-          severity: form.severity as RiskSeverity,
-          mitigation: form.mitigation,
-          status: form.status as RiskStatus,
-        })
-        break
-      case 'roadmap':
-        addRoadmapItem({
-          title: form.title,
-          description: form.description,
-          stage: form.stage,
-          status: form.status as RoadmapStatus,
-          sortOrder: roadmapItems.length + 1,
-        })
-        break
+      setLoading(false)
+      setSuccess(true)
+      setTimeout(onClose, 1200)
+    } catch (err) {
+      setLoading(false)
+      setSaveError(err instanceof Error ? err.message : 'Could not save. Please try again.')
     }
-
-    setLoading(false)
-    setSuccess(true)
-    setTimeout(onClose, 1200)
   }
 
   const isValid = type === 'task' ? !!form.title?.trim()
@@ -326,6 +332,7 @@ export default function ConversionModal({ type, sourceContent, onClose }: Props)
             </div>
 
             <div className="px-6 py-4 border-t border-zinc-100 flex items-center justify-end gap-3 shrink-0">
+              {saveError && <p className="mr-auto text-xs text-red-600 leading-snug">{saveError}</p>}
               <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 rounded-lg transition-colors">
                 Cancel
               </button>

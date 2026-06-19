@@ -20,8 +20,8 @@ export default function ProjectOverviewPage() {
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress').length
   const openRisks       = risks.filter(r => r.status === 'open').length
 
-  function handleDelete() {
-    deleteProject(project.id)
+  async function handleDelete() {
+    await deleteProject(project.id)
     router.replace('/projects')
   }
 

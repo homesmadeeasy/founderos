@@ -27,6 +27,7 @@ export default function EditProjectModal({ project, onClose }: Props) {
   })
   const [loading, setLoading] = useState(false)
   const [saved,   setSaved]   = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
 
   function set<K extends keyof typeof form>(k: K, v: typeof form[K]) {
     setForm(prev => ({ ...prev, [k]: v }))
@@ -35,11 +36,16 @@ export default function EditProjectModal({ project, onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    await new Promise(r => setTimeout(r, 400))
-    updateProject(project.id, form)
-    setLoading(false)
-    setSaved(true)
-    setTimeout(onClose, 900)
+    setError(null)
+    try {
+      await updateProject(project.id, form)
+      setLoading(false)
+      setSaved(true)
+      setTimeout(onClose, 900)
+    } catch (err) {
+      setLoading(false)
+      setError(err instanceof Error ? err.message : 'Could not save changes. Please try again.')
+    }
   }
 
   return (
@@ -126,6 +132,7 @@ export default function EditProjectModal({ project, onClose }: Props) {
             </div>
 
             <div className="px-6 py-4 border-t border-zinc-100 flex items-center justify-end gap-3 shrink-0">
+              {error && <p className="mr-auto text-xs text-red-600 leading-snug">{error}</p>}
               <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 rounded-lg transition-colors">Cancel</button>
               <button type="submit" disabled={loading || !form.title.trim()} className="flex items-center gap-2 px-5 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 {loading && <Loader2 size={13} className="animate-spin" />}

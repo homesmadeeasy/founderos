@@ -4,10 +4,12 @@ import Link from 'next/link'
 import { useAppContext } from '@/contexts/AppContext'
 import StatusBadge from '@/components/ui/StatusBadge'
 import CreateProjectModal from '@/components/ui/CreateProjectModal'
+import LoadingScreen, { ErrorScreen } from '@/components/ui/LoadingScreen'
 
 export default function DashboardPage() {
-  const { appState, isHydrated } = useAppContext()
-  if (!isHydrated) return null
+  const { appState, isHydrated, loadError } = useAppContext()
+  if (!isHydrated) return <div className="p-6"><LoadingScreen label="Loading your dashboard…" /></div>
+  if (loadError)   return <div className="p-6"><ErrorScreen message={loadError} /></div>
 
   const { projects, tasks, decisions, risks } = appState
 

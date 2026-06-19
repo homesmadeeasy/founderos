@@ -5,11 +5,10 @@
  *
  * Provides:
  *  - All project-scoped data (tasks, notes, etc.) filtered by projectId
- *  - sendMessage (real OpenAI chat via /api/chat)
+ *  - sendMessage: persists the user message to Supabase, calls /api/chat with
+ *    project context, then persists the assistant reply to Supabase
  *  - aiError + retryLastMessage for graceful failure handling
- *  - add* helpers with projectId pre-filled
- *
- * ProjectProvider is rendered by app/(app)/projects/[id]/layout.tsx.
+ *  - add* converters with projectId (and optional source message link) pre-filled
  */
 
 import { createContext, useContext, useState, useCallback } from 'react'
@@ -20,11 +19,11 @@ import type {
   TaskStatus, TaskPriority, RiskSeverity, RiskStatus, RoadmapStatus,
 } from '@/lib/types'
 
-// ─── Types (re-exported for convenience) ─────────────────────────────────────
+// ─── Converter payload types ─────────────────────────────────────────────────
 
-export type NewTask        = { title: string; description: string; priority: TaskPriority; status: TaskStatus }
-export type NewNote        = { title: string; content: string }
-export type NewDecision    = { decision: string; reasoning: string }
+export type NewTask        = { title: string; description: string; priority: TaskPriority; status: TaskStatus; sourceMessageId?: string }
+export type NewNote        = { title: string; content: string; sourceMessageId?: string }
+export type NewDecision    = { decision: string; reasoning: string; sourceMessageId?: string }
 export type NewRisk        = { title: string; description: string; severity: RiskSeverity; mitigation: string; status: RiskStatus }
 export type NewRoadmapItem = { title: string; description: string; stage: string; status: RoadmapStatus; sortOrder: number }
 
@@ -42,11 +41,11 @@ interface ProjectContextValue {
   sendMessage:     (content: string) => void
   retryLastMessage:() => void
   dismissError:    () => void
-  addTask:         (data: NewTask)        => Task
-  addNote:         (data: NewNote)        => Note
-  addDecision:     (data: NewDecision)    => Decision
-  addRisk:         (data: NewRisk)        => Risk
-  addRoadmapItem:  (data: NewRoadmapItem) => RoadmapItem
+  addTask:         (data: NewTask)        => Promise<Task>
+  addNote:         (data: NewNote)        => Promise<Note>
+  addDecision:     (data: NewDecision)    => Promise<Decision>
+  addRisk:         (data: NewRisk)        => Promise<Risk>
+  addRoadmapItem:  (data: NewRoadmapItem) => Promise<RoadmapItem>
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null)
@@ -56,9 +55,6 @@ export function useProjectContext(): ProjectContextValue {
   if (!ctx) throw new Error('useProjectContext must be used inside <ProjectProvider>')
   return ctx
 }
-
-function uid() { return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}` }
-function now() { return new Date().toISOString() }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
@@ -85,16 +81,12 @@ export function ProjectProvider({
     .sort((a, b) => a.sortOrder - b.sortOrder)
   const messages     = app.appState.chatMessages[pid] ?? []
 
-  // ── AI call ─────────────────────────────────────────────────────────────────
+  // ── AI request ──────────────────────────────────────────────────────────────
 
-  /**
-   * Calls /api/chat with the user's message + project context + recent history.
-   * `history` should be the conversation BEFORE the message being answered.
-   */
-  const callAi = useCallback(async (userText: string, history: Message[]) => {
+  /** Call /api/chat for an answer to `userText`, given prior `history`. */
+  const requestAssistant = useCallback(async (userText: string, history: Message[]) => {
     setIsAiTyping(true)
     setAiError(null)
-
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -105,14 +97,12 @@ export function ProjectProvider({
           history: buildChatHistory(history),
         }),
       })
-
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.error || 'The AI request failed. Please try again.')
       }
-
       const data = await res.json() as { reply: string }
-      app.addMessage(pid, { id: uid(), role: 'assistant', content: data.reply, createdAt: now() })
+      await app.addMessage(pid, 'assistant', data.reply)
       setLastFailedMessage(null)
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
@@ -123,20 +113,27 @@ export function ProjectProvider({
   }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems])
 
   const sendMessage = useCallback((content: string) => {
-    const userMsg: Message = { id: uid(), role: 'user', content, createdAt: now() }
-    app.addMessage(pid, userMsg)
-    // history = conversation so far (before this new message)
-    callAi(content, messages)
-  }, [app, pid, messages, callAi])
+    const historyBefore = messages
+    void (async () => {
+      try {
+        await app.addMessage(pid, 'user', content)
+      } catch {
+        setAiError('Could not save your message. Please try again.')
+        setLastFailedMessage(content)
+        return
+      }
+      await requestAssistant(content, historyBefore)
+    })()
+  }, [app, pid, messages, requestAssistant])
 
   const retryLastMessage = useCallback(() => {
     if (!lastFailedMessage) return
-    // The failed user message is already the last item in state — exclude it from history.
+    // The failed user message is already persisted — exclude it from history.
     const history = messages[messages.length - 1]?.role === 'user'
       ? messages.slice(0, -1)
       : messages
-    callAi(lastFailedMessage, history)
-  }, [lastFailedMessage, messages, callAi])
+    void requestAssistant(lastFailedMessage, history)
+  }, [lastFailedMessage, messages, requestAssistant])
 
   const dismissError = useCallback(() => setAiError(null), [])
 

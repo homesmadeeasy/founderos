@@ -15,9 +15,10 @@ const buttons: { type: ConversionType; label: string; icon: typeof CheckSquare }
 
 interface Props {
   messageContent: string
+  sourceMessageId?: string
 }
 
-export default function ConversionButtons({ messageContent }: Props) {
+export default function ConversionButtons({ messageContent, sourceMessageId }: Props) {
   const [activeType, setActiveType] = useState<ConversionType | null>(null)
 
   return (
@@ -39,6 +40,7 @@ export default function ConversionButtons({ messageContent }: Props) {
         <ConversionModal
           type={activeType}
           sourceContent={messageContent}
+          sourceMessageId={sourceMessageId}
           onClose={() => setActiveType(null)}
         />
       )}

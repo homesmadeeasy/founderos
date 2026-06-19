@@ -29,8 +29,9 @@ export default function CreateProjectModal() {
   const [open, setOpen]     = useState(false)
   const [form, setForm]     = useState<FormState>(EMPTY)
   const [loading, setLoading] = useState(false)
+  const [error, setError]   = useState<string | null>(null)
 
-  function close() { setOpen(false); setForm(EMPTY) }
+  function close() { setOpen(false); setForm(EMPTY); setError(null) }
 
   function set(k: keyof FormState, v: string | number) {
     setForm(prev => ({ ...prev, [k]: v }))
@@ -40,10 +41,15 @@ export default function CreateProjectModal() {
     e.preventDefault()
     if (!form.title.trim()) return
     setLoading(true)
-    await new Promise(r => setTimeout(r, 400))
-    const project = createProject(form)
-    close()
-    router.push(`/projects/${project.id}`)
+    setError(null)
+    try {
+      const project = await createProject(form)
+      close()
+      router.push(`/projects/${project.id}`)
+    } catch (err) {
+      setLoading(false)
+      setError(err instanceof Error ? err.message : 'Could not create the project. Please try again.')
+    }
   }
 
   return (
@@ -112,6 +118,12 @@ export default function CreateProjectModal() {
                   </select>
                 </div>
               </div>
+
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-100 px-3 py-2.5">
+                  <p className="text-xs text-red-600 leading-relaxed">{error}</p>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button type="button" onClick={close} className="px-4 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 rounded-lg transition-colors">Cancel</button>

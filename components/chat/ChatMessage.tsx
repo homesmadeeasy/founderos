@@ -81,7 +81,7 @@ export default function ChatMessage({ message }: Props) {
         </div>
 
         {/* Conversion buttons — only on assistant messages */}
-        {!isUser && <ConversionButtons messageContent={message.content} />}
+        {!isUser && <ConversionButtons messageContent={message.content} sourceMessageId={message.id} />}
       </div>
     </div>
   )

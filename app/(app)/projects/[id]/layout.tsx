@@ -1,24 +1,29 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAppContext } from '@/contexts/AppContext'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import ProjectTabs from '@/components/project/ProjectTabs'
 import StatusBadge from '@/components/ui/StatusBadge'
+import LoadingScreen, { ErrorScreen } from '@/components/ui/LoadingScreen'
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
   const params = useParams<{ id: string }>()
   const id     = params?.id ?? ''
   const router = useRouter()
 
-  const { appState, isHydrated } = useAppContext()
-  if (!isHydrated) return null
-
+  const { appState, isHydrated, loadError } = useAppContext()
   const project = appState.projects.find(p => p.id === id)
-  if (!project) {
-    router.replace('/projects')
-    return null
-  }
+
+  // Redirect to the project list if the project doesn't exist (after load).
+  useEffect(() => {
+    if (isHydrated && !loadError && !project) router.replace('/projects')
+  }, [isHydrated, loadError, project, router])
+
+  if (!isHydrated) return <div className="p-6"><LoadingScreen label="Loading project…" /></div>
+  if (loadError)   return <div className="p-6"><ErrorScreen message={loadError} /></div>
+  if (!project)    return <div className="p-6"><LoadingScreen label="Redirecting…" /></div>
 
   return (
     <ProjectProvider project={project}>
