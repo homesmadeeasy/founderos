@@ -24,9 +24,10 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import * as db from '@/lib/db'
 import type {
-  AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message, Idea,
+  AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message, Idea, Link,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
   RiskSeverity, RiskStatus, RoadmapStatus, MessageRole, IdeaStatus,
+  EntityType, RelationshipType,
 } from '@/lib/types'
 
 // ─── Insert payload types ───────────────────────────────────────────────────
@@ -57,6 +58,11 @@ export type NewRoadmapItem = { projectId: string; title: string; description: st
 export type NewIdea      = {
   title: string; description: string; targetUser: string; problem: string; solution: string
   potentialScore: number; difficultyScore: number; status: IdeaStatus; tags: string[]
+}
+export type NewLink      = {
+  sourceType: EntityType; sourceId: string
+  targetType: EntityType; targetId: string
+  relationshipType: RelationshipType; description?: string
 }
 
 interface AppContextValue {
@@ -98,6 +104,10 @@ interface AppContextValue {
   updateIdea:       (id: string, data: Partial<Omit<Idea, 'id' | 'createdAt'>>) => Promise<void>
   deleteIdea:       (id: string) => Promise<void>
 
+  // Links (Knowledge Graph)
+  createLink:       (data: NewLink) => Promise<Link>
+  deleteLink:       (id: string) => Promise<void>
+
   // Chat
   addMessage:       (projectId: string, role: MessageRole, content: string) => Promise<Message>
 }
@@ -105,7 +115,7 @@ interface AppContextValue {
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const EMPTY_STATE: AppState = {
-  projects: [], tasks: [], notes: [], decisions: [], risks: [], roadmapItems: [], ideas: [], chatMessages: {},
+  projects: [], tasks: [], notes: [], decisions: [], risks: [], roadmapItems: [], ideas: [], links: [], chatMessages: {},
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -345,6 +355,25 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
       () => db.deleteIdea(supabase, id),
     ), [supabase, mutate])
 
+  // ── Links ──────────────────────────────────────────────────────────────────
+
+  const createLink = useCallback(async (data: NewLink): Promise<Link> => {
+    try {
+      const item = await db.createLink(supabase, userId, data)
+      patch(s => ({ ...s, links: [item, ...s.links] }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] createLink failed:', err)
+      throw err
+    }
+  }, [supabase, userId, patch])
+
+  const deleteLink = useCallback((id: string) =>
+    mutate(
+      s => ({ ...s, links: s.links.filter(l => l.id !== id) }),
+      () => db.deleteLink(supabase, id),
+    ), [supabase, mutate])
+
   // ── Chat ──────────────────────────────────────────────────────────────────
 
   const addMessage = useCallback(async (projectId: string, role: MessageRole, content: string): Promise<Message> => {
@@ -371,6 +400,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
       addRisk, updateRisk, deleteRisk,
       addRoadmapItem, updateRoadmapItem, deleteRoadmapItem,
       createIdea, updateIdea, deleteIdea,
+      createLink, deleteLink,
       addMessage,
     }}>
       {children}

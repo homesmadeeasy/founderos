@@ -6,6 +6,7 @@ import {
   GitFork, CalendarRange, Plus, Check, Loader2,
 } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
+import { useAppContext } from '@/contexts/AppContext'
 import StatusBadge from '@/components/ui/StatusBadge'
 import type { ProjectReview, TaskPriority } from '@/lib/types'
 
@@ -31,6 +32,7 @@ function Section({ icon: Icon, title, text }: {
 
 export default function ReviewCard({ review }: { review: ProjectReview }) {
   const { addTask, addRoadmapItem, roadmapItems } = useProjectContext()
+  const { createLink } = useAppContext()
 
   // Track which suggestions were added (by index) and their in-flight state.
   const [addedTasks, setAddedTasks]       = useState<Record<number, 'loading' | 'done'>>({})
@@ -41,12 +43,21 @@ export default function ReviewCard({ review }: { review: ProjectReview }) {
     if (!t || addedTasks[index]) return
     setAddedTasks(prev => ({ ...prev, [index]: 'loading' }))
     try {
-      await addTask({
+      const created = await addTask({
         title: t.title,
         description: t.description,
         priority: PRIORITY_MAP[t.priority] ?? 'medium',
         status: 'todo',
       })
+      try {
+        await createLink({
+          sourceType: 'project_review', sourceId: review.id,
+          targetType: 'task', targetId: created.id,
+          relationshipType: 'suggested_by', description: 'Suggested by project review',
+        })
+      } catch (linkErr) {
+        console.error('[FounderOS] failed to create review→task link:', linkErr)
+      }
       setAddedTasks(prev => ({ ...prev, [index]: 'done' }))
     } catch {
       setAddedTasks(prev => {
@@ -62,13 +73,22 @@ export default function ReviewCard({ review }: { review: ProjectReview }) {
     if (!r || addedRoadmap[index]) return
     setAddedRoadmap(prev => ({ ...prev, [index]: 'loading' }))
     try {
-      await addRoadmapItem({
+      const created = await addRoadmapItem({
         title: r.title,
         description: r.description,
         stage: r.stage || 'Next',
         status: 'planned',
         sortOrder: roadmapItems.length + 1 + index,
       })
+      try {
+        await createLink({
+          sourceType: 'project_review', sourceId: review.id,
+          targetType: 'roadmap_item', targetId: created.id,
+          relationshipType: 'suggested_by', description: 'Suggested by project review',
+        })
+      } catch (linkErr) {
+        console.error('[FounderOS] failed to create review→roadmap link:', linkErr)
+      }
       setAddedRoadmap(prev => ({ ...prev, [index]: 'done' }))
     } catch {
       setAddedRoadmap(prev => {

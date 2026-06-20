@@ -19,7 +19,11 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
-import { loadProjectContext, createProjectReview } from '@/lib/db'
+import { loadProjectContext, createProjectReview, loadLinks } from '@/lib/db'
+import {
+  collectProjectEntityIds, getProjectLinks, buildLabelResolver, summarizeLinks,
+} from '@/lib/links'
+import type { AppState } from '@/lib/types'
 import {
   AI_MODEL, REVIEW_SYSTEM_PROMPT, renderReviewContext, normalizeReview,
   type ProjectReviewRequestBody,
@@ -65,6 +69,21 @@ export async function POST(req: Request) {
   }
   if (!context) {
     return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
+  }
+
+  // 2b. Load linked memory for this project (best-effort — never blocks a review).
+  try {
+    const links = await loadLinks(supabase)
+    const stateForLinks: AppState = {
+      projects: [context.project],
+      tasks: context.tasks, notes: context.notes, decisions: context.decisions,
+      risks: context.risks, roadmapItems: context.roadmapItems, ideas: [],
+      links, chatMessages: { [projectId]: context.messages },
+    }
+    const ids = collectProjectEntityIds(stateForLinks, projectId)
+    context.linkedMemory = summarizeLinks(getProjectLinks(links, ids), buildLabelResolver(stateForLinks))
+  } catch (err) {
+    console.error('[api/project-review] failed to load linked memory:', err)
   }
 
   // 3. Ask OpenAI for a structured review

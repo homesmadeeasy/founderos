@@ -15,12 +15,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message,
-  ProjectReview, Idea, IdeaAnalysis, IdeaStatus,
+  ProjectReview, Idea, IdeaAnalysis, IdeaStatus, Link, EntityType,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
   RiskSeverity, RiskStatus, RoadmapStatus, MessageRole,
 } from './types'
 import type {
-  NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea,
+  NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink,
 } from '@/contexts/AppContext'
 import {
   normalizeSuggestedTasks, normalizeSuggestedRoadmapItems,
@@ -61,6 +61,10 @@ interface IdeaAnalysisRow {
   mvp_suggestion: string | null; validation_plan: string | null; next_steps: string | null
   suggested_project: unknown; suggested_tasks: unknown; suggested_risks: unknown
   suggested_roadmap_items: unknown; created_at: string
+}
+interface LinkRow {
+  id: string; source_type: string; source_id: string; target_type: string; target_id: string
+  relationship_type: string; description: string | null; created_at: string
 }
 
 // ─── Row → app mappers ──────────────────────────────────────────────────────
@@ -122,6 +126,14 @@ const toIdeaAnalysis = (r: IdeaAnalysisRow): IdeaAnalysis => ({
   createdAt: r.created_at,
 })
 
+const toLink = (r: LinkRow): Link => ({
+  id: r.id,
+  sourceType: r.source_type as EntityType, sourceId: r.source_id,
+  targetType: r.target_type as EntityType, targetId: r.target_id,
+  relationshipType: r.relationship_type as Link['relationshipType'],
+  description: r.description ?? '', createdAt: r.created_at,
+})
+
 const toProjectReview = (r: ProjectReviewRow): ProjectReview => ({
   id: r.id, projectId: r.project_id,
   summary: r.summary ?? '', progressReview: r.progress_review ?? '',
@@ -136,7 +148,7 @@ const toProjectReview = (r: ProjectReviewRow): ProjectReview => ({
 // ─── Load everything for the signed-in user ───────────────────────────────────
 
 export async function loadAppState(supabase: SupabaseClient): Promise<AppState> {
-  const [projects, tasks, notes, decisions, risks, roadmap, messages, ideas] = await Promise.all([
+  const [projects, tasks, notes, decisions, risks, roadmap, messages, ideas, links] = await Promise.all([
     supabase.from('projects').select('*').order('updated_at', { ascending: false }),
     supabase.from('tasks').select('*').order('created_at', { ascending: false }),
     supabase.from('notes').select('*').order('created_at', { ascending: false }),
@@ -145,10 +157,11 @@ export async function loadAppState(supabase: SupabaseClient): Promise<AppState> 
     supabase.from('roadmap_items').select('*').order('sort_order', { ascending: true }),
     supabase.from('messages').select('*').order('created_at', { ascending: true }),
     supabase.from('ideas').select('*').order('updated_at', { ascending: false }),
+    supabase.from('links').select('*').order('created_at', { ascending: false }),
   ])
 
   const firstError = projects.error || tasks.error || notes.error || decisions.error
-    || risks.error || roadmap.error || messages.error || ideas.error
+    || risks.error || roadmap.error || messages.error || ideas.error || links.error
   if (firstError) throw firstError
 
   // Group messages by project
@@ -165,6 +178,7 @@ export async function loadAppState(supabase: SupabaseClient): Promise<AppState> 
     risks:        (risks.data     ?? []).map(toRisk),
     roadmapItems: (roadmap.data   ?? []).map(toRoadmap),
     ideas:        (ideas.data     ?? []).map(toIdea),
+    links:        (links.data     ?? []).map(toLink),
     chatMessages,
   }
 }
@@ -471,4 +485,41 @@ export async function createIdeaAnalysis(
   }).select('*').single()
   if (error) throw error
   return toIdeaAnalysis(data as IdeaAnalysisRow)
+}
+
+// ─── Links (Knowledge Graph) ──────────────────────────────────────────────────
+
+/** All of the signed-in user's links (RLS scoped), newest first. */
+export async function loadLinks(supabase: SupabaseClient): Promise<Link[]> {
+  const { data, error } = await supabase.from('links').select('*').order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(r => toLink(r as LinkRow))
+}
+
+export async function createLink(supabase: SupabaseClient, userId: string, d: NewLink): Promise<Link> {
+  const { data, error } = await supabase.from('links').insert({
+    user_id: userId,
+    source_type: d.sourceType, source_id: d.sourceId,
+    target_type: d.targetType, target_id: d.targetId,
+    relationship_type: d.relationshipType,
+    description: d.description ?? null,
+  }).select('*').single()
+  if (error) throw error
+  return toLink(data as LinkRow)
+}
+
+/** Links where the given entity is either the source or the target. */
+export async function getLinksForEntity(supabase: SupabaseClient, type: EntityType, id: string): Promise<Link[]> {
+  const { data, error } = await supabase
+    .from('links')
+    .select('*')
+    .or(`and(source_type.eq.${type},source_id.eq.${id}),and(target_type.eq.${type},target_id.eq.${id})`)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(r => toLink(r as LinkRow))
+}
+
+export async function deleteLink(supabase: SupabaseClient, id: string) {
+  const { error } = await supabase.from('links').delete().eq('id', id)
+  if (error) throw error
 }

@@ -66,6 +66,7 @@ export interface ChatContext {
   decisions:    { decision: string }[]
   risks:        { title: string; severity: string; status: string }[]
   roadmapItems: { title: string; stage: string; status: string }[]
+  linkedMemory?: string[]
 }
 
 export interface ChatHistoryMessage {
@@ -96,6 +97,7 @@ export function buildChatContext(
   decisions: Decision[],
   risks: Risk[],
   roadmapItems: RoadmapItem[],
+  linkedMemory: string[] = [],
 ): ChatContext {
   return {
     title:       project.title,
@@ -108,6 +110,7 @@ export function buildChatContext(
     decisions:    decisions.slice(0, 10).map(d => ({ decision: d.decision })),
     risks:        risks.slice(0, 10).map(r => ({ title: r.title, severity: r.severity, status: r.status })),
     roadmapItems: roadmapItems.slice(0, 15).map(r => ({ title: r.title, stage: r.stage, status: r.status })),
+    linkedMemory: linkedMemory.slice(0, 15),
   }
 }
 
@@ -150,5 +153,8 @@ EXISTING RISKS
 ${list(ctx.risks, r => `${r.title} [${r.severity}, ${r.status}]`, 'no risks yet')}
 
 EXISTING ROADMAP ITEMS
-${list(ctx.roadmapItems, r => `${r.title} [${r.stage}, ${r.status}]`, 'no roadmap items yet')}`
+${list(ctx.roadmapItems, r => `${r.title} [${r.stage}, ${r.status}]`, 'no roadmap items yet')}
+
+LINKED MEMORY (how items in this project connect)
+${list(ctx.linkedMemory ?? [], s => s, 'no linked memory yet')}`
 }

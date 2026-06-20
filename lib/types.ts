@@ -213,6 +213,51 @@ export interface IdeaAnalysis {
   createdAt: string
 }
 
+// ─── Knowledge Graph / Linked Memory ────────────────────────────────────────
+
+export type EntityType =
+  | 'idea'
+  | 'idea_analysis'
+  | 'project'
+  | 'conversation'
+  | 'message'
+  | 'task'
+  | 'note'
+  | 'decision'
+  | 'risk'
+  | 'roadmap_item'
+  | 'project_review'
+
+export type RelationshipType =
+  | 'created_from'
+  | 'converted_to'
+  | 'suggested_by'
+  | 'supports'
+  | 'blocks'
+  | 'relates_to'
+  | 'caused_by'
+  | 'resolves'
+  | 'depends_on'
+  | 'part_of'
+
+export interface Link {
+  id: string
+  sourceType: EntityType
+  sourceId: string
+  targetType: EntityType
+  targetId: string
+  relationshipType: RelationshipType
+  description: string
+  createdAt: string
+}
+
+/** A resolved endpoint of a link — its type, id and a human-readable label. */
+export interface LinkedEntity {
+  type: EntityType
+  id: string
+  label: string
+}
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 export interface AppState {
@@ -223,5 +268,6 @@ export interface AppState {
   risks: Risk[]
   roadmapItems: RoadmapItem[]
   ideas: Idea[]
+  links: Link[]
   chatMessages: Record<string, Message[]>
 }

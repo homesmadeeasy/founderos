@@ -3,8 +3,13 @@
 import { useState, useEffect } from 'react'
 import { X, Check, Loader2, Sparkles } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
-import type { TaskPriority, TaskStatus, RiskSeverity, RiskStatus, RoadmapStatus } from '@/lib/types'
+import { useAppContext } from '@/contexts/AppContext'
+import type { TaskPriority, TaskStatus, RiskSeverity, RiskStatus, RoadmapStatus, EntityType } from '@/lib/types'
 import type { ExtractResponseBody } from '@/lib/extract'
+
+const TYPE_TO_ENTITY: Record<ConversionType, EntityType> = {
+  task: 'task', note: 'note', decision: 'decision', risk: 'risk', roadmap: 'roadmap_item',
+}
 
 export type ConversionType = 'task' | 'note' | 'decision' | 'risk' | 'roadmap'
 
@@ -182,6 +187,7 @@ interface Props {
 
 export default function ConversionModal({ type, sourceContent, sourceMessageId, onClose }: Props) {
   const { addTask, addNote, addDecision, addRisk, addRoadmapItem, roadmapItems } = useProjectContext()
+  const { createLink } = useAppContext()
   // Start with the simple local fallback so fields are never empty.
   const [form, setForm] = useState<Record<string, string>>(getInitialForm(type, sourceContent))
   const [loading, setLoading] = useState(false)
@@ -232,40 +238,54 @@ export default function ConversionModal({ type, sourceContent, sourceMessageId, 
     setSaveError(null)
 
     try {
+      let createdId: string | null = null
       switch (type) {
         case 'task':
-          await addTask({
+          createdId = (await addTask({
             title: form.title,
             description: form.description,
             priority: form.priority as TaskPriority,
             status: form.status as TaskStatus,
             sourceMessageId,
-          })
+          })).id
           break
         case 'note':
-          await addNote({ title: form.title, content: form.content, sourceMessageId })
+          createdId = (await addNote({ title: form.title, content: form.content, sourceMessageId })).id
           break
         case 'decision':
-          await addDecision({ decision: form.decision, reasoning: form.reasoning, sourceMessageId })
+          createdId = (await addDecision({ decision: form.decision, reasoning: form.reasoning, sourceMessageId })).id
           break
         case 'risk':
-          await addRisk({
+          createdId = (await addRisk({
             title: form.title,
             description: form.description,
             severity: form.severity as RiskSeverity,
             mitigation: form.mitigation,
             status: form.status as RiskStatus,
-          })
+          })).id
           break
         case 'roadmap':
-          await addRoadmapItem({
+          createdId = (await addRoadmapItem({
             title: form.title,
             description: form.description,
             stage: form.stage,
             status: form.status as RoadmapStatus,
             sortOrder: roadmapItems.length + 1,
-          })
+          })).id
           break
+      }
+
+      // Knowledge graph: link the new object back to the source chat message.
+      if (createdId && sourceMessageId) {
+        try {
+          await createLink({
+            sourceType: 'message', sourceId: sourceMessageId,
+            targetType: TYPE_TO_ENTITY[type], targetId: createdId,
+            relationshipType: 'created_from', description: 'Created from AI chat message',
+          })
+        } catch (linkErr) {
+          console.error('[FounderOS] failed to create message→object link:', linkErr)
+        }
       }
 
       setLoading(false)

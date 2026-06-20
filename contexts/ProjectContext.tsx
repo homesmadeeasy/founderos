@@ -16,6 +16,7 @@ import { useAppContext } from './AppContext'
 import { createClient } from '@/lib/supabase/client'
 import * as db from '@/lib/db'
 import { buildChatContext, buildChatHistory } from '@/lib/ai'
+import { collectProjectEntityIds, getProjectLinks, buildLabelResolver, summarizeLinks } from '@/lib/links'
 import type {
   Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectReview,
   TaskStatus, TaskPriority, RiskSeverity, RiskStatus, RoadmapStatus,
@@ -122,12 +123,16 @@ export function ProjectProvider({
     setIsAiTyping(true)
     setAiError(null)
     try {
+      const linkedMemory = summarizeLinks(
+        getProjectLinks(app.appState.links, collectProjectEntityIds(app.appState, pid)),
+        buildLabelResolver(app.appState),
+      )
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userText,
-          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems),
+          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory),
           history: buildChatHistory(history),
         }),
       })

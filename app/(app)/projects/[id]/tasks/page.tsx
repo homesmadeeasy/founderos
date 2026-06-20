@@ -7,6 +7,7 @@ import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import StatusBadge from '@/components/ui/StatusBadge'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import LinkButton from '@/components/memory/LinkButton'
 import type { Task, TaskStatus } from '@/lib/types'
 
 const STATUS_CYCLE: Record<TaskStatus, TaskStatus> = {
@@ -107,6 +108,9 @@ export default function TasksPage() {
                   >
                     <RotateCcw size={10} /> {STATUS_LABEL[task.status]}
                   </button>
+                  <div className="hidden group-hover:flex">
+                    <LinkButton type="task" id={task.id} label={task.title} />
+                  </div>
                   <button
                     onClick={() => setPendingDelete(task)}
                     className="hidden group-hover:flex items-center justify-center w-6 h-6 text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"

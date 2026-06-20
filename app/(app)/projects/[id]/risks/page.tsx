@@ -7,6 +7,7 @@ import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import StatusBadge from '@/components/ui/StatusBadge'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import LinkButton from '@/components/memory/LinkButton'
 import type { Risk, RiskStatus } from '@/lib/types'
 
 const STATUS_CYCLE: Record<RiskStatus, RiskStatus> = {
@@ -76,12 +77,15 @@ export default function RisksPage() {
             <p className="text-xs text-zinc-600 leading-relaxed">{risk.mitigation}</p>
           </div>
         )}
-        <button
-          onClick={() => cycleStatus(risk)}
-          className="text-xs text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50 px-2 py-1 rounded-md transition-colors"
-        >
-          {STATUS_ACTION[risk.status]}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => cycleStatus(risk)}
+            className="text-xs text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50 px-2 py-1 rounded-md transition-colors"
+          >
+            {STATUS_ACTION[risk.status]}
+          </button>
+          <LinkButton type="risk" id={risk.id} label={risk.title} />
+        </div>
       </div>
     )
   }

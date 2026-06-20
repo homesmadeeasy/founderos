@@ -6,6 +6,7 @@ import { MessageSquare, Trash2, GitFork } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import LinkButton from '@/components/memory/LinkButton'
 import type { Decision } from '@/lib/types'
 
 export default function DecisionsPage() {
@@ -42,13 +43,16 @@ export default function DecisionsPage() {
       <div className="space-y-3">
         {decisions.map((d, i) => (
           <div key={d.id} className="bg-white rounded-xl border border-zinc-100 p-5 hover:border-zinc-200 transition-colors group relative">
-            <button
-              onClick={() => setPendingDelete(d)}
-              className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
-              title="Delete decision"
-            >
-              <Trash2 size={11} />
-            </button>
+            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all">
+              <LinkButton type="decision" id={d.id} label={d.decision} />
+              <button
+                onClick={() => setPendingDelete(d)}
+                className="w-6 h-6 flex items-center justify-center text-zinc-300 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                title="Delete decision"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
 
             <div className="flex items-start gap-3 pr-6">
               <div className="w-6 h-6 rounded-full bg-zinc-100 text-zinc-500 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">

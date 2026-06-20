@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles } from 'lucide-react'
+import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles, Network } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import EditProjectModal from '@/components/project/EditProjectModal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import StatusBadge from '@/components/ui/StatusBadge'
+import { collectProjectEntityIds, getProjectLinks, buildLabelResolver, describeLink } from '@/lib/links'
 import type { TaskPriority } from '@/lib/types'
 
 const TASK_PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, low: 2 }
@@ -16,8 +17,19 @@ const TASK_PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, l
 export default function ProjectOverviewPage() {
   const router = useRouter()
   const { project, tasks, notes, decisions, risks, roadmapItems, messages, reviews, reviewsLoading } = useProjectContext()
-  const { deleteProject } = useAppContext()
+  const { appState, deleteProject } = useAppContext()
   const latestReview = reviews[0]
+
+  // Knowledge graph: recent links involving this project, in plain English.
+  const { projectLinks, describe } = useMemo(() => {
+    const ids = collectProjectEntityIds(appState, project.id)
+    const resolve = buildLabelResolver(appState)
+    return {
+      projectLinks: getProjectLinks(appState.links, ids),
+      describe: (l: typeof appState.links[number]) => describeLink(l, resolve),
+    }
+  }, [appState, project.id])
+  const recentLinks = projectLinks.slice(0, 5)
   const [showEdit,   setShowEdit]   = useState(false)
   const [showDelete, setShowDelete] = useState(false)
 
@@ -51,6 +63,7 @@ export default function ProjectOverviewPage() {
     { icon: GitFork,       label: 'Decisions', href: 'decisions', stat: `${decisions.length} logged`,                 color: 'text-purple-500',  bg: 'bg-purple-50' },
     { icon: AlertTriangle, label: 'Risks',     href: 'risks',     stat: `${openRisks} open`,                          color: 'text-red-500',     bg: 'bg-red-50' },
     { icon: Map,           label: 'Roadmap',   href: 'roadmap',   stat: `${roadmapItems.length} items`,               color: 'text-indigo-500',  bg: 'bg-indigo-50' },
+    { icon: Network,       label: 'Memory Graph', href: 'memory', stat: `${projectLinks.length} link${projectLinks.length === 1 ? '' : 's'}`, color: 'text-teal-500', bg: 'bg-teal-50' },
   ]
 
   return (
@@ -153,6 +166,35 @@ export default function ProjectOverviewPage() {
               <Sparkles size={12} /> Generate first review
             </Link>
           </div>
+        )}
+      </div>
+
+      {/* Linked Memory */}
+      <div className="bg-white rounded-xl border border-zinc-100 p-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Network size={13} className="text-zinc-400" />
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Linked Memory</p>
+          </div>
+          {projectLinks.length > 0 && (
+            <Link href={`/projects/${project.id}/memory`} className="text-zinc-300 hover:text-zinc-600 transition-colors">
+              <ArrowRight size={14} />
+            </Link>
+          )}
+        </div>
+        {recentLinks.length === 0 ? (
+          <p className="text-xs text-zinc-400 leading-relaxed py-1">
+            No linked memory yet. As you convert AI responses, review projects, and turn ideas into projects, FounderOS will build a memory graph automatically.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {recentLinks.map(l => (
+              <li key={l.id} className="flex items-start gap-2 text-sm text-zinc-700 leading-relaxed">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+                <span>{describe(l)}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

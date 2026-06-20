@@ -89,11 +89,13 @@ export interface ReviewContextInput {
   risks: Risk[]
   roadmapItems: RoadmapItem[]
   messages: Message[]
+  /** Plain-English summaries of how items in this project are connected. */
+  linkedMemory?: string[]
 }
 
 /** Render the project state into a concise text block for the model. */
 export function renderReviewContext(input: ReviewContextInput): string {
-  const { project, tasks, notes, decisions, risks, roadmapItems, messages } = input
+  const { project, tasks, notes, decisions, risks, roadmapItems, messages, linkedMemory = [] } = input
 
   const list = <T,>(items: T[], fmt: (item: T) => string, empty: string) =>
     items.length ? items.map(i => `  - ${fmt(i)}`).join('\n') : `  (${empty})`
@@ -131,7 +133,10 @@ ROADMAP (${roadmapItems.length})
 ${list(roadmapItems.slice(0, 20), r => `${r.title} [${r.stage || 'unstaged'}, ${r.status}]`, 'no roadmap items')}
 
 RECENT CHAT (last ${recent.length} messages)
-${list(recent, m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content.replace(/\s+/g, ' ').slice(0, 240)}`, 'no chat history')}`
+${list(recent, m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content.replace(/\s+/g, ' ').slice(0, 240)}`, 'no chat history')}
+
+LINKED MEMORY (how items in this project connect — e.g. which risks block tasks, which tasks came from reviews, which project came from an idea)
+${list(linkedMemory.slice(0, 15), s => s, 'no linked memory yet')}`
 }
 
 // ─── Normalisation ─────────────────────────────────────────────────────────────

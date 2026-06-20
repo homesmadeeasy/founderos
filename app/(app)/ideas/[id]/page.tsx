@@ -25,7 +25,7 @@ export default function IdeaDetailPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
 
-  const { appState, isHydrated, loadError, createProject, addTask, addRisk, addRoadmapItem, updateIdea } = useAppContext()
+  const { appState, isHydrated, loadError, createProject, addTask, addRisk, addRoadmapItem, updateIdea, createLink } = useAppContext()
   const idea = appState.ideas.find(i => i.id === id)
 
   const [analyses, setAnalyses]           = useState<IdeaAnalysis[]>([])
@@ -119,6 +119,24 @@ export default function IdeaDetailPage() {
         for (const r of latest.suggestedRoadmapItems) {
           await addRoadmapItem({ projectId: project.id, title: r.title, description: r.description, stage: r.stage || 'Next', status: 'planned', sortOrder: order++ })
         }
+      }
+
+      // Knowledge graph: record where this project came from (best-effort).
+      try {
+        await createLink({
+          sourceType: 'idea', sourceId: idea.id,
+          targetType: 'project', targetId: project.id,
+          relationshipType: 'converted_to', description: 'Idea was turned into this project',
+        })
+        if (latest) {
+          await createLink({
+            sourceType: 'idea_analysis', sourceId: latest.id,
+            targetType: 'project', targetId: project.id,
+            relationshipType: 'suggested_by', description: 'Project suggested by idea analysis',
+          })
+        }
+      } catch (linkErr) {
+        console.error('[FounderOS] failed to create idea→project links:', linkErr)
       }
 
       await updateIdea(idea.id, { status: 'Turned Into Project' })
