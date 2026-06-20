@@ -1,0 +1,395 @@
+/**
+ * Global Command Bar — types and helpers.
+ *
+ * Safe for the client — contains NO secrets.
+ * Search runs against AppContext data already loaded via RLS-scoped queries.
+ */
+
+import type { AppState } from './types'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type CommandObjectType =
+  | 'project'
+  | 'idea'
+  | 'task'
+  | 'note'
+  | 'decision'
+  | 'risk'
+  | 'roadmap_item'
+
+export type CommandCreateType =
+  | 'project'
+  | 'idea'
+  | 'task'
+  | 'note'
+  | 'decision'
+  | 'risk'
+  | 'roadmap_item'
+
+export type CommandActionKind = 'navigate' | 'create' | 'recent'
+
+export interface CommandSearchResult {
+  id: string
+  objectType: CommandObjectType
+  title: string
+  preview: string
+  projectId?: string
+  projectName?: string
+  href: string
+}
+
+export interface CommandAction {
+  id: string
+  kind: CommandActionKind
+  label: string
+  description?: string
+  href?: string
+  createType?: CommandCreateType
+  /** Extra strings used when filtering by query. */
+  keywords?: string[]
+}
+
+export interface ParsedCreateCommand {
+  createType: CommandCreateType
+  text: string
+}
+
+export interface CreateDraft {
+  createType: CommandCreateType
+  title: string
+  description: string
+  /** decision body */
+  decision?: string
+  reasoning?: string
+  /** note body */
+  content?: string
+  stage?: string
+}
+
+// ─── Display labels ───────────────────────────────────────────────────────────
+
+export const OBJECT_TYPE_LABEL: Record<CommandObjectType, string> = {
+  project: 'Project',
+  idea: 'Idea',
+  task: 'Task',
+  note: 'Note',
+  decision: 'Decision',
+  risk: 'Risk',
+  roadmap_item: 'Roadmap item',
+}
+
+export const CREATE_TYPE_LABEL: Record<CommandCreateType, string> = {
+  project: 'New project',
+  idea: 'New idea',
+  task: 'New task',
+  note: 'New note',
+  decision: 'New decision',
+  risk: 'New risk',
+  roadmap_item: 'New roadmap item',
+}
+
+// ─── Route helpers ────────────────────────────────────────────────────────────
+
+/** Extract project id when the user is on a /projects/[id] route. */
+export function parseProjectIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/projects\/([^/]+)/)
+  if (!match) return null
+  const id = match[1]
+  if (id === 'projects') return null
+  return id
+}
+
+export function buildProjectMap(state: AppState): Map<string, string> {
+  return new Map(state.projects.map(p => [p.id, p.title]))
+}
+
+// ─── Navigation actions ───────────────────────────────────────────────────────
+
+export function buildNavigationActions(projectId: string | null): CommandAction[] {
+  const global: CommandAction[] = [
+    { id: 'nav-dashboard', kind: 'navigate', label: 'Dashboard', href: '/dashboard', keywords: ['home'] },
+    { id: 'nav-projects', kind: 'navigate', label: 'Projects', href: '/projects', keywords: ['project list'] },
+    { id: 'nav-ideas', kind: 'navigate', label: 'Idea Vault', href: '/ideas', keywords: ['ideas', 'vault'] },
+    { id: 'nav-settings', kind: 'navigate', label: 'Settings', href: '/settings', keywords: ['preferences'] },
+  ]
+
+  if (!projectId) return global
+
+  const base = `/projects/${projectId}`
+  const projectNav: CommandAction[] = [
+    { id: 'nav-proj-overview', kind: 'navigate', label: 'Project overview', href: base, keywords: ['current project'] },
+    { id: 'nav-proj-chat', kind: 'navigate', label: 'Project chat', href: `${base}/chat`, keywords: ['ai', 'assistant'] },
+    { id: 'nav-proj-tasks', kind: 'navigate', label: 'Project tasks', href: `${base}/tasks` },
+    { id: 'nav-proj-notes', kind: 'navigate', label: 'Project notes', href: `${base}/notes` },
+    { id: 'nav-proj-decisions', kind: 'navigate', label: 'Project decisions', href: `${base}/decisions` },
+    { id: 'nav-proj-risks', kind: 'navigate', label: 'Project risks', href: `${base}/risks` },
+    { id: 'nav-proj-roadmap', kind: 'navigate', label: 'Project roadmap', href: `${base}/roadmap` },
+    { id: 'nav-proj-review', kind: 'navigate', label: 'Project review', href: `${base}/review` },
+    { id: 'nav-proj-memory', kind: 'navigate', label: 'Memory graph', href: `${base}/memory`, keywords: ['linked memory', 'knowledge graph'] },
+  ]
+
+  return [...global, ...projectNav]
+}
+
+export function buildCreateActions(projectId: string | null): CommandAction[] {
+  const global: CommandAction[] = [
+    { id: 'create-idea', kind: 'create', label: CREATE_TYPE_LABEL.idea, createType: 'idea', keywords: ['capture idea'] },
+    { id: 'create-project', kind: 'create', label: CREATE_TYPE_LABEL.project, createType: 'project', keywords: ['start project'] },
+  ]
+
+  if (!projectId) return global
+
+  return [
+    ...global,
+    { id: 'create-task', kind: 'create', label: CREATE_TYPE_LABEL.task, createType: 'task' },
+    { id: 'create-note', kind: 'create', label: CREATE_TYPE_LABEL.note, createType: 'note' },
+    { id: 'create-decision', kind: 'create', label: CREATE_TYPE_LABEL.decision, createType: 'decision' },
+    { id: 'create-risk', kind: 'create', label: CREATE_TYPE_LABEL.risk, createType: 'risk' },
+    { id: 'create-roadmap', kind: 'create', label: CREATE_TYPE_LABEL.roadmap_item, createType: 'roadmap_item' },
+  ]
+}
+
+// ─── Recent items ─────────────────────────────────────────────────────────────
+
+export function buildRecentSearchResults(state: AppState, projectMap: Map<string, string>): CommandSearchResult[] {
+  const recentProjects = [...state.projects]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 3)
+    .map(p => ({
+      id: p.id,
+      objectType: 'project' as const,
+      title: p.title,
+      preview: p.description || p.goal || 'Project',
+      href: `/projects/${p.id}`,
+    }))
+
+  const recentIdeas = [...state.ideas]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 3)
+    .map(i => ({
+      id: i.id,
+      objectType: 'idea' as const,
+      title: i.title,
+      preview: i.description || i.status,
+      href: `/ideas/${i.id}`,
+    }))
+
+  const recentTasks = [...state.tasks]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3)
+    .map(t => ({
+      id: t.id,
+      objectType: 'task' as const,
+      title: t.title,
+      preview: t.description || t.status,
+      projectId: t.projectId,
+      projectName: projectMap.get(t.projectId),
+      href: `/projects/${t.projectId}/tasks`,
+    }))
+
+  return [...recentProjects, ...recentIdeas, ...recentTasks]
+}
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+function matchesQuery(q: string, ...fields: (string | undefined)[]): boolean {
+  return fields.some(f => f && f.toLowerCase().includes(q))
+}
+
+function filterActions(actions: CommandAction[], q: string): CommandAction[] {
+  if (!q) return actions
+  return actions.filter(a => {
+    const haystack = [a.label, a.description, ...(a.keywords ?? [])].filter(Boolean).join(' ').toLowerCase()
+    return haystack.includes(q)
+  })
+}
+
+/** Client-side search across loaded app state (RLS-scoped data). */
+export function searchAppData(
+  state: AppState,
+  query: string,
+  projectMap: Map<string, string>,
+  limit = 20,
+): CommandSearchResult[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+
+  const results: CommandSearchResult[] = []
+
+  for (const p of state.projects) {
+    if (matchesQuery(q, p.title, p.description, p.goal)) {
+      results.push({
+        id: p.id,
+        objectType: 'project',
+        title: p.title,
+        preview: p.description || p.goal || '',
+        href: `/projects/${p.id}`,
+      })
+    }
+  }
+
+  for (const i of state.ideas) {
+    if (matchesQuery(q, i.title, i.description, i.problem, i.solution, ...i.tags)) {
+      results.push({
+        id: i.id,
+        objectType: 'idea',
+        title: i.title,
+        preview: i.description || i.problem || '',
+        href: `/ideas/${i.id}`,
+      })
+    }
+  }
+
+  for (const t of state.tasks) {
+    if (matchesQuery(q, t.title, t.description)) {
+      results.push({
+        id: t.id,
+        objectType: 'task',
+        title: t.title,
+        preview: t.description || t.status,
+        projectId: t.projectId,
+        projectName: projectMap.get(t.projectId),
+        href: `/projects/${t.projectId}/tasks`,
+      })
+    }
+  }
+
+  for (const n of state.notes) {
+    if (matchesQuery(q, n.title, n.content)) {
+      results.push({
+        id: n.id,
+        objectType: 'note',
+        title: n.title,
+        preview: n.content.slice(0, 120),
+        projectId: n.projectId,
+        projectName: projectMap.get(n.projectId),
+        href: `/projects/${n.projectId}/notes`,
+      })
+    }
+  }
+
+  for (const d of state.decisions) {
+    if (matchesQuery(q, d.decision, d.reasoning)) {
+      results.push({
+        id: d.id,
+        objectType: 'decision',
+        title: d.decision,
+        preview: d.reasoning.slice(0, 120),
+        projectId: d.projectId,
+        projectName: projectMap.get(d.projectId),
+        href: `/projects/${d.projectId}/decisions`,
+      })
+    }
+  }
+
+  for (const r of state.risks) {
+    if (matchesQuery(q, r.title, r.description, r.mitigation)) {
+      results.push({
+        id: r.id,
+        objectType: 'risk',
+        title: r.title,
+        preview: r.description || r.mitigation,
+        projectId: r.projectId,
+        projectName: projectMap.get(r.projectId),
+        href: `/projects/${r.projectId}/risks`,
+      })
+    }
+  }
+
+  for (const r of state.roadmapItems) {
+    if (matchesQuery(q, r.title, r.description, r.stage)) {
+      results.push({
+        id: r.id,
+        objectType: 'roadmap_item',
+        title: r.title,
+        preview: r.description || r.stage,
+        projectId: r.projectId,
+        projectName: projectMap.get(r.projectId),
+        href: `/projects/${r.projectId}/roadmap`,
+      })
+    }
+  }
+
+  return results.slice(0, limit)
+}
+
+// ─── Natural-language create commands ─────────────────────────────────────────
+
+const CREATE_TYPE_ALIASES: Record<string, CommandCreateType> = {
+  idea: 'idea',
+  project: 'project',
+  task: 'task',
+  note: 'note',
+  decision: 'decision',
+  risk: 'risk',
+  roadmap: 'roadmap_item',
+  'roadmap item': 'roadmap_item',
+  roadmapitem: 'roadmap_item',
+}
+
+function normalizeCreateType(raw: string): CommandCreateType | null {
+  return CREATE_TYPE_ALIASES[raw.toLowerCase().replace(/\s+/g, ' ').trim()] ?? null
+}
+
+const PROJECT_ONLY_CREATES: CommandCreateType[] = ['task', 'note', 'decision', 'risk', 'roadmap_item']
+
+/** Rule-based parsing: "new task: Build upload" → create draft. */
+export function parseCreateCommand(input: string, inProject: boolean): ParsedCreateCommand | null {
+  const trimmed = input.trim()
+  const match = trimmed.match(/^(?:new|create)\s+(idea|project|task|note|decision|risk|roadmap(?:\s*item)?)\s*:\s*(.+)$/i)
+  if (!match) return null
+
+  const createType = normalizeCreateType(match[1])
+  if (!createType) return null
+
+  const text = match[2].trim()
+  if (!text) return null
+
+  if (!inProject && PROJECT_ONLY_CREATES.includes(createType)) return null
+
+  return { createType, text }
+}
+
+export function createDraftFromParsed(parsed: ParsedCreateCommand): CreateDraft {
+  const { createType, text } = parsed
+  if (createType === 'decision') {
+    return { createType, title: text, description: '', decision: text, reasoning: '' }
+  }
+  if (createType === 'note') {
+    return { createType, title: text, description: '', content: text }
+  }
+  return { createType, title: text, description: text }
+}
+
+export function emptyCreateDraft(createType: CommandCreateType): CreateDraft {
+  if (createType === 'decision') {
+    return { createType, title: '', description: '', decision: '', reasoning: '' }
+  }
+  if (createType === 'note') {
+    return { createType, title: '', description: '', content: '' }
+  }
+  if (createType === 'roadmap_item') {
+    return { createType, title: '', description: '', stage: 'Next' }
+  }
+  return { createType, title: '', description: '' }
+}
+
+/** Filter navigation + create actions for the current query. */
+export function filterCommandPalette(
+  state: AppState,
+  query: string,
+  projectId: string | null,
+): { actions: CommandAction[]; results: CommandSearchResult[]; parsed: ParsedCreateCommand | null } {
+  const q = query.trim().toLowerCase()
+  const projectMap = buildProjectMap(state)
+  const parsed = parseCreateCommand(query, !!projectId)
+
+  const navActions = filterActions(buildNavigationActions(projectId), q)
+  const createActions = filterActions(buildCreateActions(projectId), q)
+  const actions = [...createActions, ...navActions]
+
+  const results = q ? searchAppData(state, query, projectMap) : []
+
+  return { actions, results, parsed }
+}

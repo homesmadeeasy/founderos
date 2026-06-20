@@ -10,8 +10,10 @@ import {
   CalendarCheck2,
   Settings,
   LogOut,
+  Command,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useCommandBar, commandShortcutLabel } from '@/components/command/CommandBarProvider'
 
 const nav = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -24,6 +26,7 @@ const nav = [
 export default function Sidebar({ userEmail }: { userEmail?: string }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { openCommandBar } = useCommandBar()
   const [loggingOut, setLoggingOut] = useState(false)
 
   async function handleLogout() {
@@ -41,6 +44,21 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
       {/* Logo */}
       <div className="h-14 px-5 flex items-center border-b border-zinc-100">
         <span className="text-sm font-bold tracking-tight text-zinc-900">FounderOS</span>
+      </div>
+
+      {/* Command */}
+      <div className="px-2 pt-3 pb-1">
+        <button
+          type="button"
+          onClick={openCommandBar}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50 border border-zinc-200 transition-colors"
+        >
+          <Command size={15} strokeWidth={1.8} />
+          <span className="flex-1 text-left">Command</span>
+          <kbd className="text-[10px] font-medium text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
+            {commandShortcutLabel()}
+          </kbd>
+        </button>
       </div>
 
       {/* Nav */}
