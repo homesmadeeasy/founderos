@@ -15,12 +15,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message,
-  ProjectReview, Idea, IdeaAnalysis, IdeaStatus, Link, EntityType,
+  ProjectReview, Idea, IdeaAnalysis, IdeaStatus, Link, EntityType, ProjectFile, FileStatus,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
   RiskSeverity, RiskStatus, RoadmapStatus, MessageRole,
 } from './types'
 import type {
-  NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink,
+  NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink, NewProjectFile,
 } from '@/contexts/AppContext'
 import {
   normalizeSuggestedTasks, normalizeSuggestedRoadmapItems,
@@ -65,6 +65,11 @@ interface IdeaAnalysisRow {
 interface LinkRow {
   id: string; source_type: string; source_id: string; target_type: string; target_id: string
   relationship_type: string; description: string | null; created_at: string
+}
+interface ProjectFileRow {
+  id: string; project_id: string; file_name: string; file_path: string; file_type: string | null
+  file_size: number | null; summary: string | null; extracted_text: string | null
+  status: string; created_at: string; updated_at: string
 }
 
 // ─── Row → app mappers ──────────────────────────────────────────────────────
@@ -134,6 +139,13 @@ const toLink = (r: LinkRow): Link => ({
   description: r.description ?? '', createdAt: r.created_at,
 })
 
+const toProjectFile = (r: ProjectFileRow): ProjectFile => ({
+  id: r.id, projectId: r.project_id, fileName: r.file_name, filePath: r.file_path,
+  fileType: r.file_type ?? '', fileSize: r.file_size ?? 0,
+  summary: r.summary ?? '', extractedText: r.extracted_text ?? '',
+  status: r.status as FileStatus, createdAt: r.created_at, updatedAt: r.updated_at,
+})
+
 const toProjectReview = (r: ProjectReviewRow): ProjectReview => ({
   id: r.id, projectId: r.project_id,
   summary: r.summary ?? '', progressReview: r.progress_review ?? '',
@@ -148,7 +160,7 @@ const toProjectReview = (r: ProjectReviewRow): ProjectReview => ({
 // ─── Load everything for the signed-in user ───────────────────────────────────
 
 export async function loadAppState(supabase: SupabaseClient): Promise<AppState> {
-  const [projects, tasks, notes, decisions, risks, roadmap, messages, ideas, links] = await Promise.all([
+  const [projects, tasks, notes, decisions, risks, roadmap, messages, ideas, links, projectFiles] = await Promise.all([
     supabase.from('projects').select('*').order('updated_at', { ascending: false }),
     supabase.from('tasks').select('*').order('created_at', { ascending: false }),
     supabase.from('notes').select('*').order('created_at', { ascending: false }),
@@ -158,10 +170,11 @@ export async function loadAppState(supabase: SupabaseClient): Promise<AppState> 
     supabase.from('messages').select('*').order('created_at', { ascending: true }),
     supabase.from('ideas').select('*').order('updated_at', { ascending: false }),
     supabase.from('links').select('*').order('created_at', { ascending: false }),
+    supabase.from('project_files').select('*').order('created_at', { ascending: false }),
   ])
 
   const firstError = projects.error || tasks.error || notes.error || decisions.error
-    || risks.error || roadmap.error || messages.error || ideas.error || links.error
+    || risks.error || roadmap.error || messages.error || ideas.error || links.error || projectFiles.error
   if (firstError) throw firstError
 
   // Group messages by project
@@ -178,6 +191,7 @@ export async function loadAppState(supabase: SupabaseClient): Promise<AppState> 
     risks:        (risks.data     ?? []).map(toRisk),
     roadmapItems: (roadmap.data   ?? []).map(toRoadmap),
     ideas:        (ideas.data     ?? []).map(toIdea),
+    projectFiles: (projectFiles.data ?? []).map(toProjectFile),
     links:        (links.data     ?? []).map(toLink),
     chatMessages,
   }
@@ -352,16 +366,17 @@ export async function loadProjectContext(
   if (projectError) throw projectError
   if (!projectData) return null
 
-  const [tasks, notes, decisions, risks, roadmap, messages] = await Promise.all([
+  const [tasks, notes, decisions, risks, roadmap, messages, files] = await Promise.all([
     supabase.from('tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('notes').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('decisions').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('risks').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
     supabase.from('roadmap_items').select('*').eq('project_id', projectId).order('sort_order', { ascending: true }),
     supabase.from('messages').select('*').eq('project_id', projectId).order('created_at', { ascending: true }),
+    supabase.from('project_files').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
   ])
 
-  const firstError = tasks.error || notes.error || decisions.error || risks.error || roadmap.error || messages.error
+  const firstError = tasks.error || notes.error || decisions.error || risks.error || roadmap.error || messages.error || files.error
   if (firstError) throw firstError
 
   return {
@@ -372,6 +387,7 @@ export async function loadProjectContext(
     risks:        (risks.data    ?? []).map(toRisk),
     roadmapItems: (roadmap.data  ?? []).map(toRoadmap),
     messages:     (messages.data ?? []).map(toMessage),
+    projectFiles: (files.data    ?? []).map(toProjectFile),
   }
 }
 
@@ -521,5 +537,48 @@ export async function getLinksForEntity(supabase: SupabaseClient, type: EntityTy
 
 export async function deleteLink(supabase: SupabaseClient, id: string) {
   const { error } = await supabase.from('links').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ─── Project Files ────────────────────────────────────────────────────────────
+
+export async function createProjectFile(
+  supabase: SupabaseClient, userId: string, d: NewProjectFile,
+): Promise<ProjectFile> {
+  const { data, error } = await supabase.from('project_files').insert({
+    user_id: userId,
+    project_id: d.projectId,
+    file_name: d.fileName,
+    file_path: d.filePath,
+    file_type: d.fileType,
+    file_size: d.fileSize,
+    extracted_text: d.extractedText ?? null,
+    status: 'Uploaded',
+  }).select('*').single()
+  if (error) throw error
+  return toProjectFile(data as ProjectFileRow)
+}
+
+export async function updateProjectFile(
+  supabase: SupabaseClient, id: string,
+  d: Partial<Pick<ProjectFile, 'summary' | 'extractedText' | 'status'>>,
+): Promise<ProjectFile> {
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (d.summary       !== undefined) patch.summary = d.summary
+  if (d.extractedText !== undefined) patch.extracted_text = d.extractedText
+  if (d.status        !== undefined) patch.status = d.status
+  const { data, error } = await supabase.from('project_files').update(patch).eq('id', id).select('*').single()
+  if (error) throw error
+  return toProjectFile(data as ProjectFileRow)
+}
+
+export async function loadProjectFile(supabase: SupabaseClient, fileId: string): Promise<ProjectFile | null> {
+  const { data, error } = await supabase.from('project_files').select('*').eq('id', fileId).maybeSingle()
+  if (error) throw error
+  return data ? toProjectFile(data as ProjectFileRow) : null
+}
+
+export async function deleteProjectFileRecord(supabase: SupabaseClient, id: string) {
+  const { error } = await supabase.from('project_files').delete().eq('id', id)
   if (error) throw error
 }

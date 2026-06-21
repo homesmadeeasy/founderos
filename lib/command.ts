@@ -17,6 +17,7 @@ export type CommandObjectType =
   | 'decision'
   | 'risk'
   | 'roadmap_item'
+  | 'project_file'
 
 export type CommandCreateType =
   | 'project'
@@ -77,6 +78,7 @@ export const OBJECT_TYPE_LABEL: Record<CommandObjectType, string> = {
   decision: 'Decision',
   risk: 'Risk',
   roadmap_item: 'Roadmap item',
+  project_file: 'File',
 }
 
 export const CREATE_TYPE_LABEL: Record<CommandCreateType, string> = {
@@ -127,6 +129,7 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
     { id: 'nav-proj-roadmap', kind: 'navigate', label: 'Project roadmap', href: `${base}/roadmap` },
     { id: 'nav-proj-review', kind: 'navigate', label: 'Project review', href: `${base}/review` },
     { id: 'nav-proj-memory', kind: 'navigate', label: 'Memory graph', href: `${base}/memory`, keywords: ['linked memory', 'knowledge graph'] },
+    { id: 'nav-proj-files', kind: 'navigate', label: 'Project files', href: `${base}/files`, keywords: ['upload', 'documents'] },
   ]
 
   return [...global, ...projectNav]
@@ -307,6 +310,20 @@ export function searchAppData(
         projectId: r.projectId,
         projectName: projectMap.get(r.projectId),
         href: `/projects/${r.projectId}/roadmap`,
+      })
+    }
+  }
+
+  for (const f of state.projectFiles) {
+    if (matchesQuery(q, f.fileName, f.summary, f.extractedText)) {
+      results.push({
+        id: f.id,
+        objectType: 'project_file',
+        title: f.fileName,
+        preview: f.summary || f.status,
+        projectId: f.projectId,
+        projectName: projectMap.get(f.projectId),
+        href: `/projects/${f.projectId}/files`,
       })
     }
   }

@@ -213,6 +213,24 @@ export interface IdeaAnalysis {
   createdAt: string
 }
 
+// ─── Project Files ────────────────────────────────────────────────────────────
+
+export type FileStatus = 'Uploaded' | 'Processing' | 'Summarised' | 'Failed'
+
+export interface ProjectFile {
+  id: string
+  projectId: string
+  fileName: string
+  filePath: string
+  fileType: string
+  fileSize: number
+  summary: string
+  extractedText: string
+  status: FileStatus
+  createdAt: string
+  updatedAt: string
+}
+
 // ─── Knowledge Graph / Linked Memory ────────────────────────────────────────
 
 export type EntityType =
@@ -227,6 +245,7 @@ export type EntityType =
   | 'risk'
   | 'roadmap_item'
   | 'project_review'
+  | 'project_file'
 
 export type RelationshipType =
   | 'created_from'
@@ -268,6 +287,7 @@ export interface AppState {
   risks: Risk[]
   roadmapItems: RoadmapItem[]
   ideas: Idea[]
+  projectFiles: ProjectFile[]
   links: Link[]
   chatMessages: Record<string, Message[]>
 }

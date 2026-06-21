@@ -10,8 +10,9 @@
  */
 
 import type {
-  Project, Task, Note, Decision, Risk, RoadmapItem, Message,
+  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectFile,
 } from './types'
+import { summarizeProjectFiles } from './file'
 
 // ─── Model config ─────────────────────────────────────────────────────────────
 // Change the model in this single place. gpt-4o-mini is a current, fast and
@@ -67,6 +68,7 @@ export interface ChatContext {
   risks:        { title: string; severity: string; status: string }[]
   roadmapItems: { title: string; stage: string; status: string }[]
   linkedMemory?: string[]
+  projectFiles?: string[]
 }
 
 export interface ChatHistoryMessage {
@@ -98,6 +100,7 @@ export function buildChatContext(
   risks: Risk[],
   roadmapItems: RoadmapItem[],
   linkedMemory: string[] = [],
+  projectFiles: ProjectFile[] = [],
 ): ChatContext {
   return {
     title:       project.title,
@@ -111,6 +114,7 @@ export function buildChatContext(
     risks:        risks.slice(0, 10).map(r => ({ title: r.title, severity: r.severity, status: r.status })),
     roadmapItems: roadmapItems.slice(0, 15).map(r => ({ title: r.title, stage: r.stage, status: r.status })),
     linkedMemory: linkedMemory.slice(0, 15),
+    projectFiles: summarizeProjectFiles(projectFiles, 10),
   }
 }
 
@@ -156,5 +160,8 @@ EXISTING ROADMAP ITEMS
 ${list(ctx.roadmapItems, r => `${r.title} [${r.stage}, ${r.status}]`, 'no roadmap items yet')}
 
 LINKED MEMORY (how items in this project connect)
-${list(ctx.linkedMemory ?? [], s => s, 'no linked memory yet')}`
+${list(ctx.linkedMemory ?? [], s => s, 'no linked memory yet')}
+
+UPLOADED PROJECT FILES (summaries only)
+${list(ctx.projectFiles ?? [], s => s, 'no files uploaded yet')}`
 }

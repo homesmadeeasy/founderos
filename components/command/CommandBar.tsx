@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Search, Loader2, ArrowRight, Plus, LayoutDashboard, FolderKanban, Lightbulb,
   Settings, MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map,
-  Sparkles, Network, AlertCircle,
+  Sparkles, Network, AlertCircle, File,
 } from 'lucide-react'
 import { useAppContext } from '@/contexts/AppContext'
 import {
@@ -573,5 +573,6 @@ function objectIcon(type: CommandSearchResult['objectType']) {
     case 'decision': return GitFork
     case 'risk': return AlertTriangle
     case 'roadmap_item': return Map
+    case 'project_file': return File
   }
 }

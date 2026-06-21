@@ -114,6 +114,7 @@ export function ProjectProvider({
   const roadmapItems = app.appState.roadmapItems
     .filter(r => r.projectId === pid)
     .sort((a, b) => a.sortOrder - b.sortOrder)
+  const projectFiles = app.appState.projectFiles.filter(f => f.projectId === pid)
   const messages     = app.appState.chatMessages[pid] ?? []
 
   // ── AI request ──────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ export function ProjectProvider({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userText,
-          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory),
+          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles),
           history: buildChatHistory(history),
         }),
       })
@@ -149,7 +150,7 @@ export function ProjectProvider({
     } finally {
       setIsAiTyping(false)
     }
-  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems])
+  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems, projectFiles])
 
   const sendMessage = useCallback((content: string) => {
     const historyBefore = messages

@@ -24,7 +24,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import * as db from '@/lib/db'
 import type {
-  AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message, Idea, Link,
+  AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message, Idea, Link, ProjectFile,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
   RiskSeverity, RiskStatus, RoadmapStatus, MessageRole, IdeaStatus,
   EntityType, RelationshipType,
@@ -63,6 +63,10 @@ export type NewLink      = {
   sourceType: EntityType; sourceId: string
   targetType: EntityType; targetId: string
   relationshipType: RelationshipType; description?: string
+}
+export type NewProjectFile = {
+  projectId: string; fileName: string; filePath: string
+  fileType: string; fileSize: number; extractedText?: string
 }
 
 interface AppContextValue {
@@ -108,6 +112,11 @@ interface AppContextValue {
   createLink:       (data: NewLink) => Promise<Link>
   deleteLink:       (id: string) => Promise<void>
 
+  // Project files
+  createProjectFile:  (data: NewProjectFile) => Promise<ProjectFile>
+  updateProjectFile:  (id: string, data: Partial<Pick<ProjectFile, 'summary' | 'extractedText' | 'status'>>) => Promise<ProjectFile>
+  deleteProjectFile:  (id: string, filePath: string) => Promise<void>
+
   // Chat
   addMessage:       (projectId: string, role: MessageRole, content: string) => Promise<Message>
 }
@@ -115,7 +124,7 @@ interface AppContextValue {
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const EMPTY_STATE: AppState = {
-  projects: [], tasks: [], notes: [], decisions: [], risks: [], roadmapItems: [], ideas: [], links: [], chatMessages: {},
+  projects: [], tasks: [], notes: [], decisions: [], risks: [], roadmapItems: [], ideas: [], projectFiles: [], links: [], chatMessages: {},
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -212,6 +221,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
         decisions:    s.decisions.filter(d => d.projectId !== id),
         risks:        s.risks.filter(r => r.projectId !== id),
         roadmapItems: s.roadmapItems.filter(r => r.projectId !== id),
+        projectFiles: s.projectFiles.filter(f => f.projectId !== id),
         chatMessages: Object.fromEntries(Object.entries(s.chatMessages).filter(([k]) => k !== id)),
       }),
       () => db.deleteProject(supabase, id),
@@ -374,6 +384,44 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
       () => db.deleteLink(supabase, id),
     ), [supabase, mutate])
 
+  // ── Project files ──────────────────────────────────────────────────────────
+
+  const createProjectFile = useCallback(async (data: NewProjectFile): Promise<ProjectFile> => {
+    try {
+      const item = await db.createProjectFile(supabase, userId, data)
+      patch(s => ({ ...s, projectFiles: [item, ...s.projectFiles] }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] createProjectFile failed:', err)
+      throw err
+    }
+  }, [supabase, userId, patch])
+
+  const updateProjectFile = useCallback(async (
+    id: string, data: Partial<Pick<ProjectFile, 'summary' | 'extractedText' | 'status'>>,
+  ): Promise<ProjectFile> => {
+    try {
+      const item = await db.updateProjectFile(supabase, id, data)
+      patch(s => ({ ...s, projectFiles: s.projectFiles.map(f => f.id === id ? item : f) }))
+      return item
+    } catch (err) {
+      console.error('[FounderOS] updateProjectFile failed:', err)
+      throw err
+    }
+  }, [supabase, patch])
+
+  const deleteProjectFile = useCallback(async (id: string, filePath: string) => {
+    patch(s => ({ ...s, projectFiles: s.projectFiles.filter(f => f.id !== id) }))
+    try {
+      await supabase.storage.from('project-files').remove([filePath])
+      await db.deleteProjectFileRecord(supabase, id)
+    } catch (err) {
+      console.error('[FounderOS] deleteProjectFile failed:', err)
+      await reload()
+      throw err
+    }
+  }, [supabase, patch, reload])
+
   // ── Chat ──────────────────────────────────────────────────────────────────
 
   const addMessage = useCallback(async (projectId: string, role: MessageRole, content: string): Promise<Message> => {
@@ -401,6 +449,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
       addRoadmapItem, updateRoadmapItem, deleteRoadmapItem,
       createIdea, updateIdea, deleteIdea,
       createLink, deleteLink,
+      createProjectFile, updateProjectFile, deleteProjectFile,
       addMessage,
     }}>
       {children}

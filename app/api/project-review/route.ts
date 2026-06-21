@@ -77,7 +77,8 @@ export async function POST(req: Request) {
     const stateForLinks: AppState = {
       projects: [context.project],
       tasks: context.tasks, notes: context.notes, decisions: context.decisions,
-      risks: context.risks, roadmapItems: context.roadmapItems, ideas: [],
+      risks: context.risks, roadmapItems: context.roadmapItems,
+      projectFiles: context.projectFiles ?? [], ideas: [],
       links, chatMessages: { [projectId]: context.messages },
     }
     const ids = collectProjectEntityIds(stateForLinks, projectId)

@@ -19,7 +19,7 @@ import type {
 
 export const ENTITY_TYPES: EntityType[] = [
   'idea', 'idea_analysis', 'project', 'conversation', 'message',
-  'task', 'note', 'decision', 'risk', 'roadmap_item', 'project_review',
+  'task', 'note', 'decision', 'risk', 'roadmap_item', 'project_review', 'project_file',
 ]
 
 export const RELATIONSHIP_TYPES: RelationshipType[] = [
@@ -40,6 +40,7 @@ export const ENTITY_LABEL: Record<EntityType, string> = {
   risk:           'Risk',
   roadmap_item:   'Roadmap item',
   project_review: 'Project Review',
+  project_file:   'Project file',
 }
 
 /** Human label for a relationship type (for grouping / filters). */
@@ -57,7 +58,7 @@ export const RELATIONSHIP_LABEL: Record<RelationshipType, string> = {
 }
 
 /** Entity types that have a user-facing title we can resolve. */
-const TITLED_TYPES: EntityType[] = ['idea', 'project', 'task', 'note', 'decision', 'risk', 'roadmap_item']
+const TITLED_TYPES: EntityType[] = ['idea', 'project', 'task', 'note', 'decision', 'risk', 'roadmap_item', 'project_file']
 
 // ─── Label resolution ─────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export function buildLabelResolver(state: AppState): LabelResolver {
       case 'risk':         return state.risks.find(r => r.id === id)?.title
       case 'roadmap_item': return state.roadmapItems.find(r => r.id === id)?.title
       case 'idea':         return state.ideas.find(i => i.id === id)?.title
+      case 'project_file': return state.projectFiles.find(f => f.id === id)?.fileName
       default:             return undefined
     }
   }
@@ -102,7 +104,11 @@ export function describeLink(link: Link, resolve: LabelResolver): string {
     case 'supports':      return `${source} supports ${target}.`
     case 'resolves':      return `${source} resolves ${target}.`
     case 'depends_on':    return `${source} depends on ${target}.`
-    case 'part_of':       return `${source} is part of ${target}.`
+    case 'part_of':
+      if (link.sourceType === 'project' && link.targetType === 'project_file') {
+        return `${target} was uploaded to ${source}.`
+      }
+      return `${source} is part of ${target}.`
     case 'caused_by':     return `${source} was caused by ${target}.`
     case 'relates_to':    return `${source} relates to ${target}.`
     default:              return `${source} ${String(link.relationshipType).replace(/_/g, ' ')} ${target}.`
@@ -123,6 +129,7 @@ export function collectProjectEntityIds(state: AppState, projectId: string): Set
   state.decisions.forEach(d => { if (d.projectId === projectId) ids.add(d.id) })
   state.risks.forEach(r => { if (r.projectId === projectId) ids.add(r.id) })
   state.roadmapItems.forEach(r => { if (r.projectId === projectId) ids.add(r.id) })
+  state.projectFiles.forEach(f => { if (f.projectId === projectId) ids.add(f.id) })
   ;(state.chatMessages[projectId] ?? []).forEach(m => ids.add(m.id))
   return ids
 }

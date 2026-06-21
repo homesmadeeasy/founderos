@@ -13,6 +13,7 @@ const tabs = [
   { label: 'Roadmap',   slug: 'roadmap' },
   { label: 'Project Review', slug: 'review' },
   { label: 'Memory Graph', slug: 'memory' },
+  { label: 'Files', slug: 'files' },
 ]
 
 export default function ProjectTabs({ projectId }: { projectId: string }) {

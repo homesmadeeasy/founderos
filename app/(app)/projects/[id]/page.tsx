@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles, Network } from 'lucide-react'
+import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles, Network, File } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import EditProjectModal from '@/components/project/EditProjectModal'
@@ -30,6 +30,10 @@ export default function ProjectOverviewPage() {
     }
   }, [appState, project.id])
   const recentLinks = projectLinks.slice(0, 5)
+  const projectFiles = appState.projectFiles
+    .filter(f => f.projectId === project.id)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const latestFiles = projectFiles.slice(0, 3)
   const [showEdit,   setShowEdit]   = useState(false)
   const [showDelete, setShowDelete] = useState(false)
 
@@ -64,6 +68,7 @@ export default function ProjectOverviewPage() {
     { icon: AlertTriangle, label: 'Risks',     href: 'risks',     stat: `${openRisks} open`,                          color: 'text-red-500',     bg: 'bg-red-50' },
     { icon: Map,           label: 'Roadmap',   href: 'roadmap',   stat: `${roadmapItems.length} items`,               color: 'text-indigo-500',  bg: 'bg-indigo-50' },
     { icon: Network,       label: 'Memory Graph', href: 'memory', stat: `${projectLinks.length} link${projectLinks.length === 1 ? '' : 's'}`, color: 'text-teal-500', bg: 'bg-teal-50' },
+    { icon: File,          label: 'Files',        href: 'files',  stat: `${projectFiles.length} file${projectFiles.length === 1 ? '' : 's'}`, color: 'text-amber-600', bg: 'bg-amber-50' },
   ]
 
   return (
@@ -192,6 +197,47 @@ export default function ProjectOverviewPage() {
               <li key={l.id} className="flex items-start gap-2 text-sm text-zinc-700 leading-relaxed">
                 <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
                 <span>{describe(l)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Project Files */}
+      <div className="bg-white rounded-xl border border-zinc-100 p-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <File size={13} className="text-zinc-400" />
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Project Files</p>
+          </div>
+          {projectFiles.length > 0 && (
+            <Link href={`/projects/${project.id}/files`} className="text-zinc-300 hover:text-zinc-600 transition-colors">
+              <ArrowRight size={14} />
+            </Link>
+          )}
+        </div>
+        {latestFiles.length === 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-400 leading-relaxed py-1">No files uploaded yet.</p>
+            <Link
+              href={`/projects/${project.id}/files`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-700 transition-colors"
+            >
+              <File size={12} /> Upload first file
+            </Link>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {latestFiles.map(f => (
+              <li key={f.id} className="flex items-start gap-2">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-zinc-800 truncate">{f.fileName}</p>
+                  <p className="text-xs text-zinc-400">
+                    {f.status}
+                    {f.summary ? ` · ${f.summary.replace(/\s+/g, ' ').slice(0, 80)}…` : ''}
+                  </p>
+                </div>
               </li>
             ))}
           </ul>

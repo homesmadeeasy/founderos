@@ -13,7 +13,7 @@
  */
 
 import type {
-  Project, Task, Note, Decision, Risk, RoadmapItem, Message,
+  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectFile,
   SuggestedReviewTask, SuggestedReviewRoadmapItem,
 } from './types'
 import { AI_MODEL } from './ai'
@@ -89,13 +89,14 @@ export interface ReviewContextInput {
   risks: Risk[]
   roadmapItems: RoadmapItem[]
   messages: Message[]
+  projectFiles?: ProjectFile[]
   /** Plain-English summaries of how items in this project are connected. */
   linkedMemory?: string[]
 }
 
 /** Render the project state into a concise text block for the model. */
 export function renderReviewContext(input: ReviewContextInput): string {
-  const { project, tasks, notes, decisions, risks, roadmapItems, messages, linkedMemory = [] } = input
+  const { project, tasks, notes, decisions, risks, roadmapItems, messages, projectFiles = [], linkedMemory = [] } = input
 
   const list = <T,>(items: T[], fmt: (item: T) => string, empty: string) =>
     items.length ? items.map(i => `  - ${fmt(i)}`).join('\n') : `  (${empty})`
@@ -131,6 +132,14 @@ ${list(risks.slice(0, 15), r => `${r.title} [${r.severity}, ${r.status}]`, 'no r
 
 ROADMAP (${roadmapItems.length})
 ${list(roadmapItems.slice(0, 20), r => `${r.title} [${r.stage || 'unstaged'}, ${r.status}]`, 'no roadmap items')}
+
+PROJECT FILES (${projectFiles.length})
+${list(projectFiles.slice(0, 15), f => {
+  const summary = f.summary?.trim()
+  return summary
+    ? `${f.fileName} [${f.status}]: ${summary.replace(/\s+/g, ' ').slice(0, 200)}`
+    : `${f.fileName} [${f.status}]`
+}, 'no files uploaded')}
 
 RECENT CHAT (last ${recent.length} messages)
 ${list(recent, m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content.replace(/\s+/g, ' ').slice(0, 240)}`, 'no chat history')}
