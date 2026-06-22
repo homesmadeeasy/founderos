@@ -23,10 +23,23 @@ const EMPTY: FormState = {
 const inputCls  = 'w-full px-3 py-2.5 text-sm border border-zinc-200 rounded-lg outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100 transition-colors'
 const selectCls = `${inputCls} bg-white`
 
-export default function CreateProjectModal() {
+export default function CreateProjectModal({
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+}: {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
+} = {}) {
   const router = useRouter()
   const { createProject } = useAppContext()
-  const [open, setOpen]     = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = (next: boolean) => {
+    if (controlledOpen === undefined) setInternalOpen(next)
+    onOpenChange?.(next)
+  }
   const [form, setForm]     = useState<FormState>(EMPTY)
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState<string | null>(null)
@@ -54,12 +67,14 @@ export default function CreateProjectModal() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors"
-      >
-        <Plus size={13} /> New Project
-      </button>
+      {!hideTrigger && (
+        <button
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-700 transition-colors"
+        >
+          <Plus size={13} /> New Project
+        </button>
+      )}
 
       {open && (
         <div
