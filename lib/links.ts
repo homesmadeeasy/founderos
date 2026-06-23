@@ -19,7 +19,7 @@ import type {
 
 export const ENTITY_TYPES: EntityType[] = [
   'idea', 'idea_analysis', 'project', 'conversation', 'message',
-  'task', 'note', 'decision', 'risk', 'roadmap_item', 'project_review', 'project_file',
+  'task', 'note', 'decision', 'risk', 'roadmap_item', 'project_review', 'project_file', 'weekly_review',
 ]
 
 export const RELATIONSHIP_TYPES: RelationshipType[] = [
@@ -41,6 +41,7 @@ export const ENTITY_LABEL: Record<EntityType, string> = {
   roadmap_item:   'Roadmap item',
   project_review: 'Project Review',
   project_file:   'Project file',
+  weekly_review:  'Weekly Review',
 }
 
 /** Human label for a relationship type (for grouping / filters). */

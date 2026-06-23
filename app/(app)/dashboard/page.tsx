@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Target, CheckSquare, AlertTriangle, Activity, Lightbulb, Sparkles, Network,
-  FolderKanban, ArrowRight, MessageSquare,
+  FolderKanban, ArrowRight, MessageSquare, CalendarCheck2,
 } from 'lucide-react'
+import { loadWeeklyReviews } from '@/lib/db'
 import { useAppContext } from '@/contexts/AppContext'
 import { createClient } from '@/lib/supabase/client'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -13,7 +14,7 @@ import CreateProjectModal from '@/components/ui/CreateProjectModal'
 import LoadingScreen, { ErrorScreen } from '@/components/ui/LoadingScreen'
 import EmptyState from '@/components/ui/EmptyState'
 import { buildLabelResolver, describeLink } from '@/lib/links'
-import type { Project, Task } from '@/lib/types'
+import type { Project, Task, WeeklyReview } from '@/lib/types'
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 } as const
 
@@ -54,6 +55,7 @@ function Section({
 export default function DashboardPage() {
   const { appState, isHydrated, loadError } = useAppContext()
   const [recentReviews, setRecentReviews] = useState<ReviewPreview[]>([])
+  const [latestWeeklyReview, setLatestWeeklyReview] = useState<WeeklyReview | null>(null)
 
   useEffect(() => {
     if (!isHydrated) return
@@ -64,14 +66,22 @@ export default function DashboardPage() {
         .select('id, project_id, summary, created_at')
         .order('created_at', { ascending: false })
         .limit(3)
-      if (!data) return
-      setRecentReviews(data.map(r => ({
-        id: r.id,
-        projectId: r.project_id,
-        projectTitle: appState.projects.find(p => p.id === r.project_id)?.title ?? 'Project',
-        summary: r.summary ?? '',
-        createdAt: r.created_at,
-      })))
+      if (data) {
+        setRecentReviews(data.map(r => ({
+          id: r.id,
+          projectId: r.project_id,
+          projectTitle: appState.projects.find(p => p.id === r.project_id)?.title ?? 'Project',
+          summary: r.summary ?? '',
+          createdAt: r.created_at,
+        })))
+      }
+
+      try {
+        const weekly = await loadWeeklyReviews(supabase)
+        setLatestWeeklyReview(weekly[0] ?? null)
+      } catch (err) {
+        console.error('[Dashboard] loadWeeklyReviews failed:', err)
+      }
     })()
   }, [isHydrated, appState.projects])
 
@@ -230,6 +240,33 @@ export default function DashboardPage() {
         )}
       </Section>
 
+      {/* Latest Weekly Review */}
+      <Section title="Latest Weekly Review" icon={CalendarCheck2} href="/weekly-review">
+        {latestWeeklyReview ? (
+          <Link href="/weekly-review" className="block px-5 py-4 hover:bg-zinc-50 transition-colors">
+            <p className="text-[11px] text-zinc-400">
+              {new Date(latestWeeklyReview.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+              {' · '}
+              {latestWeeklyReview.weekStart} – {latestWeeklyReview.weekEnd}
+            </p>
+            <p className="text-sm font-medium text-zinc-800 mt-1 line-clamp-2">{latestWeeklyReview.summary}</p>
+            {latestWeeklyReview.nextWeekFocus && (
+              <p className="text-xs text-zinc-500 mt-2 line-clamp-2">
+                <span className="font-medium text-zinc-600">Next week: </span>
+                {latestWeeklyReview.nextWeekFocus}
+              </p>
+            )}
+          </Link>
+        ) : (
+          <EmptyState
+            icon={CalendarCheck2}
+            title="No weekly review yet"
+            description="Generate a cross-workspace weekly review to maintain momentum across everything you're building."
+            action={{ label: 'Generate weekly review', href: '/weekly-review' }}
+          />
+        )}
+      </Section>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Next tasks */}
         <Section title="Next tasks to work on" icon={CheckSquare} href="/projects">
@@ -366,6 +403,9 @@ function findLinkHref(
   link: { sourceType: string; sourceId: string; targetType: string; targetId: string },
   projects: Project[],
 ): string {
+  if (link.sourceType === 'weekly_review' || link.targetType === 'weekly_review') {
+    return '/weekly-review'
+  }
   const projectId =
     link.sourceType === 'project' ? link.sourceId :
     link.targetType === 'project' ? link.targetId :

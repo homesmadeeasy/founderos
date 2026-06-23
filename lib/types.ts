@@ -135,6 +135,41 @@ export interface ProjectReview {
   createdAt: string
 }
 
+// ─── Global Weekly Review ─────────────────────────────────────────────────────
+
+/** A task suggested by the Weekly Review Engine. May include a project id. */
+export interface SuggestedWeeklyTask {
+  projectId?: string
+  title: string
+  description: string
+  priority: 'Low' | 'Medium' | 'High'
+}
+
+/** A project the Weekly Review Engine recommends reviewing. */
+export interface SuggestedProjectReviewRef {
+  projectId: string
+  reason: string
+}
+
+export interface WeeklyReview {
+  id: string
+  weekStart: string
+  weekEnd: string
+  summary: string
+  completedWork: string
+  activeProjects: string
+  stuckProjects: string
+  keyDecisions: string
+  keyRisks: string
+  ideasToRevisit: string
+  filesAdded: string
+  memoryInsights: string
+  nextWeekFocus: string
+  suggestedTasks: SuggestedWeeklyTask[]
+  suggestedProjectReviews: SuggestedProjectReviewRef[]
+  createdAt: string
+}
+
 // ─── Idea Vault ─────────────────────────────────────────────────────────────
 
 export type IdeaStatus =
@@ -246,6 +281,7 @@ export type EntityType =
   | 'roadmap_item'
   | 'project_review'
   | 'project_file'
+  | 'weekly_review'
 
 export type RelationshipType =
   | 'created_from'

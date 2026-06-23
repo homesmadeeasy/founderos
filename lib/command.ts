@@ -5,7 +5,7 @@
  * Search runs against AppContext data already loaded via RLS-scoped queries.
  */
 
-import type { AppState } from './types'
+import type { AppState, WeeklyReview } from './types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,7 @@ export type CommandObjectType =
   | 'risk'
   | 'roadmap_item'
   | 'project_file'
+  | 'weekly_review'
 
 export type CommandCreateType =
   | 'project'
@@ -79,6 +80,7 @@ export const OBJECT_TYPE_LABEL: Record<CommandObjectType, string> = {
   risk: 'Risk',
   roadmap_item: 'Roadmap item',
   project_file: 'File',
+  weekly_review: 'Weekly Review',
 }
 
 export const CREATE_TYPE_LABEL: Record<CommandCreateType, string> = {
@@ -113,6 +115,7 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
     { id: 'nav-dashboard', kind: 'navigate', label: 'Dashboard', href: '/dashboard', keywords: ['home'] },
     { id: 'nav-projects', kind: 'navigate', label: 'Projects', href: '/projects', keywords: ['project list'] },
     { id: 'nav-ideas', kind: 'navigate', label: 'Idea Vault', href: '/ideas', keywords: ['ideas', 'vault'] },
+    { id: 'nav-weekly-review', kind: 'navigate', label: 'Weekly Review', href: '/weekly-review', keywords: ['review', 'weekly', 'summary'] },
     { id: 'nav-settings', kind: 'navigate', label: 'Settings', href: '/settings', keywords: ['preferences'] },
   ]
 
@@ -331,6 +334,31 @@ export function searchAppData(
   return results.slice(0, limit)
 }
 
+/** Search weekly reviews by summary and focus text. */
+export function searchWeeklyReviews(
+  reviews: WeeklyReview[],
+  query: string,
+  limit = 8,
+): CommandSearchResult[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+
+  return reviews
+    .filter(r =>
+      r.summary.toLowerCase().includes(q) ||
+      r.nextWeekFocus.toLowerCase().includes(q) ||
+      r.completedWork.toLowerCase().includes(q),
+    )
+    .slice(0, limit)
+    .map(r => ({
+      id: r.id,
+      objectType: 'weekly_review' as const,
+      title: r.summary.slice(0, 80) || 'Weekly Review',
+      preview: r.nextWeekFocus.slice(0, 120) || `${r.weekStart} – ${r.weekEnd}`,
+      href: '/weekly-review',
+    }))
+}
+
 // ─── Natural-language create commands ─────────────────────────────────────────
 
 const CREATE_TYPE_ALIASES: Record<string, CommandCreateType> = {
@@ -397,6 +425,7 @@ export function filterCommandPalette(
   state: AppState,
   query: string,
   projectId: string | null,
+  weeklyReviews: WeeklyReview[] = [],
 ): { actions: CommandAction[]; results: CommandSearchResult[]; parsed: ParsedCreateCommand | null } {
   const q = query.trim().toLowerCase()
   const projectMap = buildProjectMap(state)
@@ -406,7 +435,9 @@ export function filterCommandPalette(
   const createActions = filterActions(buildCreateActions(projectId), q)
   const actions = [...createActions, ...navActions]
 
-  const results = q ? searchAppData(state, query, projectMap) : []
+  const results = q
+    ? [...searchAppData(state, query, projectMap), ...searchWeeklyReviews(weeklyReviews, query)]
+    : []
 
   return { actions, results, parsed }
 }

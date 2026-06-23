@@ -19,7 +19,7 @@ const nav = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Projects',  href: '/projects',  icon: FolderKanban },
   { label: 'Idea Vault', href: '/ideas',    icon: Lightbulb },
-  { label: 'Weekly Review', href: '/review', icon: CalendarCheck2 },
+  { label: 'Weekly Review', href: '/weekly-review', icon: CalendarCheck2 },
   { label: 'Settings', href: '/settings',   icon: Settings },
 ]
 

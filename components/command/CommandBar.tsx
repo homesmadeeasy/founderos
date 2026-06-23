@@ -5,9 +5,12 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Search, Loader2, ArrowRight, Plus, LayoutDashboard, FolderKanban, Lightbulb,
   Settings, MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map,
-  Sparkles, Network, AlertCircle, File,
+  Sparkles, Network, AlertCircle, File, CalendarCheck2,
 } from 'lucide-react'
 import { useAppContext } from '@/contexts/AppContext'
+import { createClient } from '@/lib/supabase/client'
+import { loadWeeklyReviews } from '@/lib/db'
+import type { WeeklyReview } from '@/lib/types'
 import {
   parseProjectIdFromPath, buildProjectMap, buildRecentSearchResults,
   filterCommandPalette, createDraftFromParsed, emptyCreateDraft,
@@ -41,15 +44,24 @@ export default function CommandBar({ onClose }: Props) {
   const [draft, setDraft] = useState<CreateDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>([])
 
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { inputRef.current?.focus() }, [])
 
+  useEffect(() => {
+    if (!isHydrated) return
+    const supabase = createClient()
+    void loadWeeklyReviews(supabase)
+      .then(setWeeklyReviews)
+      .catch(err => console.error('[CommandBar] loadWeeklyReviews failed:', err))
+  }, [isHydrated])
+
   const { actions, results, parsed } = useMemo(
-    () => filterCommandPalette(appState, query, projectId),
-    [appState, query, projectId],
+    () => filterCommandPalette(appState, query, projectId, weeklyReviews),
+    [appState, query, projectId, weeklyReviews],
   )
 
   const recent = useMemo(
@@ -556,6 +568,7 @@ function actionIcon(action: CommandAction) {
   if (href.includes('/decisions')) return GitFork
   if (href.includes('/risks')) return AlertTriangle
   if (href.includes('/roadmap')) return Map
+  if (href.includes('/weekly-review')) return CalendarCheck2
   if (href.includes('/review')) return Sparkles
   if (href.includes('/memory')) return Network
   if (href.includes('/ideas')) return Lightbulb
@@ -574,5 +587,6 @@ function objectIcon(type: CommandSearchResult['objectType']) {
     case 'risk': return AlertTriangle
     case 'roadmap_item': return Map
     case 'project_file': return File
+    case 'weekly_review': return CalendarCheck2
   }
 }
