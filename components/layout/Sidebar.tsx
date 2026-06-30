@@ -9,6 +9,7 @@ import {
   Lightbulb,
   CalendarCheck2,
   GitBranch,
+  Brain,
   Settings,
   LogOut,
   Command,
@@ -23,6 +24,7 @@ const nav = [
   { label: 'Idea Vault', href: '/ideas',    icon: Lightbulb },
   { label: 'Weekly Review', href: '/weekly-review', icon: CalendarCheck2 },
   { label: 'Patterns', href: '/patterns', icon: GitBranch },
+  { label: 'Memory Search', href: '/memory-search', icon: Brain },
   { label: 'Settings', href: '/settings',   icon: Settings },
 ]
 

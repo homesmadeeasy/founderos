@@ -16,6 +16,7 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { loadGlobalWorkspaceContext, createWeeklyReview } from '@/lib/db'
+import { indexWeeklyReview } from '@/lib/memory/indexing'
 import {
   AI_MODEL, WEEKLY_REVIEW_SYSTEM_PROMPT, renderWeeklyContext, normalizeWeeklyReview,
 } from '@/lib/weekly-review'
@@ -89,6 +90,8 @@ export async function POST() {
     const review = await createWeeklyReview(
       supabase, user.id, context.weekStart, context.weekEnd, fields,
     )
+    void indexWeeklyReview(supabase, user.id, review)
+      .catch(err => console.error('[api/weekly-review] memory index failed:', err))
     return NextResponse.json({ review })
   } catch (err) {
     console.error('[api/weekly-review] failed to save review:', err)

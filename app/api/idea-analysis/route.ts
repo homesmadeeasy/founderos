@@ -19,6 +19,7 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { loadIdea, createIdeaAnalysis } from '@/lib/db'
+import { indexIdeaAnalysis } from '@/lib/memory/indexing'
 import {
   AI_MODEL, IDEA_SYSTEM_PROMPT, renderIdeaContext, normalizeIdeaAnalysis,
   type IdeaAnalysisRequestBody,
@@ -107,6 +108,8 @@ export async function POST(req: Request) {
   // 4. Save and return the analysis
   try {
     const analysis = await createIdeaAnalysis(supabase, user.id, ideaId, fields)
+    void indexIdeaAnalysis(supabase, user.id, analysis, idea.title)
+      .catch(err => console.error('[api/idea-analysis] memory index failed:', err))
     return NextResponse.json({ analysis })
   } catch (err) {
     console.error('[api/idea-analysis] failed to save analysis:', err)

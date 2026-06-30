@@ -35,6 +35,7 @@ export type {
 import type {
   NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink, NewProjectFile,
 } from '@/lib/db/input-types'
+import { queueMemoryIndex } from '@/lib/memory/routes'
 
 // ─── Insert payload types (re-exported from lib/db/input-types) ─────────────
 
@@ -167,6 +168,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const project = await db.createProject(supabase, userId, data)
       patch(s => ({ ...s, projects: [project, ...s.projects] }))
+      queueMemoryIndex('project', project.id)
       return project
     } catch (err) {
       console.error('[FounderOS] createProject failed:', err)
@@ -177,7 +179,10 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
   const updateProject = useCallback((id: string, data: Partial<Omit<Project, 'id' | 'createdAt'>>) =>
     mutate(
       s => ({ ...s, projects: s.projects.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p) }),
-      () => db.updateProject(supabase, id, data),
+      async () => {
+        await db.updateProject(supabase, id, data)
+        queueMemoryIndex('project', id)
+      },
     ), [supabase, mutate])
 
   const deleteProject = useCallback((id: string) =>
@@ -202,6 +207,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const item = await db.createTask(supabase, userId, data)
       patch(s => ({ ...s, tasks: [item, ...s.tasks] }))
+      queueMemoryIndex('task', item.id)
       return item
     } catch (err) {
       console.error('[FounderOS] addTask failed:', err)
@@ -212,7 +218,10 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
   const updateTask = useCallback((id: string, data: Partial<Task>) =>
     mutate(
       s => ({ ...s, tasks: s.tasks.map(t => t.id === id ? { ...t, ...data } : t) }),
-      () => db.updateTask(supabase, id, data),
+      async () => {
+        await db.updateTask(supabase, id, data)
+        queueMemoryIndex('task', id)
+      },
     ), [supabase, mutate])
 
   const deleteTask = useCallback((id: string) =>
@@ -227,6 +236,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const item = await db.createNote(supabase, userId, data)
       patch(s => ({ ...s, notes: [item, ...s.notes] }))
+      queueMemoryIndex('note', item.id)
       return item
     } catch (err) {
       console.error('[FounderOS] addNote failed:', err)
@@ -246,6 +256,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const item = await db.createDecision(supabase, userId, data)
       patch(s => ({ ...s, decisions: [item, ...s.decisions] }))
+      queueMemoryIndex('decision', item.id)
       return item
     } catch (err) {
       console.error('[FounderOS] addDecision failed:', err)
@@ -265,6 +276,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const item = await db.createRisk(supabase, userId, data)
       patch(s => ({ ...s, risks: [item, ...s.risks] }))
+      queueMemoryIndex('risk', item.id)
       return item
     } catch (err) {
       console.error('[FounderOS] addRisk failed:', err)
@@ -275,7 +287,10 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
   const updateRisk = useCallback((id: string, data: Partial<Risk>) =>
     mutate(
       s => ({ ...s, risks: s.risks.map(r => r.id === id ? { ...r, ...data } : r) }),
-      () => db.updateRisk(supabase, id, data),
+      async () => {
+        await db.updateRisk(supabase, id, data)
+        queueMemoryIndex('risk', id)
+      },
     ), [supabase, mutate])
 
   const deleteRisk = useCallback((id: string) =>
@@ -290,6 +305,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const item = await db.createRoadmapItem(supabase, userId, data)
       patch(s => ({ ...s, roadmapItems: [...s.roadmapItems, item] }))
+      queueMemoryIndex('roadmap_item', item.id)
       return item
     } catch (err) {
       console.error('[FounderOS] addRoadmapItem failed:', err)
@@ -300,7 +316,10 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
   const updateRoadmapItem = useCallback((id: string, data: Partial<RoadmapItem>) =>
     mutate(
       s => ({ ...s, roadmapItems: s.roadmapItems.map(r => r.id === id ? { ...r, ...data } : r) }),
-      () => db.updateRoadmapItem(supabase, id, data),
+      async () => {
+        await db.updateRoadmapItem(supabase, id, data)
+        queueMemoryIndex('roadmap_item', id)
+      },
     ), [supabase, mutate])
 
   const deleteRoadmapItem = useCallback((id: string) =>
@@ -315,6 +334,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const item = await db.createIdea(supabase, userId, data)
       patch(s => ({ ...s, ideas: [item, ...s.ideas] }))
+      queueMemoryIndex('idea', item.id)
       return item
     } catch (err) {
       console.error('[FounderOS] createIdea failed:', err)
@@ -325,7 +345,10 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
   const updateIdea = useCallback((id: string, data: Partial<Omit<Idea, 'id' | 'createdAt'>>) =>
     mutate(
       s => ({ ...s, ideas: s.ideas.map(i => i.id === id ? { ...i, ...data, updatedAt: new Date().toISOString() } : i) }),
-      () => db.updateIdea(supabase, id, data),
+      async () => {
+        await db.updateIdea(supabase, id, data)
+        queueMemoryIndex('idea', id)
+      },
     ), [supabase, mutate])
 
   const deleteIdea = useCallback((id: string) =>
@@ -340,6 +363,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const item = await db.createLink(supabase, userId, data)
       patch(s => ({ ...s, links: [item, ...s.links] }))
+      queueMemoryIndex('link', item.id)
       return item
     } catch (err) {
       console.error('[FounderOS] createLink failed:', err)
@@ -372,6 +396,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     try {
       const item = await db.updateProjectFile(supabase, id, data)
       patch(s => ({ ...s, projectFiles: s.projectFiles.map(f => f.id === id ? item : f) }))
+      if (item.summary || item.extractedText) queueMemoryIndex('project_file', item.id)
       return item
     } catch (err) {
       console.error('[FounderOS] updateProjectFile failed:', err)

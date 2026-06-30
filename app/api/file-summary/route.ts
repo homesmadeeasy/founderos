@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { loadProjectFile, loadProjectContext, updateProjectFile } from '@/lib/db'
+import { indexProjectFile } from '@/lib/memory/indexing'
 import { AI_MODEL } from '@/lib/ai'
 import { FILE_SYSTEM_PROMPT } from '@/lib/file'
 
@@ -97,6 +98,9 @@ ${text.slice(0, 40000)}`,
       extractedText: text,
       status: 'Summarised',
     })
+
+    void indexProjectFile(supabase, user.id, updated, context.project.title)
+      .catch(err => console.error('[api/file-summary] memory index failed:', err))
 
     return NextResponse.json({ file: updated })
   } catch (err) {

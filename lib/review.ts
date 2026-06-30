@@ -94,6 +94,8 @@ export interface ReviewContextInput {
   projectFiles?: ProjectFile[]
   /** Plain-English summaries of how items in this project are connected. */
   linkedMemory?: string[]
+  /** Semantically retrieved memories relevant to this project. */
+  semanticMemory?: string[]
   /** Latest Project DNA profile, if available. */
   projectDna?: ProjectDnaSnapshot
   /** Latest cross-project pattern analysis, if available. */
@@ -102,7 +104,7 @@ export interface ReviewContextInput {
 
 /** Render the project state into a concise text block for the model. */
 export function renderReviewContext(input: ReviewContextInput): string {
-  const { project, tasks, notes, decisions, risks, roadmapItems, messages, projectFiles = [], linkedMemory = [], projectDna, patternAnalysis } = input
+  const { project, tasks, notes, decisions, risks, roadmapItems, messages, projectFiles = [], linkedMemory = [], semanticMemory = [], projectDna, patternAnalysis } = input
 
   const list = <T,>(items: T[], fmt: (item: T) => string, empty: string) =>
     items.length ? items.map(i => `  - ${fmt(i)}`).join('\n') : `  (${empty})`
@@ -151,7 +153,10 @@ RECENT CHAT (last ${recent.length} messages)
 ${list(recent, m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content.replace(/\s+/g, ' ').slice(0, 240)}`, 'no chat history')}
 
 LINKED MEMORY (how items in this project connect — e.g. which risks block tasks, which tasks came from reviews, which project came from an idea)
-${list(linkedMemory.slice(0, 15), s => s, 'no linked memory yet')}${projectDna ? `
+${list(linkedMemory.slice(0, 15), s => s, 'no linked memory yet')}
+
+SEMANTIC MEMORY (retrieved past notes, decisions, risks most relevant to this project)
+${list(semanticMemory.slice(0, 5), s => s, 'no semantic matches')}${projectDna ? `
 
 PROJECT DNA (long-term identity and evolution)
 ${renderDnaSnapshotPrompt(projectDna)}` : ''}${patternAnalysis ? `

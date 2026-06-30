@@ -70,6 +70,7 @@ export interface ChatContext {
   risks:        { title: string; severity: string; status: string }[]
   roadmapItems: { title: string; stage: string; status: string }[]
   linkedMemory?: string[]
+  semanticMemory?: string[]
   projectFiles?: string[]
   projectDna?: ProjectDnaSnapshot
   patternAnalysis?: PatternAnalysisSnapshot
@@ -107,6 +108,7 @@ export function buildChatContext(
   projectFiles: ProjectFile[] = [],
   projectDna?: ProjectDnaSnapshot,
   patternAnalysis?: PatternAnalysisSnapshot,
+  semanticMemory: string[] = [],
 ): ChatContext {
   return {
     title:       project.title,
@@ -120,6 +122,7 @@ export function buildChatContext(
     risks:        risks.slice(0, 10).map(r => ({ title: r.title, severity: r.severity, status: r.status })),
     roadmapItems: roadmapItems.slice(0, 15).map(r => ({ title: r.title, stage: r.stage, status: r.status })),
     linkedMemory: linkedMemory.slice(0, 15),
+    semanticMemory: semanticMemory.slice(0, 3),
     projectFiles: summarizeProjectFiles(projectFiles, 10),
     projectDna,
     patternAnalysis,
@@ -169,6 +172,9 @@ ${list(ctx.roadmapItems, r => `${r.title} [${r.stage}, ${r.status}]`, 'no roadma
 
 LINKED MEMORY (how items in this project connect)
 ${list(ctx.linkedMemory ?? [], s => s, 'no linked memory yet')}
+
+SEMANTIC MEMORY (most relevant past notes/decisions/risks for this message)
+${list(ctx.semanticMemory ?? [], s => s, 'no semantic matches')}
 
 UPLOADED PROJECT FILES (summaries only)
 ${list(ctx.projectFiles ?? [], s => s, 'no files uploaded yet')}${ctx.projectDna ? `

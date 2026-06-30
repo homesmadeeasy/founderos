@@ -378,6 +378,77 @@ export interface LinkedEntity {
   label: string
 }
 
+// ─── Semantic Search / Vector Memory ─────────────────────────────────────────
+
+export type MemoryEntityType =
+  | 'idea'
+  | 'idea_analysis'
+  | 'project'
+  | 'message'
+  | 'task'
+  | 'note'
+  | 'decision'
+  | 'risk'
+  | 'roadmap_item'
+  | 'project_review'
+  | 'weekly_review'
+  | 'project_file'
+  | 'project_dna'
+  | 'pattern_analysis'
+  | 'link'
+
+export interface MemoryEmbedding {
+  id: string
+  userId: string
+  entityType: MemoryEntityType
+  entityId: string
+  projectId: string | null
+  title: string | null
+  content: string
+  contentPreview: string | null
+  metadata: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MemorySearchResult {
+  id: string
+  entityType: MemoryEntityType
+  entityId: string
+  projectId: string | null
+  title: string | null
+  contentPreview: string | null
+  metadata: Record<string, unknown>
+  similarity: number
+  href: string
+}
+
+export interface SemanticSearchResponse {
+  results: MemorySearchResult[]
+  query: string
+  count: number
+}
+
+export interface AskMemorySource {
+  entityType: MemoryEntityType
+  entityId: string
+  title: string | null
+  contentPreview: string | null
+  projectId: string | null
+  href: string
+}
+
+export interface AskMemoryResponse {
+  answer: string
+  sources: AskMemorySource[]
+  followUpActions: string[]
+}
+
+export interface MemoryIndexStatus {
+  indexedCount: number
+  lastIndexedAt: string | null
+}
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 // ─── User profile ───────────────────────────────────────────────────────────

@@ -15,6 +15,8 @@ import {
   REVIEW_SYSTEM_PROMPT, renderReviewContext, normalizeReview,
   type ProjectReviewRequestBody,
 } from '@/lib/review'
+import { runSemanticSearch, formatMemoryResultsForContext } from '@/lib/memory/search'
+import { indexProjectReview } from '@/lib/memory/indexing'
 
 export const runtime = 'nodejs'
 
@@ -78,6 +80,20 @@ export async function POST(req: Request) {
   }
 
   try {
+    const searchQuery = [context.project.goal, context.project.title, 'risks decisions blockers'].filter(Boolean).join(' ')
+    const semantic = await runSemanticSearch(supabase, {
+      query: searchQuery,
+      userId: auth.user.id,
+      projectId,
+      limit: 5,
+      similarityThreshold: 0.25,
+    })
+    context.semanticMemory = formatMemoryResultsForContext(semantic.results, 5)
+  } catch (err) {
+    console.error('[api/project-review] semantic memory skipped:', err)
+  }
+
+  try {
     const fields = await runJsonCompletion(
       {
         system: REVIEW_SYSTEM_PROMPT,
@@ -88,6 +104,8 @@ export async function POST(req: Request) {
       normalizeReview,
     )
     const review = await createProjectReview(supabase, auth.user.id, projectId, fields)
+    void indexProjectReview(supabase, auth.user.id, review, context.project.title)
+      .catch(err => console.error('[api/project-review] memory index failed:', err))
     return NextResponse.json({ review })
   } catch (err) {
     if (err instanceof Error && (err.message.includes('JSON') || err.message.includes('empty'))) {

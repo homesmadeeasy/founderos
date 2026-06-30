@@ -59,6 +59,10 @@ export interface ParsedCreateCommand {
   text: string
 }
 
+export interface ParsedAskMemoryCommand {
+  question: string
+}
+
 export interface CreateDraft {
   createType: CommandCreateType
   title: string
@@ -121,6 +125,7 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
     { id: 'nav-ideas', kind: 'navigate', label: 'Idea Vault', href: '/ideas', keywords: ['ideas', 'vault'] },
     { id: 'nav-weekly-review', kind: 'navigate', label: 'Weekly Review', href: '/weekly-review', keywords: ['review', 'weekly', 'summary'] },
     { id: 'nav-patterns', kind: 'navigate', label: 'Patterns', href: '/patterns', keywords: ['pattern', 'cross-project', 'analysis', 'insights'] },
+    { id: 'nav-memory-search', kind: 'navigate', label: 'Memory Search', href: '/memory-search', keywords: ['semantic', 'search', 'ask memory', 'vector', 'recall'] },
     { id: 'nav-how-it-works', kind: 'navigate', label: 'How FounderOS works', href: '/how-it-works', keywords: ['help', 'guide', 'onboarding', 'tutorial'] },
     { id: 'nav-settings', kind: 'navigate', label: 'Settings', href: '/settings', keywords: ['preferences'] },
   ]
@@ -139,6 +144,7 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
     { id: 'nav-proj-review', kind: 'navigate', label: 'Project review', href: `${base}/review` },
     { id: 'nav-proj-dna', kind: 'navigate', label: 'Project DNA', href: `${base}/dna`, keywords: ['dna', 'profile', 'identity'] },
     { id: 'nav-proj-memory', kind: 'navigate', label: 'Memory graph', href: `${base}/memory`, keywords: ['linked memory', 'knowledge graph'] },
+    { id: 'nav-proj-memory-search', kind: 'navigate', label: 'Project memory search', href: `${base}/memory-search`, keywords: ['semantic', 'ask memory', 'search'] },
     { id: 'nav-proj-files', kind: 'navigate', label: 'Project files', href: `${base}/files`, keywords: ['upload', 'documents'] },
   ]
 
@@ -444,6 +450,14 @@ function normalizeCreateType(raw: string): CommandCreateType | null {
 
 const PROJECT_ONLY_CREATES: CommandCreateType[] = ['task', 'note', 'decision', 'risk', 'roadmap_item']
 
+/** Rule-based parsing: "ask memory: What decisions…" → question text. */
+export function parseAskMemoryCommand(input: string): ParsedAskMemoryCommand | null {
+  const match = input.trim().match(/^ask\s+memory\s*:\s*(.+)$/i)
+  if (!match) return null
+  const question = match[1].trim()
+  return question ? { question } : null
+}
+
 /** Rule-based parsing: "new task: Build upload" → create draft. */
 export function parseCreateCommand(input: string, inProject: boolean): ParsedCreateCommand | null {
   const trimmed = input.trim()
@@ -493,10 +507,11 @@ export function filterCommandPalette(
   weeklyReviews: WeeklyReview[] = [],
   projectDnaRecords: ProjectDna[] = [],
   patternAnalyses: PatternAnalysis[] = [],
-): { actions: CommandAction[]; results: CommandSearchResult[]; parsed: ParsedCreateCommand | null } {
+): { actions: CommandAction[]; results: CommandSearchResult[]; parsed: ParsedCreateCommand | null; askMemory: ParsedAskMemoryCommand | null } {
   const q = query.trim().toLowerCase()
   const projectMap = buildProjectMap(state)
   const parsed = parseCreateCommand(query, !!projectId)
+  const askMemory = parseAskMemoryCommand(query)
 
   const navActions = filterActions(buildNavigationActions(projectId), q)
   const createActions = filterActions(buildCreateActions(projectId), q)
@@ -511,5 +526,5 @@ export function filterCommandPalette(
       ]
     : []
 
-  return { actions, results, parsed }
+  return { actions, results, parsed, askMemory }
 }

@@ -175,12 +175,30 @@ export function ProjectProvider({
       )
       const dnaSnapshot = latestDna ? toDnaSnapshot(latestDna) : undefined
       const patternSnapshot = latestPattern ? toPatternSnapshot(latestPattern) : undefined
+
+      let semanticMemory: string[] = []
+      try {
+        const searchRes = await fetch('/api/memory/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: userText, project_id: pid, limit: 3 }),
+        })
+        if (searchRes.ok) {
+          const searchData = await searchRes.json() as { results?: { entityType: string; title?: string | null; contentPreview?: string | null }[] }
+          semanticMemory = (searchData.results ?? []).slice(0, 3).map(r =>
+            `[${r.entityType}] ${r.title ?? r.entityType}: ${r.contentPreview ?? ''}`,
+          )
+        }
+      } catch {
+        // Non-blocking — chat works without semantic memory
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userText,
-          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles, dnaSnapshot, patternSnapshot),
+          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles, dnaSnapshot, patternSnapshot, semanticMemory),
           history: buildChatHistory(history),
         }),
       })

@@ -14,6 +14,7 @@ const tabs = [
   { label: 'Project Review', slug: 'review' },
   { label: 'DNA', slug: 'dna' },
   { label: 'Memory Graph', slug: 'memory' },
+  { label: 'Memory Search', slug: 'memory-search' },
   { label: 'Files', slug: 'files' },
 ]
 

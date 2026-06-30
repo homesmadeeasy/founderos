@@ -13,7 +13,7 @@ import { loadWeeklyReviews, loadLatestProjectDnaForAllProjects, loadPatternAnaly
 import type { WeeklyReview, ProjectDna, PatternAnalysis } from '@/lib/types'
 import {
   parseProjectIdFromPath, buildProjectMap, buildRecentSearchResults,
-  filterCommandPalette, createDraftFromParsed, emptyCreateDraft,
+  filterCommandPalette, createDraftFromParsed, emptyCreateDraft, parseAskMemoryCommand,
   OBJECT_TYPE_LABEL, CREATE_TYPE_LABEL,
   type CommandAction, type CommandSearchResult, type CreateDraft,
 } from '@/lib/command'
@@ -22,6 +22,7 @@ type PaletteRow =
   | { kind: 'action'; action: CommandAction }
   | { kind: 'result'; result: CommandSearchResult }
   | { kind: 'parsed'; label: string; draft: CreateDraft }
+  | { kind: 'askMemory'; question: string }
 
 interface Props {
   onClose: () => void
@@ -63,7 +64,7 @@ export default function CommandBar({ onClose }: Props) {
     ]).catch(err => console.error('[CommandBar] failed to load search data:', err))
   }, [isHydrated])
 
-  const { actions, results, parsed } = useMemo(
+  const { actions, results, parsed, askMemory } = useMemo(
     () => filterCommandPalette(appState, query, projectId, weeklyReviews, projectDnaRecords, patternAnalyses),
     [appState, query, projectId, weeklyReviews, projectDnaRecords, patternAnalyses],
   )
@@ -86,6 +87,13 @@ export default function CommandBar({ onClose }: Props) {
       })
     }
 
+    if (askMemory) {
+      list.push({
+        kind: 'askMemory',
+        question: askMemory.question,
+      })
+    }
+
     for (const action of actions) list.push({ kind: 'action', action })
     for (const result of results) list.push({ kind: 'result', result })
 
@@ -94,7 +102,7 @@ export default function CommandBar({ onClose }: Props) {
     }
 
     return list
-  }, [mode, parsed, actions, results, recent, query])
+  }, [mode, parsed, askMemory, actions, results, recent, query])
 
   useEffect(() => { setSelected(0) }, [query, mode])
 
@@ -122,14 +130,21 @@ export default function CommandBar({ onClose }: Props) {
     }
   }, [close, router, openCreate])
 
+  const runAskMemory = useCallback((question: string) => {
+    close()
+    const base = projectId ? `/projects/${projectId}/memory-search` : '/memory-search'
+    router.push(`${base}?q=${encodeURIComponent(question)}&mode=ask`)
+  }, [close, router, projectId])
+
   const runRow = useCallback((row: PaletteRow) => {
     if (row.kind === 'action') runAction(row.action)
     else if (row.kind === 'parsed') openCreate(row.draft)
+    else if (row.kind === 'askMemory') runAskMemory(row.question)
     else if (row.kind === 'result') {
       close()
       router.push(row.result.href)
     }
-  }, [runAction, openCreate, close, router])
+  }, [runAction, openCreate, runAskMemory, close, router])
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (mode === 'create') {
@@ -495,6 +510,7 @@ export default function CommandBar({ onClose }: Props) {
 function rowKey(row: PaletteRow, index: number): string {
   if (row.kind === 'action') return row.action.id
   if (row.kind === 'result') return `${row.result.objectType}-${row.result.id}`
+  if (row.kind === 'askMemory') return `ask-memory-${index}`
   return `parsed-${index}`
 }
 
@@ -511,27 +527,35 @@ function PaletteRowItem({
     ? actionIcon(row.action)
     : row.kind === 'parsed'
       ? Plus
-      : objectIcon(row.result.objectType)
+      : row.kind === 'askMemory'
+        ? Sparkles
+        : objectIcon(row.result.objectType)
 
   const label = row.kind === 'action'
     ? row.action.label
     : row.kind === 'parsed'
       ? row.label
-      : row.result.title
+      : row.kind === 'askMemory'
+        ? `Ask Memory — "${row.question}"`
+        : row.result.title
 
   const description = row.kind === 'action'
     ? row.action.description ?? (row.action.kind === 'create' ? 'Create' : 'Go to page')
     : row.kind === 'parsed'
       ? 'Press Enter to open create form'
-      : row.result.preview
+      : row.kind === 'askMemory'
+        ? 'Press Enter to ask using your workspace memory'
+        : row.result.preview
 
   const badge = row.kind === 'result'
     ? OBJECT_TYPE_LABEL[row.result.objectType]
-    : row.kind === 'action' && row.action.kind === 'create'
-      ? 'Create'
-      : row.kind === 'parsed'
+    : row.kind === 'askMemory'
+      ? 'Ask Memory'
+      : row.kind === 'action' && row.action.kind === 'create'
         ? 'Create'
-        : 'Navigate'
+        : row.kind === 'parsed'
+          ? 'Create'
+          : 'Navigate'
 
   const meta = row.kind === 'result' && row.result.projectName
     ? row.result.projectName

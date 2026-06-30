@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { loadProjectDnaContext, createProjectDna, createLink } from '@/lib/db'
+import { indexProjectDNA } from '@/lib/memory/indexing'
 import {
   AI_MODEL, PROJECT_DNA_SYSTEM_PROMPT, renderProjectDnaContext, normalizeProjectDna,
   type ProjectDnaRequestBody,
@@ -107,6 +108,8 @@ export async function POST(req: Request) {
     } catch (linkErr) {
       console.error('[api/project-dna] failed to create memory link:', linkErr)
     }
+    void indexProjectDNA(supabase, user.id, dna, context.project.title)
+      .catch(err => console.error('[api/project-dna] memory index failed:', err))
     return NextResponse.json({ dna })
   } catch (err) {
     console.error('[api/project-dna] failed to save DNA:', err)

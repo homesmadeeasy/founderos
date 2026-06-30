@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
-  User, Bot, Bell, Shield, AlertTriangle, ChevronRight, Mail,
+  User, Bot, Bell, Shield, AlertTriangle, ChevronRight, Mail, Brain, Loader2, RefreshCw,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import LoadingScreen from '@/components/ui/LoadingScreen'
+import type { MemoryIndexStatus } from '@/lib/types'
 
 const sections = [
   {
@@ -96,6 +98,18 @@ function PlaceholderToggle({ label, desc, defaultOn }: { label: string; desc: st
 export default function SettingsPage() {
   const [email, setEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [indexStatus, setIndexStatus] = useState<MemoryIndexStatus | null>(null)
+  const [reindexing, setReindexing] = useState(false)
+  const [memoryMessage, setMemoryMessage] = useState<string | null>(null)
+
+  const loadMemoryStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/memory/status')
+      if (res.ok) setIndexStatus(await res.json() as MemoryIndexStatus)
+    } catch {
+      // Non-blocking
+    }
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
@@ -103,7 +117,27 @@ export default function SettingsPage() {
       setEmail(data.user?.email ?? null)
       setLoading(false)
     })
-  }, [])
+    void loadMemoryStatus()
+  }, [loadMemoryStatus])
+
+  async function handleReindex() {
+    setReindexing(true)
+    setMemoryMessage(null)
+    try {
+      const res = await fetch('/api/memory/reindex', { method: 'POST' })
+      const data = await res.json() as MemoryIndexStatus & { indexed?: number; error?: string }
+      if (!res.ok) {
+        setMemoryMessage(data.error ?? 'Reindex failed.')
+        return
+      }
+      setIndexStatus({ indexedCount: data.indexedCount, lastIndexedAt: data.lastIndexedAt })
+      setMemoryMessage(`Indexed ${data.indexed ?? data.indexedCount} items.`)
+    } catch {
+      setMemoryMessage('Reindex failed. Try again.')
+    } finally {
+      setReindexing(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -124,8 +158,56 @@ export default function SettingsPage() {
 
       <div className="flex items-center gap-3 px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-xs text-zinc-500">
         <span className="font-medium text-zinc-600">Preview</span>
-        <span>These sections are placeholders — full settings are coming soon.</span>
+        <span>Most sections below are placeholders — Memory Search is live.</span>
       </div>
+
+      <section className="bg-white rounded-xl border border-zinc-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-zinc-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-100 text-zinc-500">
+              <Brain size={15} />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-900">Semantic memory</h2>
+              <p className="text-xs text-zinc-400 mt-0.5">Vector index for Memory Search and Ask Memory</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <p className="text-sm text-zinc-600">
+            <span className="font-medium text-zinc-800">{indexStatus?.indexedCount ?? '—'}</span>
+            {' '}indexed items
+            {indexStatus?.lastIndexedAt && (
+              <span className="text-zinc-400">
+                {' '}· last updated {new Date(indexStatus.lastIndexedAt).toLocaleString()}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+            Rebuilding may take a moment and uses AI embedding calls.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleReindex()}
+              disabled={reindexing}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 disabled:opacity-50"
+            >
+              {reindexing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Rebuild Memory Index
+            </button>
+            <Link
+              href="/memory-search"
+              className="text-sm font-medium text-zinc-600 hover:text-zinc-900"
+            >
+              Open Memory Search →
+            </Link>
+          </div>
+          {memoryMessage && (
+            <p className="text-xs text-zinc-500">{memoryMessage}</p>
+          )}
+        </div>
+      </section>
 
       <div className="space-y-4">
         {sections.map(section => {

@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { loadPatternAnalysisContext, createPatternAnalysis } from '@/lib/db'
+import { indexPatternAnalysis } from '@/lib/memory/indexing'
 import {
   AI_MODEL, PATTERN_ANALYSIS_SYSTEM_PROMPT, renderPatternAnalysisContext, normalizePatternAnalysis,
 } from '@/lib/pattern-analysis'
@@ -80,6 +81,8 @@ export async function POST() {
 
   try {
     const analysis = await createPatternAnalysis(supabase, user.id, fields)
+    void indexPatternAnalysis(supabase, user.id, analysis)
+      .catch(err => console.error('[api/pattern-analysis] memory index failed:', err))
     return NextResponse.json({ analysis })
   } catch (err) {
     console.error('[api/pattern-analysis] failed to save analysis:', err)
