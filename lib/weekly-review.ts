@@ -115,16 +115,27 @@ export interface WeeklyReviewContextInput {
   risks: Risk[]
   roadmapItems: RoadmapItem[]
   projectReviews: ProjectReviewSummary[]
+  projectDnaSummaries: ProjectDnaSummary[]
   projectFiles: ProjectFile[]
   links: Link[]
   recentMessages: Array<{ projectId: string; projectTitle: string; role: string; content: string; createdAt: string }>
   linkedMemorySummaries: string[]
 }
 
+export interface ProjectDnaSummary {
+  projectId: string
+  projectTitle: string
+  dnaSummary: string
+  currentDirection: string
+  momentumPattern: string
+  nextStrategicMove: string
+  confidenceScore: number
+}
+
 export function renderWeeklyContext(input: WeeklyReviewContextInput): string {
   const {
     weekStart, weekEnd, projects, ideas, tasks, notes, decisions, risks,
-    roadmapItems, projectReviews, projectFiles, recentMessages, linkedMemorySummaries,
+    roadmapItems, projectReviews, projectDnaSummaries, projectFiles, recentMessages, linkedMemorySummaries,
   } = input
 
   const list = <T,>(items: T[], fmt: (item: T) => string, empty: string) =>
@@ -188,6 +199,11 @@ PROJECT REVIEWS THIS WEEK (${weekReviews.length})
 ${list(weekReviews.slice(0, 8), r =>
   `[${r.projectTitle}] ${r.summary.replace(/\s+/g, ' ').slice(0, 160)}`,
   'no project reviews this week')}
+
+PROJECT DNA PROFILES (${projectDnaSummaries.length} active projects with DNA)
+${list(projectDnaSummaries.slice(0, 10), d =>
+  `[${d.projectTitle}] ${d.dnaSummary.replace(/\s+/g, ' ').slice(0, 120)} — direction: ${d.currentDirection.replace(/\s+/g, ' ').slice(0, 80)} — momentum: ${d.momentumPattern.replace(/\s+/g, ' ').slice(0, 60)}`,
+  'no project DNA profiles yet')}
 
 RECENT CHAT (last ${recentMessages.length} messages across projects)
 ${list(recentMessages.slice(0, MAX_WEEKLY_MESSAGES), m =>

@@ -17,7 +17,7 @@ import type {
   AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message,
   ProjectReview, Idea, IdeaAnalysis, IdeaStatus, Link, EntityType, ProjectFile, FileStatus,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
-  RiskSeverity, RiskStatus, RoadmapStatus, MessageRole, WeeklyReview,
+  RiskSeverity, RiskStatus, RoadmapStatus, MessageRole, WeeklyReview, ProjectDna,
 } from './types'
 import type {
   NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink, NewProjectFile,
@@ -30,7 +30,10 @@ import {
   normalizeSuggestedWeeklyTasks, normalizeSuggestedProjectReviews,
   getWeekBounds, type NormalizedWeeklyReviewFields, type WeeklyReviewContextInput,
 } from './weekly-review'
-import { buildLabelResolver, summarizeLinks } from './links'
+import {
+  type NormalizedProjectDnaFields, type ProjectDnaContextInput, type IdeaOriginContext,
+} from './project-dna'
+import { buildLabelResolver, summarizeLinks, collectProjectEntityIds, getProjectLinks } from './links'
 import {
   normalizeSuggestedProject, normalizeSuggestedIdeaTasks,
   normalizeSuggestedIdeaRisks, normalizeSuggestedIdeaRoadmapItems,
@@ -83,6 +86,13 @@ interface WeeklyReviewRow {
   ideas_to_revisit: string | null; files_added: string | null; memory_insights: string | null
   next_week_focus: string | null; suggested_tasks: unknown; suggested_project_reviews: unknown
   created_at: string
+}
+interface ProjectDnaRow {
+  id: string; project_id: string
+  origin: string | null; core_goal: string | null; current_direction: string | null
+  major_decisions: string | null; recurring_risks: string | null; momentum_pattern: string | null
+  lessons_learned: string | null; next_strategic_move: string | null; dna_summary: string | null
+  confidence_score: number | null; created_at: string
 }
 
 // ─── Row → app mappers ──────────────────────────────────────────────────────
@@ -186,6 +196,22 @@ const toWeeklyReview = (r: WeeklyReviewRow): WeeklyReview => ({
   nextWeekFocus: r.next_week_focus ?? '',
   suggestedTasks: normalizeSuggestedWeeklyTasks(r.suggested_tasks),
   suggestedProjectReviews: normalizeSuggestedProjectReviews(r.suggested_project_reviews),
+  createdAt: r.created_at,
+})
+
+const toProjectDna = (r: ProjectDnaRow): ProjectDna => ({
+  id: r.id,
+  projectId: r.project_id,
+  origin: r.origin ?? '',
+  coreGoal: r.core_goal ?? '',
+  currentDirection: r.current_direction ?? '',
+  majorDecisions: r.major_decisions ?? '',
+  recurringRisks: r.recurring_risks ?? '',
+  momentumPattern: r.momentum_pattern ?? '',
+  lessonsLearned: r.lessons_learned ?? '',
+  nextStrategicMove: r.next_strategic_move ?? '',
+  dnaSummary: r.dna_summary ?? '',
+  confidenceScore: r.confidence_score ?? 50,
   createdAt: r.created_at,
 })
 
@@ -546,9 +572,20 @@ export async function loadGlobalWorkspaceContext(
   const resolve = buildLabelResolver(stateForLinks)
   const linkedMemorySummaries = summarizeLinks(links, resolve, 12)
 
+  const latestDnaRecords = await loadLatestProjectDnaForAllProjects(supabase)
+  const projectDnaSummaries = latestDnaRecords.map(d => ({
+    projectId: d.projectId,
+    projectTitle: projectMap.get(d.projectId) ?? 'Project',
+    dnaSummary: d.dnaSummary,
+    currentDirection: d.currentDirection,
+    momentumPattern: d.momentumPattern,
+    nextStrategicMove: d.nextStrategicMove,
+    confidenceScore: d.confidenceScore,
+  }))
+
   return {
     weekStart, weekEnd, projects, ideas, tasks, notes, decisions, risks,
-    roadmapItems, projectReviews, projectFiles, links, recentMessages, linkedMemorySummaries,
+    roadmapItems, projectReviews, projectDnaSummaries, projectFiles, links, recentMessages, linkedMemorySummaries,
   }
 }
 
@@ -579,6 +616,156 @@ export async function createWeeklyReview(
   }).select('*').single()
   if (error) throw error
   return toWeeklyReview(data as WeeklyReviewRow)
+}
+
+// ─── Project DNA ──────────────────────────────────────────────────────────────
+
+/** Load every DNA profile for a project, newest first. */
+export async function loadProjectDna(
+  supabase: SupabaseClient, projectId: string,
+): Promise<ProjectDna[]> {
+  const { data, error } = await supabase
+    .from('project_dna')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(r => toProjectDna(r as ProjectDnaRow))
+}
+
+/** Latest DNA profile for one project, or null. */
+export async function loadLatestProjectDna(
+  supabase: SupabaseClient, projectId: string,
+): Promise<ProjectDna | null> {
+  const { data, error } = await supabase
+    .from('project_dna')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data ? toProjectDna(data as ProjectDnaRow) : null
+}
+
+/** Latest DNA per project (for weekly review + command search). */
+export async function loadLatestProjectDnaForAllProjects(
+  supabase: SupabaseClient,
+): Promise<ProjectDna[]> {
+  const { data, error } = await supabase
+    .from('project_dna')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  const seen = new Set<string>()
+  const latest: ProjectDna[] = []
+  for (const row of data ?? []) {
+    const dna = toProjectDna(row as ProjectDnaRow)
+    if (seen.has(dna.projectId)) continue
+    seen.add(dna.projectId)
+    latest.push(dna)
+  }
+  return latest
+}
+
+async function loadIdeaOriginForProject(
+  supabase: SupabaseClient, projectId: string,
+): Promise<IdeaOriginContext | undefined> {
+  const { data: linkData } = await supabase
+    .from('links')
+    .select('source_id')
+    .eq('target_type', 'project')
+    .eq('target_id', projectId)
+    .eq('source_type', 'idea')
+    .eq('relationship_type', 'converted_to')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!linkData?.source_id) return undefined
+
+  const ideaId = linkData.source_id
+  const [ideaRes, analysisRes] = await Promise.all([
+    supabase.from('ideas').select('*').eq('id', ideaId).maybeSingle(),
+    supabase.from('idea_analyses').select('summary').eq('idea_id', ideaId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+  ])
+
+  if (!ideaRes.data) return undefined
+  const idea = toIdea(ideaRes.data as IdeaRow)
+  return {
+    ideaTitle: idea.title,
+    ideaDescription: idea.description,
+    ideaStatus: idea.status,
+    analysisSummary: analysisRes.data?.summary ?? undefined,
+  }
+}
+
+/** Aggregate project data for DNA generation. */
+export async function loadProjectDnaContext(
+  supabase: SupabaseClient, projectId: string,
+): Promise<ProjectDnaContextInput | null> {
+  const base = await loadProjectContext(supabase, projectId)
+  if (!base) return null
+
+  const [reviews, previousDna, ideaOrigin, allLinks] = await Promise.all([
+    loadProjectReviews(supabase, projectId),
+    loadLatestProjectDna(supabase, projectId),
+    loadIdeaOriginForProject(supabase, projectId),
+    loadLinks(supabase),
+  ])
+
+  const stateForLinks: AppState = {
+    projects: [base.project],
+    tasks: base.tasks, notes: base.notes, decisions: base.decisions,
+    risks: base.risks, roadmapItems: base.roadmapItems,
+    projectFiles: base.projectFiles ?? [], ideas: [],
+    links: allLinks, chatMessages: { [projectId]: base.messages },
+  }
+  const ids = collectProjectEntityIds(stateForLinks, projectId)
+  const linkedMemory = summarizeLinks(
+    getProjectLinks(allLinks, ids),
+    buildLabelResolver(stateForLinks),
+  )
+
+  return {
+    project: base.project,
+    tasks: base.tasks,
+    notes: base.notes,
+    decisions: base.decisions,
+    risks: base.risks,
+    roadmapItems: base.roadmapItems,
+    messages: base.messages,
+    projectFiles: base.projectFiles ?? [],
+    projectReviews: reviews,
+    linkedMemory,
+    ideaOrigin,
+    previousDna: previousDna ?? undefined,
+  }
+}
+
+/** Insert a generated DNA profile and return the saved row. */
+export async function createProjectDna(
+  supabase: SupabaseClient,
+  userId: string,
+  projectId: string,
+  fields: NormalizedProjectDnaFields,
+): Promise<ProjectDna> {
+  const { data, error } = await supabase.from('project_dna').insert({
+    user_id: userId,
+    project_id: projectId,
+    origin: fields.origin,
+    core_goal: fields.coreGoal,
+    current_direction: fields.currentDirection,
+    major_decisions: fields.majorDecisions,
+    recurring_risks: fields.recurringRisks,
+    momentum_pattern: fields.momentumPattern,
+    lessons_learned: fields.lessonsLearned,
+    next_strategic_move: fields.nextStrategicMove,
+    dna_summary: fields.dnaSummary,
+    confidence_score: fields.confidenceScore,
+  }).select('*').single()
+  if (error) throw error
+  return toProjectDna(data as ProjectDnaRow)
 }
 
 // ─── Ideas ────────────────────────────────────────────────────────────────────

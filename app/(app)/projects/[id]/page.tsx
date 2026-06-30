@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles, Network, File } from 'lucide-react'
+import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles, Network, File, Dna } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
 import EditProjectModal from '@/components/project/EditProjectModal'
@@ -16,7 +16,7 @@ const TASK_PRIORITY_RANK: Record<TaskPriority, number> = { high: 0, medium: 1, l
 
 export default function ProjectOverviewPage() {
   const router = useRouter()
-  const { project, tasks, notes, decisions, risks, roadmapItems, messages, reviews, reviewsLoading } = useProjectContext()
+  const { project, tasks, notes, decisions, risks, roadmapItems, messages, reviews, reviewsLoading, latestDna, dnaLoading } = useProjectContext()
   const { appState, deleteProject } = useAppContext()
   const latestReview = reviews[0]
 
@@ -169,6 +169,58 @@ export default function ProjectOverviewPage() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-700 transition-colors"
             >
               <Sparkles size={12} /> Generate first review
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* Project DNA */}
+      <div className="bg-white rounded-xl border border-zinc-100 p-5">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Dna size={13} className="text-violet-400" />
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Project DNA</p>
+          </div>
+          {latestDna && (
+            <Link href={`/projects/${project.id}/dna`} className="text-zinc-300 hover:text-zinc-600 transition-colors">
+              <ArrowRight size={14} />
+            </Link>
+          )}
+        </div>
+        {dnaLoading ? (
+          <p className="text-xs text-zinc-400 py-1">Loading…</p>
+        ) : latestDna ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-violet-600 bg-violet-50 rounded-full px-2 py-0.5 tabular-nums">
+                {latestDna.confidenceScore}% confidence
+              </span>
+              <span className="text-[11px] text-zinc-400">
+                {new Date(latestDna.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+            <p className="text-sm text-zinc-700 leading-relaxed line-clamp-2">{latestDna.dnaSummary}</p>
+            {latestDna.nextStrategicMove && (
+              <p className="text-xs text-zinc-500 line-clamp-2">
+                <span className="font-medium text-zinc-600">Next move: </span>
+                {latestDna.nextStrategicMove}
+              </p>
+            )}
+            <Link
+              href={`/projects/${project.id}/dna`}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900 transition-colors"
+            >
+              View full DNA <ArrowRight size={12} />
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-zinc-400 leading-relaxed">No Project DNA yet.</p>
+            <Link
+              href={`/projects/${project.id}/dna`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-700 transition-colors"
+            >
+              <Dna size={12} /> Generate Project DNA
             </Link>
           </div>
         )}

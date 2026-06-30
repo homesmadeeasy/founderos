@@ -19,7 +19,7 @@ import type {
 
 export const ENTITY_TYPES: EntityType[] = [
   'idea', 'idea_analysis', 'project', 'conversation', 'message',
-  'task', 'note', 'decision', 'risk', 'roadmap_item', 'project_review', 'project_file', 'weekly_review',
+  'task', 'note', 'decision', 'risk', 'roadmap_item', 'project_review', 'project_file', 'weekly_review', 'project_dna',
 ]
 
 export const RELATIONSHIP_TYPES: RelationshipType[] = [
@@ -42,6 +42,7 @@ export const ENTITY_LABEL: Record<EntityType, string> = {
   project_review: 'Project Review',
   project_file:   'Project file',
   weekly_review:  'Weekly Review',
+  project_dna:    'Project DNA',
 }
 
 /** Human label for a relationship type (for grouping / filters). */
@@ -109,6 +110,9 @@ export function describeLink(link: Link, resolve: LabelResolver): string {
       if (link.sourceType === 'project' && link.targetType === 'project_file') {
         return `${target} was uploaded to ${source}.`
       }
+      if (link.sourceType === 'project' && link.targetType === 'project_dna') {
+        return `${target} was generated for ${source}.`
+      }
       return `${source} is part of ${target}.`
     case 'caused_by':     return `${source} was caused by ${target}.`
     case 'relates_to':    return `${source} relates to ${target}.`
@@ -132,6 +136,14 @@ export function collectProjectEntityIds(state: AppState, projectId: string): Set
   state.roadmapItems.forEach(r => { if (r.projectId === projectId) ids.add(r.id) })
   state.projectFiles.forEach(f => { if (f.projectId === projectId) ids.add(f.id) })
   ;(state.chatMessages[projectId] ?? []).forEach(m => ids.add(m.id))
+  state.links.forEach(l => {
+    if (l.sourceType === 'project' && l.sourceId === projectId && l.targetType === 'project_dna') {
+      ids.add(l.targetId)
+    }
+    if (l.targetType === 'project' && l.targetId === projectId && l.sourceType === 'project_dna') {
+      ids.add(l.sourceId)
+    }
+  })
   return ids
 }
 

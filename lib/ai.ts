@@ -10,9 +10,10 @@
  */
 
 import type {
-  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectFile,
+  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectFile, ProjectDnaSnapshot,
 } from './types'
 import { summarizeProjectFiles } from './file'
+import { renderDnaSnapshotPrompt } from './project-dna'
 
 // ─── Model config ─────────────────────────────────────────────────────────────
 // Change the model in this single place. gpt-4o-mini is a current, fast and
@@ -69,6 +70,7 @@ export interface ChatContext {
   roadmapItems: { title: string; stage: string; status: string }[]
   linkedMemory?: string[]
   projectFiles?: string[]
+  projectDna?: ProjectDnaSnapshot
 }
 
 export interface ChatHistoryMessage {
@@ -101,6 +103,7 @@ export function buildChatContext(
   roadmapItems: RoadmapItem[],
   linkedMemory: string[] = [],
   projectFiles: ProjectFile[] = [],
+  projectDna?: ProjectDnaSnapshot,
 ): ChatContext {
   return {
     title:       project.title,
@@ -115,6 +118,7 @@ export function buildChatContext(
     roadmapItems: roadmapItems.slice(0, 15).map(r => ({ title: r.title, stage: r.stage, status: r.status })),
     linkedMemory: linkedMemory.slice(0, 15),
     projectFiles: summarizeProjectFiles(projectFiles, 10),
+    projectDna,
   }
 }
 
@@ -163,5 +167,8 @@ LINKED MEMORY (how items in this project connect)
 ${list(ctx.linkedMemory ?? [], s => s, 'no linked memory yet')}
 
 UPLOADED PROJECT FILES (summaries only)
-${list(ctx.projectFiles ?? [], s => s, 'no files uploaded yet')}`
+${list(ctx.projectFiles ?? [], s => s, 'no files uploaded yet')}${ctx.projectDna ? `
+
+PROJECT DNA (living profile — use for long-term direction)
+${renderDnaSnapshotPrompt(ctx.projectDna)}` : ''}`
 }

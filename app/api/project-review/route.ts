@@ -19,7 +19,8 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
-import { loadProjectContext, createProjectReview, loadLinks } from '@/lib/db'
+import { loadProjectContext, createProjectReview, loadLinks, loadLatestProjectDna } from '@/lib/db'
+import { toDnaSnapshot } from '@/lib/project-dna'
 import {
   collectProjectEntityIds, getProjectLinks, buildLabelResolver, summarizeLinks,
 } from '@/lib/links'
@@ -46,8 +47,6 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: 'You must be signed in to generate a review.' }, { status: 401 })
   }
-
-  // Parse body
   let body: ProjectReviewRequestBody
   try {
     body = (await req.json()) as ProjectReviewRequestBody
@@ -85,6 +84,13 @@ export async function POST(req: Request) {
     context.linkedMemory = summarizeLinks(getProjectLinks(links, ids), buildLabelResolver(stateForLinks))
   } catch (err) {
     console.error('[api/project-review] failed to load linked memory:', err)
+  }
+
+  try {
+    const latestDna = await loadLatestProjectDna(supabase, projectId)
+    if (latestDna) context.projectDna = toDnaSnapshot(latestDna)
+  } catch (err) {
+    console.error('[api/project-review] failed to load project DNA:', err)
   }
 
   // 3. Ask OpenAI for a structured review

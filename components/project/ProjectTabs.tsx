@@ -12,6 +12,7 @@ const tabs = [
   { label: 'Risks',     slug: 'risks' },
   { label: 'Roadmap',   slug: 'roadmap' },
   { label: 'Project Review', slug: 'review' },
+  { label: 'DNA', slug: 'dna' },
   { label: 'Memory Graph', slug: 'memory' },
   { label: 'Files', slug: 'files' },
 ]

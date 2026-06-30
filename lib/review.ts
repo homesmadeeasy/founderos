@@ -14,9 +14,10 @@
 
 import type {
   Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectFile,
-  SuggestedReviewTask, SuggestedReviewRoadmapItem,
+  SuggestedReviewTask, SuggestedReviewRoadmapItem, ProjectDnaSnapshot,
 } from './types'
 import { AI_MODEL } from './ai'
+import { renderDnaSnapshotPrompt } from './project-dna'
 
 export { AI_MODEL }
 
@@ -92,11 +93,13 @@ export interface ReviewContextInput {
   projectFiles?: ProjectFile[]
   /** Plain-English summaries of how items in this project are connected. */
   linkedMemory?: string[]
+  /** Latest Project DNA profile, if available. */
+  projectDna?: ProjectDnaSnapshot
 }
 
 /** Render the project state into a concise text block for the model. */
 export function renderReviewContext(input: ReviewContextInput): string {
-  const { project, tasks, notes, decisions, risks, roadmapItems, messages, projectFiles = [], linkedMemory = [] } = input
+  const { project, tasks, notes, decisions, risks, roadmapItems, messages, projectFiles = [], linkedMemory = [], projectDna } = input
 
   const list = <T,>(items: T[], fmt: (item: T) => string, empty: string) =>
     items.length ? items.map(i => `  - ${fmt(i)}`).join('\n') : `  (${empty})`
@@ -145,7 +148,10 @@ RECENT CHAT (last ${recent.length} messages)
 ${list(recent, m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content.replace(/\s+/g, ' ').slice(0, 240)}`, 'no chat history')}
 
 LINKED MEMORY (how items in this project connect — e.g. which risks block tasks, which tasks came from reviews, which project came from an idea)
-${list(linkedMemory.slice(0, 15), s => s, 'no linked memory yet')}`
+${list(linkedMemory.slice(0, 15), s => s, 'no linked memory yet')}${projectDna ? `
+
+PROJECT DNA (long-term identity and evolution)
+${renderDnaSnapshotPrompt(projectDna)}` : ''}`
 }
 
 // ─── Normalisation ─────────────────────────────────────────────────────────────

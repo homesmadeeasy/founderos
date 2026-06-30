@@ -5,7 +5,7 @@
  * Search runs against AppContext data already loaded via RLS-scoped queries.
  */
 
-import type { AppState, WeeklyReview } from './types'
+import type { AppState, WeeklyReview, ProjectDna } from './types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +19,7 @@ export type CommandObjectType =
   | 'roadmap_item'
   | 'project_file'
   | 'weekly_review'
+  | 'project_dna'
 
 export type CommandCreateType =
   | 'project'
@@ -81,6 +82,7 @@ export const OBJECT_TYPE_LABEL: Record<CommandObjectType, string> = {
   roadmap_item: 'Roadmap item',
   project_file: 'File',
   weekly_review: 'Weekly Review',
+  project_dna: 'Project DNA',
 }
 
 export const CREATE_TYPE_LABEL: Record<CommandCreateType, string> = {
@@ -131,6 +133,7 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
     { id: 'nav-proj-risks', kind: 'navigate', label: 'Project risks', href: `${base}/risks` },
     { id: 'nav-proj-roadmap', kind: 'navigate', label: 'Project roadmap', href: `${base}/roadmap` },
     { id: 'nav-proj-review', kind: 'navigate', label: 'Project review', href: `${base}/review` },
+    { id: 'nav-proj-dna', kind: 'navigate', label: 'Project DNA', href: `${base}/dna`, keywords: ['dna', 'profile', 'identity'] },
     { id: 'nav-proj-memory', kind: 'navigate', label: 'Memory graph', href: `${base}/memory`, keywords: ['linked memory', 'knowledge graph'] },
     { id: 'nav-proj-files', kind: 'navigate', label: 'Project files', href: `${base}/files`, keywords: ['upload', 'documents'] },
   ]
@@ -359,6 +362,37 @@ export function searchWeeklyReviews(
     }))
 }
 
+/** Search project DNA profiles by summary and strategic move. */
+export function searchProjectDna(
+  records: ProjectDna[],
+  projectMap: Map<string, string>,
+  query: string,
+  projectId: string | null,
+  limit = 8,
+): CommandSearchResult[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+
+  return records
+    .filter(d => !projectId || d.projectId === projectId)
+    .filter(d =>
+      d.dnaSummary.toLowerCase().includes(q) ||
+      d.nextStrategicMove.toLowerCase().includes(q) ||
+      d.currentDirection.toLowerCase().includes(q) ||
+      d.origin.toLowerCase().includes(q),
+    )
+    .slice(0, limit)
+    .map(d => ({
+      id: d.id,
+      objectType: 'project_dna' as const,
+      title: d.dnaSummary.slice(0, 80) || 'Project DNA',
+      preview: d.nextStrategicMove.slice(0, 120) || d.currentDirection.slice(0, 120),
+      projectId: d.projectId,
+      projectName: projectMap.get(d.projectId),
+      href: `/projects/${d.projectId}/dna`,
+    }))
+}
+
 // ─── Natural-language create commands ─────────────────────────────────────────
 
 const CREATE_TYPE_ALIASES: Record<string, CommandCreateType> = {
@@ -426,6 +460,7 @@ export function filterCommandPalette(
   query: string,
   projectId: string | null,
   weeklyReviews: WeeklyReview[] = [],
+  projectDnaRecords: ProjectDna[] = [],
 ): { actions: CommandAction[]; results: CommandSearchResult[]; parsed: ParsedCreateCommand | null } {
   const q = query.trim().toLowerCase()
   const projectMap = buildProjectMap(state)
@@ -436,7 +471,11 @@ export function filterCommandPalette(
   const actions = [...createActions, ...navActions]
 
   const results = q
-    ? [...searchAppData(state, query, projectMap), ...searchWeeklyReviews(weeklyReviews, query)]
+    ? [
+        ...searchAppData(state, query, projectMap),
+        ...searchWeeklyReviews(weeklyReviews, query),
+        ...searchProjectDna(projectDnaRecords, projectMap, query, projectId),
+      ]
     : []
 
   return { actions, results, parsed }

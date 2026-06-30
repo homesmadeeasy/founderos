@@ -170,6 +170,34 @@ export interface WeeklyReview {
   createdAt: string
 }
 
+// ─── Project DNA ──────────────────────────────────────────────────────────────
+
+export interface ProjectDna {
+  id: string
+  projectId: string
+  origin: string
+  coreGoal: string
+  currentDirection: string
+  majorDecisions: string
+  recurringRisks: string
+  momentumPattern: string
+  lessonsLearned: string
+  nextStrategicMove: string
+  dnaSummary: string
+  confidenceScore: number
+  createdAt: string
+}
+
+/** Concise DNA snapshot for chat/review/weekly review context. */
+export interface ProjectDnaSnapshot {
+  dnaSummary: string
+  currentDirection: string
+  recurringRisks: string
+  nextStrategicMove: string
+  momentumPattern: string
+  confidenceScore: number
+}
+
 // ─── Idea Vault ─────────────────────────────────────────────────────────────
 
 export type IdeaStatus =
@@ -282,6 +310,7 @@ export type EntityType =
   | 'project_review'
   | 'project_file'
   | 'weekly_review'
+  | 'project_dna'
 
 export type RelationshipType =
   | 'created_from'

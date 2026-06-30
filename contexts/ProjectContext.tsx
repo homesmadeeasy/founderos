@@ -18,9 +18,10 @@ import * as db from '@/lib/db'
 import { buildChatContext, buildChatHistory } from '@/lib/ai'
 import { collectProjectEntityIds, getProjectLinks, buildLabelResolver, summarizeLinks } from '@/lib/links'
 import type {
-  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectReview,
+  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectReview, ProjectDna,
   TaskStatus, TaskPriority, RiskSeverity, RiskStatus, RoadmapStatus,
 } from '@/lib/types'
+import { toDnaSnapshot } from '@/lib/project-dna'
 
 // ─── Converter payload types ─────────────────────────────────────────────────
 
@@ -47,6 +48,14 @@ interface ProjectContextValue {
   reviewsError:   string | null
   prependReview:  (review: ProjectReview) => void
   reloadReviews:  () => Promise<void>
+
+  // Project DNA
+  dnaProfiles:    ProjectDna[]
+  dnaLoading:     boolean
+  dnaError:       string | null
+  latestDna:      ProjectDna | null
+  prependDna:     (dna: ProjectDna) => void
+  reloadDna:      () => Promise<void>
 
   sendMessage:     (content: string) => void
   retryLastMessage:() => void
@@ -106,6 +115,32 @@ export function ProjectProvider({
     setReviews(prev => [review, ...prev])
   }, [])
 
+  // ── Project DNA ──────────────────────────────────────────────────────────────
+  const [dnaProfiles, setDnaProfiles] = useState<ProjectDna[]>([])
+  const [dnaLoading, setDnaLoading]   = useState(true)
+  const [dnaError, setDnaError]       = useState<string | null>(null)
+
+  const reloadDna = useCallback(async () => {
+    setDnaLoading(true)
+    setDnaError(null)
+    try {
+      setDnaProfiles(await db.loadProjectDna(supabase, pid))
+    } catch (err) {
+      console.error('[FounderOS] failed to load project DNA:', err)
+      setDnaError(err instanceof Error ? err.message : 'Failed to load Project DNA.')
+    } finally {
+      setDnaLoading(false)
+    }
+  }, [supabase, pid])
+
+  useEffect(() => { void reloadDna() }, [reloadDna])
+
+  const prependDna = useCallback((dna: ProjectDna) => {
+    setDnaProfiles(prev => [dna, ...prev.filter(d => d.id !== dna.id)])
+  }, [])
+
+  const latestDna = dnaProfiles[0] ?? null
+
   // Derive data from global AppContext
   const tasks        = app.appState.tasks.filter(t => t.projectId === pid)
   const notes        = app.appState.notes.filter(n => n.projectId === pid)
@@ -128,12 +163,13 @@ export function ProjectProvider({
         getProjectLinks(app.appState.links, collectProjectEntityIds(app.appState, pid)),
         buildLabelResolver(app.appState),
       )
+      const dnaSnapshot = latestDna ? toDnaSnapshot(latestDna) : undefined
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userText,
-          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles),
+          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles, dnaSnapshot),
           history: buildChatHistory(history),
         }),
       })
@@ -150,7 +186,7 @@ export function ProjectProvider({
     } finally {
       setIsAiTyping(false)
     }
-  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems, projectFiles])
+  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems, projectFiles, latestDna])
 
   const sendMessage = useCallback((content: string) => {
     const historyBefore = messages
@@ -189,6 +225,7 @@ export function ProjectProvider({
     <ProjectContext.Provider value={{
       project, tasks, notes, decisions, risks, roadmapItems, messages, isAiTyping, aiError,
       reviews, reviewsLoading, reviewsError, prependReview, reloadReviews,
+      dnaProfiles, dnaLoading, dnaError, latestDna, prependDna, reloadDna,
       sendMessage, retryLastMessage, dismissError,
       addTask, addNote, addDecision, addRisk, addRoadmapItem,
     }}>
