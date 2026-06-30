@@ -18,10 +18,11 @@ import * as db from '@/lib/db'
 import { buildChatContext, buildChatHistory } from '@/lib/ai'
 import { collectProjectEntityIds, getProjectLinks, buildLabelResolver, summarizeLinks } from '@/lib/links'
 import type {
-  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectReview, ProjectDna,
+  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectReview, ProjectDna, PatternAnalysis,
   TaskStatus, TaskPriority, RiskSeverity, RiskStatus, RoadmapStatus,
 } from '@/lib/types'
 import { toDnaSnapshot } from '@/lib/project-dna'
+import { toPatternSnapshot } from '@/lib/pattern-analysis'
 
 // ─── Converter payload types ─────────────────────────────────────────────────
 
@@ -141,6 +142,15 @@ export function ProjectProvider({
 
   const latestDna = dnaProfiles[0] ?? null
 
+  // ── Latest cross-project pattern analysis (for chat context) ───────────────
+  const [latestPattern, setLatestPattern] = useState<PatternAnalysis | null>(null)
+
+  useEffect(() => {
+    void db.loadLatestPatternAnalysis(supabase)
+      .then(p => setLatestPattern(p))
+      .catch(err => console.error('[FounderOS] failed to load pattern analysis:', err))
+  }, [supabase])
+
   // Derive data from global AppContext
   const tasks        = app.appState.tasks.filter(t => t.projectId === pid)
   const notes        = app.appState.notes.filter(n => n.projectId === pid)
@@ -164,12 +174,13 @@ export function ProjectProvider({
         buildLabelResolver(app.appState),
       )
       const dnaSnapshot = latestDna ? toDnaSnapshot(latestDna) : undefined
+      const patternSnapshot = latestPattern ? toPatternSnapshot(latestPattern) : undefined
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userText,
-          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles, dnaSnapshot),
+          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles, dnaSnapshot, patternSnapshot),
           history: buildChatHistory(history),
         }),
       })
@@ -186,7 +197,7 @@ export function ProjectProvider({
     } finally {
       setIsAiTyping(false)
     }
-  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems, projectFiles, latestDna])
+  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems, projectFiles, latestDna, latestPattern])
 
   const sendMessage = useCallback((content: string) => {
     const historyBefore = messages

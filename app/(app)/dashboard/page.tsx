@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Target, CheckSquare, AlertTriangle, Activity, Lightbulb, Sparkles, Network,
-  FolderKanban, ArrowRight, MessageSquare, CalendarCheck2,
+  FolderKanban, ArrowRight, MessageSquare, CalendarCheck2, GitBranch, Loader2,
 } from 'lucide-react'
-import { loadWeeklyReviews } from '@/lib/db'
+import { loadWeeklyReviews, loadLatestPatternAnalysis } from '@/lib/db'
 import { useAppContext } from '@/contexts/AppContext'
 import { createClient } from '@/lib/supabase/client'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -14,7 +14,7 @@ import CreateProjectModal from '@/components/ui/CreateProjectModal'
 import LoadingScreen, { ErrorScreen } from '@/components/ui/LoadingScreen'
 import EmptyState from '@/components/ui/EmptyState'
 import { buildLabelResolver, describeLink } from '@/lib/links'
-import type { Project, Task, WeeklyReview } from '@/lib/types'
+import type { Project, Task, WeeklyReview, PatternAnalysis } from '@/lib/types'
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 } as const
 
@@ -56,6 +56,8 @@ export default function DashboardPage() {
   const { appState, isHydrated, loadError } = useAppContext()
   const [recentReviews, setRecentReviews] = useState<ReviewPreview[]>([])
   const [latestWeeklyReview, setLatestWeeklyReview] = useState<WeeklyReview | null>(null)
+  const [latestPatternAnalysis, setLatestPatternAnalysis] = useState<PatternAnalysis | null>(null)
+  const [generatingPattern, setGeneratingPattern] = useState(false)
 
   useEffect(() => {
     if (!isHydrated) return
@@ -82,8 +84,30 @@ export default function DashboardPage() {
       } catch (err) {
         console.error('[Dashboard] loadWeeklyReviews failed:', err)
       }
+
+      try {
+        const pattern = await loadLatestPatternAnalysis(supabase)
+        setLatestPatternAnalysis(pattern)
+      } catch (err) {
+        console.error('[Dashboard] loadLatestPatternAnalysis failed:', err)
+      }
     })()
   }, [isHydrated, appState.projects])
+
+  async function generatePatternAnalysis() {
+    setGeneratingPattern(true)
+    try {
+      const res = await fetch('/api/pattern-analysis', { method: 'POST' })
+      const data = await res.json() as { analysis?: PatternAnalysis; error?: string }
+      if (res.ok && data.analysis) {
+        setLatestPatternAnalysis(data.analysis)
+      }
+    } catch (err) {
+      console.error('[Dashboard] generate pattern analysis failed:', err)
+    } finally {
+      setGeneratingPattern(false)
+    }
+  }
 
   const derived = useMemo(() => {
     const { projects, tasks, risks, ideas, links, notes, decisions } = appState
@@ -237,6 +261,47 @@ export default function DashboardPage() {
             description="Create a project or capture an idea to set your focus for today."
             action={{ label: 'Create project', href: '/projects' }}
           />
+        )}
+      </Section>
+
+      {/* Latest Pattern Insight */}
+      <Section title="Latest Pattern Insight" icon={GitBranch} href="/patterns">
+        {latestPatternAnalysis ? (
+          <Link href="/patterns" className="block px-5 py-4 hover:bg-zinc-50 transition-colors">
+            <p className="text-[11px] text-zinc-400">
+              {new Date(latestPatternAnalysis.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+            <p className="text-sm font-medium text-zinc-800 mt-1 line-clamp-2">{latestPatternAnalysis.summary}</p>
+            {latestPatternAnalysis.bottlenecks && (
+              <p className="text-xs text-zinc-500 mt-2 line-clamp-2">
+                <span className="font-medium text-zinc-600">Key bottleneck: </span>
+                {latestPatternAnalysis.bottlenecks}
+              </p>
+            )}
+            {latestPatternAnalysis.recommendedChanges && (
+              <p className="text-xs text-zinc-500 mt-1 line-clamp-2">
+                <span className="font-medium text-zinc-600">Recommended change: </span>
+                {latestPatternAnalysis.recommendedChanges}
+              </p>
+            )}
+          </Link>
+        ) : (
+          <div className="px-5 py-4">
+            <EmptyState
+              icon={GitBranch}
+              title="No pattern analysis yet"
+              description="Generate a cross-project pattern analysis to understand recurring strengths, bottlenecks and opportunities across your workspace."
+              action={{
+                label: generatingPattern ? 'Generating…' : 'Generate pattern analysis',
+                onClick: generatingPattern ? undefined : () => void generatePatternAnalysis(),
+              }}
+            />
+            {generatingPattern && (
+              <div className="flex justify-center mt-3">
+                <Loader2 size={16} className="animate-spin text-zinc-400" />
+              </div>
+            )}
+          </div>
         )}
       </Section>
 
@@ -405,6 +470,9 @@ function findLinkHref(
 ): string {
   if (link.sourceType === 'weekly_review' || link.targetType === 'weekly_review') {
     return '/weekly-review'
+  }
+  if (link.sourceType === 'pattern_analysis' || link.targetType === 'pattern_analysis') {
+    return '/patterns'
   }
   const projectId =
     link.sourceType === 'project' ? link.sourceId :

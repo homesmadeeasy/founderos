@@ -5,12 +5,12 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Search, Loader2, ArrowRight, Plus, LayoutDashboard, FolderKanban, Lightbulb,
   Settings, MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map,
-  Sparkles, Network, AlertCircle, File, CalendarCheck2, Dna,
+  Sparkles, Network, AlertCircle, File, CalendarCheck2, Dna, GitBranch,
 } from 'lucide-react'
 import { useAppContext } from '@/contexts/AppContext'
 import { createClient } from '@/lib/supabase/client'
-import { loadWeeklyReviews, loadLatestProjectDnaForAllProjects } from '@/lib/db'
-import type { WeeklyReview, ProjectDna } from '@/lib/types'
+import { loadWeeklyReviews, loadLatestProjectDnaForAllProjects, loadPatternAnalyses } from '@/lib/db'
+import type { WeeklyReview, ProjectDna, PatternAnalysis } from '@/lib/types'
 import {
   parseProjectIdFromPath, buildProjectMap, buildRecentSearchResults,
   filterCommandPalette, createDraftFromParsed, emptyCreateDraft,
@@ -46,6 +46,7 @@ export default function CommandBar({ onClose }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [weeklyReviews, setWeeklyReviews] = useState<WeeklyReview[]>([])
   const [projectDnaRecords, setProjectDnaRecords] = useState<ProjectDna[]>([])
+  const [patternAnalyses, setPatternAnalyses] = useState<PatternAnalysis[]>([])
 
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -58,12 +59,13 @@ export default function CommandBar({ onClose }: Props) {
     void Promise.all([
       loadWeeklyReviews(supabase).then(setWeeklyReviews),
       loadLatestProjectDnaForAllProjects(supabase).then(setProjectDnaRecords),
+      loadPatternAnalyses(supabase).then(setPatternAnalyses),
     ]).catch(err => console.error('[CommandBar] failed to load search data:', err))
   }, [isHydrated])
 
   const { actions, results, parsed } = useMemo(
-    () => filterCommandPalette(appState, query, projectId, weeklyReviews, projectDnaRecords),
-    [appState, query, projectId, weeklyReviews, projectDnaRecords],
+    () => filterCommandPalette(appState, query, projectId, weeklyReviews, projectDnaRecords, patternAnalyses),
+    [appState, query, projectId, weeklyReviews, projectDnaRecords, patternAnalyses],
   )
 
   const recent = useMemo(
@@ -571,6 +573,7 @@ function actionIcon(action: CommandAction) {
   if (href.includes('/risks')) return AlertTriangle
   if (href.includes('/roadmap')) return Map
   if (href.includes('/dna')) return Dna
+  if (href.includes('/patterns')) return GitBranch
   if (href.includes('/weekly-review')) return CalendarCheck2
   if (href.includes('/review')) return Sparkles
   if (href.includes('/memory')) return Network
@@ -592,5 +595,6 @@ function objectIcon(type: CommandSearchResult['objectType']) {
     case 'project_file': return File
     case 'weekly_review': return CalendarCheck2
     case 'project_dna': return Dna
+    case 'pattern_analysis': return GitBranch
   }
 }

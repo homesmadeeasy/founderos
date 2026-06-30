@@ -5,7 +5,7 @@
  * Search runs against AppContext data already loaded via RLS-scoped queries.
  */
 
-import type { AppState, WeeklyReview, ProjectDna } from './types'
+import type { AppState, WeeklyReview, ProjectDna, PatternAnalysis } from './types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +20,7 @@ export type CommandObjectType =
   | 'project_file'
   | 'weekly_review'
   | 'project_dna'
+  | 'pattern_analysis'
 
 export type CommandCreateType =
   | 'project'
@@ -83,6 +84,7 @@ export const OBJECT_TYPE_LABEL: Record<CommandObjectType, string> = {
   project_file: 'File',
   weekly_review: 'Weekly Review',
   project_dna: 'Project DNA',
+  pattern_analysis: 'Pattern Analysis',
 }
 
 export const CREATE_TYPE_LABEL: Record<CommandCreateType, string> = {
@@ -118,6 +120,7 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
     { id: 'nav-projects', kind: 'navigate', label: 'Projects', href: '/projects', keywords: ['project list'] },
     { id: 'nav-ideas', kind: 'navigate', label: 'Idea Vault', href: '/ideas', keywords: ['ideas', 'vault'] },
     { id: 'nav-weekly-review', kind: 'navigate', label: 'Weekly Review', href: '/weekly-review', keywords: ['review', 'weekly', 'summary'] },
+    { id: 'nav-patterns', kind: 'navigate', label: 'Patterns', href: '/patterns', keywords: ['pattern', 'cross-project', 'analysis', 'insights'] },
     { id: 'nav-settings', kind: 'navigate', label: 'Settings', href: '/settings', keywords: ['preferences'] },
   ]
 
@@ -393,6 +396,33 @@ export function searchProjectDna(
     }))
 }
 
+/** Search pattern analyses by summary, bottlenecks and recommendations. */
+export function searchPatternAnalyses(
+  analyses: PatternAnalysis[],
+  query: string,
+  limit = 8,
+): CommandSearchResult[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+
+  return analyses
+    .filter(a =>
+      a.summary.toLowerCase().includes(q) ||
+      a.bottlenecks.toLowerCase().includes(q) ||
+      a.recommendedChanges.toLowerCase().includes(q) ||
+      a.recurringStrengths.toLowerCase().includes(q) ||
+      a.recurringWeaknesses.toLowerCase().includes(q),
+    )
+    .slice(0, limit)
+    .map(a => ({
+      id: a.id,
+      objectType: 'pattern_analysis' as const,
+      title: a.summary.slice(0, 80) || 'Pattern Analysis',
+      preview: a.bottlenecks.slice(0, 120) || a.recommendedChanges.slice(0, 120),
+      href: '/patterns',
+    }))
+}
+
 // ─── Natural-language create commands ─────────────────────────────────────────
 
 const CREATE_TYPE_ALIASES: Record<string, CommandCreateType> = {
@@ -461,6 +491,7 @@ export function filterCommandPalette(
   projectId: string | null,
   weeklyReviews: WeeklyReview[] = [],
   projectDnaRecords: ProjectDna[] = [],
+  patternAnalyses: PatternAnalysis[] = [],
 ): { actions: CommandAction[]; results: CommandSearchResult[]; parsed: ParsedCreateCommand | null } {
   const q = query.trim().toLowerCase()
   const projectMap = buildProjectMap(state)
@@ -475,6 +506,7 @@ export function filterCommandPalette(
         ...searchAppData(state, query, projectMap),
         ...searchWeeklyReviews(weeklyReviews, query),
         ...searchProjectDna(projectDnaRecords, projectMap, query, projectId),
+        ...searchPatternAnalyses(patternAnalyses, query),
       ]
     : []
 

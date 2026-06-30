@@ -198,6 +198,41 @@ export interface ProjectDnaSnapshot {
   confidenceScore: number
 }
 
+// ─── Cross-Project Pattern Analysis ─────────────────────────────────────────
+
+export type SuggestedPatternActionType = 'task' | 'review' | 'idea' | 'habit' | 'decision'
+
+export interface SuggestedPatternAction {
+  title: string
+  description: string
+  priority: 'Low' | 'Medium' | 'High'
+  type: SuggestedPatternActionType
+}
+
+export interface PatternAnalysis {
+  id: string
+  summary: string
+  recurringStrengths: string
+  recurringWeaknesses: string
+  executionPatterns: string
+  ideaPatterns: string
+  riskPatterns: string
+  decisionPatterns: string
+  projectMomentumPatterns: string
+  bottlenecks: string
+  opportunities: string
+  recommendedChanges: string
+  suggestedActions: SuggestedPatternAction[]
+  createdAt: string
+}
+
+/** Concise pattern snapshot for chat/review/weekly review context. */
+export interface PatternAnalysisSnapshot {
+  summary: string
+  bottlenecks: string
+  recommendedChanges: string
+}
+
 // ─── Idea Vault ─────────────────────────────────────────────────────────────
 
 export type IdeaStatus =
@@ -311,6 +346,7 @@ export type EntityType =
   | 'project_file'
   | 'weekly_review'
   | 'project_dna'
+  | 'pattern_analysis'
 
 export type RelationshipType =
   | 'created_from'

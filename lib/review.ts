@@ -18,6 +18,7 @@ import type {
 } from './types'
 import { AI_MODEL } from './ai'
 import { renderDnaSnapshotPrompt } from './project-dna'
+import { renderPatternSnapshotPrompt } from './pattern-analysis'
 
 export { AI_MODEL }
 
@@ -95,11 +96,13 @@ export interface ReviewContextInput {
   linkedMemory?: string[]
   /** Latest Project DNA profile, if available. */
   projectDna?: ProjectDnaSnapshot
+  /** Latest cross-project pattern analysis, if available. */
+  patternAnalysis?: import('./types').PatternAnalysisSnapshot
 }
 
 /** Render the project state into a concise text block for the model. */
 export function renderReviewContext(input: ReviewContextInput): string {
-  const { project, tasks, notes, decisions, risks, roadmapItems, messages, projectFiles = [], linkedMemory = [], projectDna } = input
+  const { project, tasks, notes, decisions, risks, roadmapItems, messages, projectFiles = [], linkedMemory = [], projectDna, patternAnalysis } = input
 
   const list = <T,>(items: T[], fmt: (item: T) => string, empty: string) =>
     items.length ? items.map(i => `  - ${fmt(i)}`).join('\n') : `  (${empty})`
@@ -151,7 +154,10 @@ LINKED MEMORY (how items in this project connect — e.g. which risks block task
 ${list(linkedMemory.slice(0, 15), s => s, 'no linked memory yet')}${projectDna ? `
 
 PROJECT DNA (long-term identity and evolution)
-${renderDnaSnapshotPrompt(projectDna)}` : ''}`
+${renderDnaSnapshotPrompt(projectDna)}` : ''}${patternAnalysis ? `
+
+USER WORKSPACE PATTERNS (cross-project)
+${renderPatternSnapshotPrompt(patternAnalysis)}` : ''}`
 }
 
 // ─── Normalisation ─────────────────────────────────────────────────────────────

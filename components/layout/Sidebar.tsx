@@ -8,6 +8,7 @@ import {
   FolderKanban,
   Lightbulb,
   CalendarCheck2,
+  GitBranch,
   Settings,
   LogOut,
   Command,
@@ -20,6 +21,7 @@ const nav = [
   { label: 'Projects',  href: '/projects',  icon: FolderKanban },
   { label: 'Idea Vault', href: '/ideas',    icon: Lightbulb },
   { label: 'Weekly Review', href: '/weekly-review', icon: CalendarCheck2 },
+  { label: 'Patterns', href: '/patterns', icon: GitBranch },
   { label: 'Settings', href: '/settings',   icon: Settings },
 ]
 

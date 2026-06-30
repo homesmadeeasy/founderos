@@ -19,8 +19,9 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
-import { loadProjectContext, createProjectReview, loadLinks, loadLatestProjectDna } from '@/lib/db'
+import { loadProjectContext, createProjectReview, loadLinks, loadLatestProjectDna, loadLatestPatternAnalysis } from '@/lib/db'
 import { toDnaSnapshot } from '@/lib/project-dna'
+import { toPatternSnapshot } from '@/lib/pattern-analysis'
 import {
   collectProjectEntityIds, getProjectLinks, buildLabelResolver, summarizeLinks,
 } from '@/lib/links'
@@ -91,6 +92,13 @@ export async function POST(req: Request) {
     if (latestDna) context.projectDna = toDnaSnapshot(latestDna)
   } catch (err) {
     console.error('[api/project-review] failed to load project DNA:', err)
+  }
+
+  try {
+    const latestPattern = await loadLatestPatternAnalysis(supabase)
+    if (latestPattern) context.patternAnalysis = toPatternSnapshot(latestPattern)
+  } catch (err) {
+    console.error('[api/project-review] failed to load pattern analysis:', err)
   }
 
   // 3. Ask OpenAI for a structured review

@@ -10,10 +10,11 @@
  */
 
 import type {
-  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectFile, ProjectDnaSnapshot,
+  Project, Task, Note, Decision, Risk, RoadmapItem, Message, ProjectFile, ProjectDnaSnapshot, PatternAnalysisSnapshot,
 } from './types'
 import { summarizeProjectFiles } from './file'
 import { renderDnaSnapshotPrompt } from './project-dna'
+import { renderPatternSnapshotPrompt } from './pattern-analysis'
 
 // ─── Model config ─────────────────────────────────────────────────────────────
 // Change the model in this single place. gpt-4o-mini is a current, fast and
@@ -71,6 +72,7 @@ export interface ChatContext {
   linkedMemory?: string[]
   projectFiles?: string[]
   projectDna?: ProjectDnaSnapshot
+  patternAnalysis?: PatternAnalysisSnapshot
 }
 
 export interface ChatHistoryMessage {
@@ -104,6 +106,7 @@ export function buildChatContext(
   linkedMemory: string[] = [],
   projectFiles: ProjectFile[] = [],
   projectDna?: ProjectDnaSnapshot,
+  patternAnalysis?: PatternAnalysisSnapshot,
 ): ChatContext {
   return {
     title:       project.title,
@@ -119,6 +122,7 @@ export function buildChatContext(
     linkedMemory: linkedMemory.slice(0, 15),
     projectFiles: summarizeProjectFiles(projectFiles, 10),
     projectDna,
+    patternAnalysis,
   }
 }
 
@@ -170,5 +174,8 @@ UPLOADED PROJECT FILES (summaries only)
 ${list(ctx.projectFiles ?? [], s => s, 'no files uploaded yet')}${ctx.projectDna ? `
 
 PROJECT DNA (living profile — use for long-term direction)
-${renderDnaSnapshotPrompt(ctx.projectDna)}` : ''}`
+${renderDnaSnapshotPrompt(ctx.projectDna)}` : ''}${ctx.patternAnalysis ? `
+
+CROSS-PROJECT PATTERNS (user-level habits — keep in mind briefly)
+${renderPatternSnapshotPrompt(ctx.patternAnalysis)}` : ''}`
 }

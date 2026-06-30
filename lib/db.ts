@@ -17,7 +17,7 @@ import type {
   AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message,
   ProjectReview, Idea, IdeaAnalysis, IdeaStatus, Link, EntityType, ProjectFile, FileStatus,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
-  RiskSeverity, RiskStatus, RoadmapStatus, MessageRole, WeeklyReview, ProjectDna,
+  RiskSeverity, RiskStatus, RoadmapStatus, MessageRole, WeeklyReview, ProjectDna, PatternAnalysis,
 } from './types'
 import type {
   NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink, NewProjectFile,
@@ -33,6 +33,11 @@ import {
 import {
   type NormalizedProjectDnaFields, type ProjectDnaContextInput, type IdeaOriginContext,
 } from './project-dna'
+import {
+  normalizeSuggestedPatternActions,
+  type NormalizedPatternAnalysisFields, type PatternAnalysisContextInput, type PatternDataCounts,
+  type WeeklyReviewSummary,
+} from './pattern-analysis'
 import { buildLabelResolver, summarizeLinks, collectProjectEntityIds, getProjectLinks } from './links'
 import {
   normalizeSuggestedProject, normalizeSuggestedIdeaTasks,
@@ -93,6 +98,14 @@ interface ProjectDnaRow {
   major_decisions: string | null; recurring_risks: string | null; momentum_pattern: string | null
   lessons_learned: string | null; next_strategic_move: string | null; dna_summary: string | null
   confidence_score: number | null; created_at: string
+}
+interface PatternAnalysisRow {
+  id: string
+  summary: string | null; recurring_strengths: string | null; recurring_weaknesses: string | null
+  execution_patterns: string | null; idea_patterns: string | null; risk_patterns: string | null
+  decision_patterns: string | null; project_momentum_patterns: string | null
+  bottlenecks: string | null; opportunities: string | null; recommended_changes: string | null
+  suggested_actions: unknown; created_at: string
 }
 
 // ─── Row → app mappers ──────────────────────────────────────────────────────
@@ -212,6 +225,23 @@ const toProjectDna = (r: ProjectDnaRow): ProjectDna => ({
   nextStrategicMove: r.next_strategic_move ?? '',
   dnaSummary: r.dna_summary ?? '',
   confidenceScore: r.confidence_score ?? 50,
+  createdAt: r.created_at,
+})
+
+const toPatternAnalysis = (r: PatternAnalysisRow): PatternAnalysis => ({
+  id: r.id,
+  summary: r.summary ?? '',
+  recurringStrengths: r.recurring_strengths ?? '',
+  recurringWeaknesses: r.recurring_weaknesses ?? '',
+  executionPatterns: r.execution_patterns ?? '',
+  ideaPatterns: r.idea_patterns ?? '',
+  riskPatterns: r.risk_patterns ?? '',
+  decisionPatterns: r.decision_patterns ?? '',
+  projectMomentumPatterns: r.project_momentum_patterns ?? '',
+  bottlenecks: r.bottlenecks ?? '',
+  opportunities: r.opportunities ?? '',
+  recommendedChanges: r.recommended_changes ?? '',
+  suggestedActions: normalizeSuggestedPatternActions(r.suggested_actions),
   createdAt: r.created_at,
 })
 
@@ -583,9 +613,15 @@ export async function loadGlobalWorkspaceContext(
     confidenceScore: d.confidenceScore,
   }))
 
+  const latestPattern = await loadLatestPatternAnalysis(supabase)
+  const latestPatternAnalysis = latestPattern
+    ? { summary: latestPattern.summary, bottlenecks: latestPattern.bottlenecks, recommendedChanges: latestPattern.recommendedChanges }
+    : undefined
+
   return {
     weekStart, weekEnd, projects, ideas, tasks, notes, decisions, risks,
-    roadmapItems, projectReviews, projectDnaSummaries, projectFiles, links, recentMessages, linkedMemorySummaries,
+    roadmapItems, projectReviews, projectDnaSummaries, latestPatternAnalysis,
+    projectFiles, links, recentMessages, linkedMemorySummaries,
   }
 }
 
@@ -766,6 +802,120 @@ export async function createProjectDna(
   }).select('*').single()
   if (error) throw error
   return toProjectDna(data as ProjectDnaRow)
+}
+
+// ─── Cross-Project Pattern Analysis ───────────────────────────────────────────
+
+export async function loadPatternAnalyses(supabase: SupabaseClient): Promise<PatternAnalysis[]> {
+  const { data, error } = await supabase
+    .from('pattern_analyses')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map(r => toPatternAnalysis(r as PatternAnalysisRow))
+}
+
+export async function loadLatestPatternAnalysis(
+  supabase: SupabaseClient,
+): Promise<PatternAnalysis | null> {
+  const { data, error } = await supabase
+    .from('pattern_analyses')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data ? toPatternAnalysis(data as PatternAnalysisRow) : null
+}
+
+/** Aggregate workspace data for cross-project pattern analysis. */
+export async function loadPatternAnalysisContext(
+  supabase: SupabaseClient,
+): Promise<PatternAnalysisContextInput> {
+  const workspace = await loadGlobalWorkspaceContext(supabase)
+
+  const weeklyRes = await supabase
+    .from('weekly_reviews')
+    .select('week_start, week_end, summary, next_week_focus, created_at')
+    .order('created_at', { ascending: false })
+    .limit(5)
+
+  const weeklyReviews: WeeklyReviewSummary[] = (weeklyRes.data ?? []).map(r => ({
+    weekStart: r.week_start,
+    weekEnd: r.week_end,
+    summary: r.summary ?? '',
+    nextWeekFocus: r.next_week_focus ?? '',
+    createdAt: r.created_at,
+  }))
+
+  const fileSummaries = workspace.projectFiles
+    .slice(0, 10)
+    .map(f => {
+      const projectTitle = workspace.projects.find(p => p.id === f.projectId)?.title ?? 'Project'
+      const summary = f.summary?.trim()
+      return summary
+        ? `[${projectTitle}] ${f.fileName}: ${summary.replace(/\s+/g, ' ').slice(0, 100)}`
+        : `[${projectTitle}] ${f.fileName}`
+    })
+
+  const activeProjects = workspace.projects.filter(p => p.status !== 'archived')
+  const openTasks = workspace.tasks.filter(t => t.status !== 'done')
+  const doneTasks = workspace.tasks.filter(t => t.status === 'done')
+  const openRisks = workspace.risks.filter(r => r.status === 'open')
+
+  const dataCounts: PatternDataCounts = {
+    projects: workspace.projects.length,
+    activeProjects: activeProjects.length,
+    tasks: workspace.tasks.length,
+    openTasks: openTasks.length,
+    doneTasks: doneTasks.length,
+    ideas: workspace.ideas.length,
+    decisions: workspace.decisions.length,
+    risks: workspace.risks.length,
+    openRisks: openRisks.length,
+    projectReviews: workspace.projectReviews.length,
+    weeklyReviews: weeklyReviews.length,
+    dnaProfiles: workspace.projectDnaSummaries.length,
+    files: workspace.projectFiles.length,
+  }
+
+  return {
+    projects: workspace.projects,
+    ideas: workspace.ideas,
+    tasks: workspace.tasks,
+    decisions: workspace.decisions,
+    risks: workspace.risks,
+    projectReviews: workspace.projectReviews,
+    weeklyReviews,
+    projectDnaSummaries: workspace.projectDnaSummaries,
+    linkedMemorySummaries: workspace.linkedMemorySummaries,
+    fileSummaries,
+    dataCounts,
+  }
+}
+
+export async function createPatternAnalysis(
+  supabase: SupabaseClient,
+  userId: string,
+  fields: NormalizedPatternAnalysisFields,
+): Promise<PatternAnalysis> {
+  const { data, error } = await supabase.from('pattern_analyses').insert({
+    user_id: userId,
+    summary: fields.summary,
+    recurring_strengths: fields.recurringStrengths,
+    recurring_weaknesses: fields.recurringWeaknesses,
+    execution_patterns: fields.executionPatterns,
+    idea_patterns: fields.ideaPatterns,
+    risk_patterns: fields.riskPatterns,
+    decision_patterns: fields.decisionPatterns,
+    project_momentum_patterns: fields.projectMomentumPatterns,
+    bottlenecks: fields.bottlenecks,
+    opportunities: fields.opportunities,
+    recommended_changes: fields.recommendedChanges,
+    suggested_actions: fields.suggestedActions,
+  }).select('*').single()
+  if (error) throw error
+  return toPatternAnalysis(data as PatternAnalysisRow)
 }
 
 // ─── Ideas ────────────────────────────────────────────────────────────────────

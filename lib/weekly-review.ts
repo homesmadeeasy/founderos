@@ -7,8 +7,9 @@
 
 import type {
   Project, Task, Note, Decision, Risk, RoadmapItem, Idea, ProjectFile, Link, Message,
-  SuggestedWeeklyTask, SuggestedProjectReviewRef,
+  SuggestedWeeklyTask, SuggestedProjectReviewRef, PatternAnalysisSnapshot,
 } from './types'
+import { renderPatternSnapshotPrompt } from './pattern-analysis'
 import { AI_MODEL } from './ai'
 
 export { AI_MODEL }
@@ -116,6 +117,7 @@ export interface WeeklyReviewContextInput {
   roadmapItems: RoadmapItem[]
   projectReviews: ProjectReviewSummary[]
   projectDnaSummaries: ProjectDnaSummary[]
+  latestPatternAnalysis?: import('./types').PatternAnalysisSnapshot
   projectFiles: ProjectFile[]
   links: Link[]
   recentMessages: Array<{ projectId: string; projectTitle: string; role: string; content: string; createdAt: string }>
@@ -135,7 +137,8 @@ export interface ProjectDnaSummary {
 export function renderWeeklyContext(input: WeeklyReviewContextInput): string {
   const {
     weekStart, weekEnd, projects, ideas, tasks, notes, decisions, risks,
-    roadmapItems, projectReviews, projectDnaSummaries, projectFiles, recentMessages, linkedMemorySummaries,
+    roadmapItems, projectReviews, projectDnaSummaries, latestPatternAnalysis,
+    projectFiles, recentMessages, linkedMemorySummaries,
   } = input
 
   const list = <T,>(items: T[], fmt: (item: T) => string, empty: string) =>
@@ -203,7 +206,10 @@ ${list(weekReviews.slice(0, 8), r =>
 PROJECT DNA PROFILES (${projectDnaSummaries.length} active projects with DNA)
 ${list(projectDnaSummaries.slice(0, 10), d =>
   `[${d.projectTitle}] ${d.dnaSummary.replace(/\s+/g, ' ').slice(0, 120)} — direction: ${d.currentDirection.replace(/\s+/g, ' ').slice(0, 80)} — momentum: ${d.momentumPattern.replace(/\s+/g, ' ').slice(0, 60)}`,
-  'no project DNA profiles yet')}
+  'no project DNA profiles yet')}${latestPatternAnalysis ? `
+
+LATEST CROSS-PROJECT PATTERN ANALYSIS
+${renderPatternSnapshotPrompt(latestPatternAnalysis)}` : ''}
 
 RECENT CHAT (last ${recentMessages.length} messages across projects)
 ${list(recentMessages.slice(0, MAX_WEEKLY_MESSAGES), m =>
