@@ -380,6 +380,19 @@ export interface LinkedEntity {
 
 // ─── App State ────────────────────────────────────────────────────────────────
 
+// ─── User profile ───────────────────────────────────────────────────────────
+
+export interface UserProfile {
+  id: string
+  email: string | null
+  fullName: string | null
+  onboardingCompleted: boolean
+  demoWorkspaceLoaded: boolean
+  createdAt: string
+}
+
+// ─── App state ────────────────────────────────────────────────────────────────
+
 export interface AppState {
   projects: Project[]
   tasks: Task[]

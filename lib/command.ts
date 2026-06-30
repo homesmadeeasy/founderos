@@ -121,6 +121,7 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
     { id: 'nav-ideas', kind: 'navigate', label: 'Idea Vault', href: '/ideas', keywords: ['ideas', 'vault'] },
     { id: 'nav-weekly-review', kind: 'navigate', label: 'Weekly Review', href: '/weekly-review', keywords: ['review', 'weekly', 'summary'] },
     { id: 'nav-patterns', kind: 'navigate', label: 'Patterns', href: '/patterns', keywords: ['pattern', 'cross-project', 'analysis', 'insights'] },
+    { id: 'nav-how-it-works', kind: 'navigate', label: 'How FounderOS works', href: '/how-it-works', keywords: ['help', 'guide', 'onboarding', 'tutorial'] },
     { id: 'nav-settings', kind: 'navigate', label: 'Settings', href: '/settings', keywords: ['preferences'] },
   ]
 

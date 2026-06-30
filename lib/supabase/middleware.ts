@@ -9,7 +9,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that require a logged-in user.
-const PROTECTED_PREFIXES = ['/dashboard', '/projects', '/ideas', '/review', '/weekly-review', '/patterns', '/settings']
+const PROTECTED_PREFIXES = ['/dashboard', '/projects', '/ideas', '/review', '/weekly-review', '/patterns', '/settings', '/onboarding']
 
 // Auth routes a logged-in user shouldn't see.
 const AUTH_ROUTES = ['/login', '/signup']
@@ -59,6 +59,30 @@ export async function updateSession(request: NextRequest) {
     url.pathname = '/dashboard'
     url.search = ''
     return NextResponse.redirect(url)
+  }
+
+  // Onboarding gate for new users
+  if (user && isProtected) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('onboarding_completed')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profile) {
+      if (!profile.onboarding_completed && pathname !== '/onboarding') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/onboarding'
+        url.search = ''
+        return NextResponse.redirect(url)
+      }
+      if (profile.onboarding_completed && pathname === '/onboarding') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        url.search = ''
+        return NextResponse.redirect(url)
+      }
+    }
   }
 
   return response

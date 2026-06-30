@@ -73,7 +73,7 @@ export default function WeeklyReviewPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-zinc-900">Weekly Review</h1>
-              <p className="text-sm text-zinc-500">Reflect on the week. Plan the next one.</p>
+              <p className="text-sm text-zinc-500">Workspace-wide review and next focus plan.</p>
             </div>
           </div>
         </div>

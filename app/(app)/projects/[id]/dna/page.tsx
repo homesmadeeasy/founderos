@@ -50,7 +50,7 @@ export default function ProjectDnaPage() {
         <div className="space-y-1">
           <h1 className="text-xl font-bold text-zinc-900">Project DNA</h1>
           <p className="text-sm text-zinc-500 leading-relaxed max-w-xl">
-            A living profile of what this project is, why it exists, how it has evolved, and what to do next strategically.
+            Living profile of this project — identity, evolution and strategic direction over time.
           </p>
         </div>
         <button
@@ -137,8 +137,8 @@ export default function ProjectDnaPage() {
             <p className="text-sm font-semibold text-zinc-700">No Project DNA yet</p>
             <p className="text-xs text-zinc-400 max-w-sm leading-relaxed">
               {hasHistory
-                ? 'FounderOS can generate a living profile from your tasks, decisions, risks, files and reviews.'
-                : 'FounderOS can generate a living profile once your project has enough ideas, decisions, risks, tasks, files and reviews.'}
+                ? 'Project DNA becomes more useful as your project gains history through tasks, decisions, risks, files and reviews.'
+                : 'Project DNA becomes more useful as your project gains history through tasks, decisions, risks, files and reviews.'}
             </p>
           </div>
         )

@@ -16,7 +16,7 @@ function ProjectsEmptyState() {
         <EmptyState
           icon={FolderKanban}
           title="No projects yet"
-          description="Projects are where FounderOS helps you plan, chat, review and build momentum."
+          description="Projects are where your ideas become execution systems with AI chat, tasks, decisions, risks, files and reviews."
           action={{ label: 'Create your first project', onClick: () => setShowCreate(true) }}
         />
       </div>

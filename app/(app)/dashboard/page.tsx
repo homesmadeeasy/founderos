@@ -13,6 +13,7 @@ import StatusBadge from '@/components/ui/StatusBadge'
 import CreateProjectModal from '@/components/ui/CreateProjectModal'
 import LoadingScreen, { ErrorScreen } from '@/components/ui/LoadingScreen'
 import EmptyState from '@/components/ui/EmptyState'
+import StartHereSection from '@/components/dashboard/StartHereSection'
 import { buildLabelResolver, describeLink } from '@/lib/links'
 import type { Project, Task, WeeklyReview, PatternAnalysis } from '@/lib/types'
 
@@ -211,6 +212,8 @@ export default function DashboardPage() {
         </div>
         <CreateProjectModal />
       </div>
+
+      <StartHereSection />
 
       {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

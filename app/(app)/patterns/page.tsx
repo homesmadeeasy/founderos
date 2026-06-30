@@ -106,7 +106,7 @@ export default function PatternsPage() {
             </div>
             <div>
               <h1 className="text-xl font-semibold text-zinc-900">Cross-Project Patterns</h1>
-              <p className="text-sm text-zinc-500">Understand how you work across all projects.</p>
+              <p className="text-sm text-zinc-500">Cross-project insights about how you work.</p>
             </div>
           </div>
         </div>
@@ -162,7 +162,7 @@ export default function PatternsPage() {
           <EmptyState
             icon={GitBranch}
             title="No pattern analysis yet"
-            description="Generate your first cross-project pattern analysis to understand how you work across everything you're building."
+            description="Pattern detection becomes more accurate as FounderOS learns how you work across multiple projects, tasks, reviews and Project DNA."
             action={{ label: 'Generate Pattern Analysis', onClick: () => void generate() }}
           />
         </div>

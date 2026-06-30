@@ -43,7 +43,7 @@ export default function RoadmapPage() {
             <Map size={20} className="text-zinc-300" />
           </div>
           <p className="text-sm font-semibold text-zinc-700">No roadmap yet</p>
-          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Build your roadmap from the project chat.</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Roadmap items help you plan what comes now, next and later.</p>
           <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
             <MessageSquare size={12} /> Open chat
           </Link>

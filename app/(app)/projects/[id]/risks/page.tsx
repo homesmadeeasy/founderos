@@ -42,7 +42,7 @@ export default function RisksPage() {
             <AlertTriangle size={20} className="text-zinc-300" />
           </div>
           <p className="text-sm font-semibold text-zinc-700">No risks identified</p>
-          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Identify risks early so you can avoid problems.</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Risks help FounderOS understand what could block progress.</p>
           <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
             <MessageSquare size={12} /> Open chat
           </Link>

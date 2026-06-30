@@ -54,7 +54,7 @@ export default function IdeasPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">Idea Vault</h1>
-          <p className="mt-0.5 text-sm text-zinc-500">Capture raw ideas, then let FounderOS help shape the best ones.</p>
+          <p className="mt-0.5 text-sm text-zinc-500">Capture ideas before they become projects.</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -91,7 +91,7 @@ export default function IdeasPage() {
           <EmptyState
             icon={Lightbulb}
             title="No ideas yet"
-            description="Capture your first idea and let FounderOS help you explore, validate and turn it into a project."
+            description="Capture raw ideas here. FounderOS can analyse them and turn the best ones into structured projects."
             action={{ label: 'Create Idea', onClick: () => setShowCreate(true) }}
           />
         </div>

@@ -3,9 +3,10 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles, Network, File, Dna } from 'lucide-react'
+import { MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map, Pencil, Trash2, ArrowRight, Sparkles, Network, File, Dna, Target } from 'lucide-react'
 import { useProjectContext } from '@/contexts/ProjectContext'
 import { useAppContext } from '@/contexts/AppContext'
+import { getRecommendedNextStep } from '@/lib/onboarding'
 import EditProjectModal from '@/components/project/EditProjectModal'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -60,6 +61,11 @@ export default function ProjectOverviewPage() {
   const roadmapPreview = roadmapItems.slice(0, 4)
   const recentMessages = messages.slice(-3)
 
+  const recommended = useMemo(
+    () => getRecommendedNextStep({ project, tasks, risks, reviews, latestDna, messages }),
+    [project, tasks, risks, reviews, latestDna, messages],
+  )
+
   const sections = [
     { icon: MessageSquare, label: 'Chat',      href: 'chat',      stat: `${messages.length} messages`,                color: 'text-blue-500',    bg: 'bg-blue-50' },
     { icon: CheckSquare,   label: 'Tasks',     href: 'tasks',     stat: `${tasks.length} total · ${doneTasks} done`,  color: 'text-orange-500',  bg: 'bg-orange-50' },
@@ -109,6 +115,25 @@ export default function ProjectOverviewPage() {
           </button>
         </div>
       </div>
+
+      {recommended && (
+        <Link
+          href={recommended.href}
+          className="flex items-start gap-4 bg-zinc-900 text-white rounded-xl p-5 hover:bg-zinc-800 transition-colors group"
+        >
+          <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
+            <Target size={16} className="text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1">Recommended next step</p>
+            <p className="text-sm font-semibold">{recommended.title}</p>
+            <p className="text-xs text-zinc-400 mt-1 leading-relaxed">{recommended.description}</p>
+          </div>
+          <span className="shrink-0 flex items-center gap-1 text-xs font-medium text-zinc-300 group-hover:text-white mt-1">
+            {recommended.actionLabel} <ArrowRight size={12} />
+          </span>
+        </Link>
+      )}
 
       {/* Meta */}
       <div className="flex items-center gap-3 flex-wrap">

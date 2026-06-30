@@ -22,7 +22,7 @@ export default function DecisionsPage() {
             <GitFork size={20} className="text-zinc-300" />
           </div>
           <p className="text-sm font-semibold text-zinc-700">No decisions logged</p>
-          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Track important choices so the project has memory.</p>
+          <p className="text-xs text-zinc-400 max-w-xs leading-relaxed">Use decisions to remember why a project changed direction.</p>
           <Link href={`/projects/${project.id}/chat`} className="mt-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg px-3 py-1.5 hover:bg-zinc-50 transition-colors flex items-center gap-1.5">
             <MessageSquare size={12} /> Open chat
           </Link>

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Search, Loader2, ArrowRight, Plus, LayoutDashboard, FolderKanban, Lightbulb,
   Settings, MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map,
-  Sparkles, Network, AlertCircle, File, CalendarCheck2, Dna, GitBranch,
+  Sparkles, Network, AlertCircle, File, CalendarCheck2, Dna, GitBranch, HelpCircle,
 } from 'lucide-react'
 import { useAppContext } from '@/contexts/AppContext'
 import { createClient } from '@/lib/supabase/client'
@@ -574,6 +574,7 @@ function actionIcon(action: CommandAction) {
   if (href.includes('/roadmap')) return Map
   if (href.includes('/dna')) return Dna
   if (href.includes('/patterns')) return GitBranch
+  if (href.includes('/how-it-works')) return HelpCircle
   if (href.includes('/weekly-review')) return CalendarCheck2
   if (href.includes('/review')) return Sparkles
   if (href.includes('/memory')) return Network

@@ -12,6 +12,7 @@ import {
   Settings,
   LogOut,
   Command,
+  HelpCircle,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCommandBar, commandShortcutLabel } from '@/components/command/CommandBarProvider'
@@ -83,6 +84,14 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
             </Link>
           )
         })}
+        <Link
+          href="/how-it-works"
+          target="_blank"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50 transition-colors"
+        >
+          <HelpCircle size={15} strokeWidth={1.8} />
+          How it works
+        </Link>
       </nav>
 
       {/* User */}

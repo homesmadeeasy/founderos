@@ -22,6 +22,9 @@ export default function ProjectChatPage() {
 
       {/* ── Left: Chat column ──────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 p-6 gap-4">
+        <p className="text-xs text-zinc-500 leading-relaxed shrink-0">
+          Chat with AI in the context of this project. Convert useful responses into tasks, notes, decisions, risks or roadmap items.
+        </p>
 
         {/* Message list */}
         <div className="flex-1 overflow-y-auto space-y-5 pr-1">
