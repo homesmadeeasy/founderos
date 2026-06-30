@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FounderOS
 
-## Getting Started
+FounderOS is an AI operating system that turns your ideas, chats, notes and files into structured projects, tasks, decisions, risks, roadmaps and progress.
 
-First, run the development server:
+Built for young founders, builders, coders and ambitious students who want more than a blank ChatGPT window.
+
+## Current features
+
+- Supabase auth and database persistence
+- Project-scoped AI chat with structured context
+- AI extraction (tasks, notes, decisions, risks, roadmap items)
+- Idea Vault with AI idea analysis and idea-to-project flow
+- Project reviews and global weekly reviews
+- Project DNA and cross-project pattern detection
+- Knowledge graph / linked memory
+- File upload with AI summaries
+- Global command bar (⌘K)
+- Onboarding, demo workspace and product clarity flows
+
+## Tech stack
+
+- **Framework:** Next.js 16 (App Router)
+- **UI:** React, Tailwind CSS
+- **Database & auth:** Supabase (PostgreSQL + RLS)
+- **AI:** OpenAI API (`gpt-4o-mini`)
+
+## Local setup
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Environment variables
+
+Create `.env.local` in the project root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+OPENAI_API_KEY=your_openai_api_key
+```
+
+These are validated server-side on AI routes. Missing values return clear developer errors in API responses.
+
+### 3. Supabase setup
+
+Run the SQL migrations in order (see `supabase/README.md`):
+
+1. `schema.sql` — core tables
+2. Feature migrations as needed (`ideas.sql`, `links.sql`, etc.)
+
+Enable email auth in your Supabase project. RLS policies are included in the migration files.
+
+### 4. Run the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build + typecheck |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
 
-## Learn More
+## Basic testing checklist
 
-To learn more about Next.js, take a look at the following resources:
+- [ ] Sign up / log in
+- [ ] Complete onboarding or load demo workspace
+- [ ] Create idea → analyse → convert to project
+- [ ] Project chat → extract task/note/decision
+- [ ] Generate project review and weekly review
+- [ ] Upload file and view memory graph
+- [ ] Generate Project DNA and pattern analysis
+- [ ] Command bar search and navigation
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment (Vercel)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Push to GitHub
+2. Import project in Vercel
+3. Set the same environment variables
+4. Deploy
 
-## Deploy on Vercel
+Ensure all Supabase migrations have been applied to your production Supabase project before going live.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+app/           Next.js routes (pages + API)
+components/    React UI components
+contexts/      App-wide React state
+lib/           Business logic, AI helpers, Supabase data layer
+supabase/      SQL migrations
+```
+
+See `DEVELOPMENT.md` for architecture details.
