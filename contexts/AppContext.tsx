@@ -24,16 +24,16 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import * as db from '@/lib/db'
 import type {
-  AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message, Idea, Link, ProjectFile,
+  AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message, Idea, Link, ProjectFile, Goal,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
   RiskSeverity, RiskStatus, RoadmapStatus, MessageRole, IdeaStatus,
-  EntityType, RelationshipType,
+  EntityType, RelationshipType, GoalCategory, GoalPriority, GoalStatus,
 } from '@/lib/types'
 export type {
-  NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink, NewProjectFile,
+  NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink, NewProjectFile, NewGoal,
 } from '@/lib/db/input-types'
 import type {
-  NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink, NewProjectFile,
+  NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem, NewIdea, NewLink, NewProjectFile, NewGoal,
 } from '@/lib/db/input-types'
 import { queueMemoryIndex } from '@/lib/memory/routes'
 
@@ -78,6 +78,12 @@ interface AppContextValue {
   updateIdea:       (id: string, data: Partial<Omit<Idea, 'id' | 'createdAt'>>) => Promise<void>
   deleteIdea:       (id: string) => Promise<void>
 
+  // Goals
+  createGoal:       (data: NewGoal) => Promise<Goal>
+  updateGoal:       (id: string, data: Partial<Omit<Goal, 'id' | 'createdAt'>>) => Promise<void>
+  deleteGoal:       (id: string) => Promise<void>
+  linkGoalToProject:(goalId: string, projectId: string) => Promise<void>
+
   // Links (Knowledge Graph)
   createLink:       (data: NewLink) => Promise<Link>
   deleteLink:       (id: string) => Promise<void>
@@ -94,7 +100,7 @@ interface AppContextValue {
 // ─── Context ──────────────────────────────────────────────────────────────────
 
 const EMPTY_STATE: AppState = {
-  projects: [], tasks: [], notes: [], decisions: [], risks: [], roadmapItems: [], ideas: [], projectFiles: [], links: [], chatMessages: {},
+  projects: [], tasks: [], notes: [], decisions: [], risks: [], roadmapItems: [], ideas: [], projectFiles: [], links: [], goals: [], chatMessages: {},
 }
 
 const AppContext = createContext<AppContextValue | null>(null)
@@ -357,6 +363,39 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
       () => db.deleteIdea(supabase, id),
     ), [supabase, mutate])
 
+  // ── Goals ──────────────────────────────────────────────────────────────────
+
+  const createGoal = useCallback(async (data: NewGoal): Promise<Goal> => {
+    try {
+      const item = await db.createGoal(supabase, userId, data)
+      patch(s => ({ ...s, goals: [item, ...s.goals] }))
+      queueMemoryIndex('goal', item.id)
+      return item
+    } catch (err) {
+      console.error('[FounderOS] createGoal failed:', err)
+      throw err
+    }
+  }, [supabase, userId, patch])
+
+  const updateGoal = useCallback((id: string, data: Partial<Omit<Goal, 'id' | 'createdAt'>>) =>
+    mutate(
+      s => ({ ...s, goals: s.goals.map(g => g.id === id ? { ...g, ...data, updatedAt: new Date().toISOString() } : g) }),
+      async () => {
+        await db.updateGoal(supabase, id, data)
+        queueMemoryIndex('goal', id)
+      },
+    ), [supabase, mutate])
+
+  const deleteGoal = useCallback((id: string) =>
+    mutate(
+      s => ({ ...s, goals: s.goals.filter(g => g.id !== id) }),
+      () => db.deleteGoal(supabase, id),
+    ), [supabase, mutate])
+
+  const linkGoalToProject = useCallback(async (goalId: string, projectId: string) => {
+    await db.createGoalLink(supabase, userId, goalId, 'project', projectId)
+  }, [supabase, userId])
+
   // ── Links ──────────────────────────────────────────────────────────────────
 
   const createLink = useCallback(async (data: NewLink): Promise<Link> => {
@@ -442,6 +481,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
       addRisk, updateRisk, deleteRisk,
       addRoadmapItem, updateRoadmapItem, deleteRoadmapItem,
       createIdea, updateIdea, deleteIdea,
+      createGoal, updateGoal, deleteGoal, linkGoalToProject,
       createLink, deleteLink,
       createProjectFile, updateProjectFile, deleteProjectFile,
       addMessage,

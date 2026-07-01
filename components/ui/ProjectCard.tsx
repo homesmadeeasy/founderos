@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { CheckSquare, MessageSquare, Sparkles, AlertTriangle } from 'lucide-react'
 import StatusBadge from './StatusBadge'
+import { WORLD_TYPE_COLOUR } from '@/lib/world'
 import type { Project } from '@/lib/types'
 
 interface Props {
@@ -20,7 +21,12 @@ export default function ProjectCard({ project, openTasks, openRisks }: Props) {
           <h3 className="text-sm font-semibold text-zinc-900 group-hover:text-zinc-700 leading-snug line-clamp-2">
             {project.title}
           </h3>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+            {project.worldType && project.worldType !== 'Custom' && (
+              <span className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${WORLD_TYPE_COLOUR[project.worldType]}`}>
+                {project.worldType}
+              </span>
+            )}
             <StatusBadge status={project.priority} />
             <StatusBadge status={project.status} />
           </div>

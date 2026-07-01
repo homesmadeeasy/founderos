@@ -1,26 +1,31 @@
 import Link from 'next/link'
 import {
   Lightbulb, FolderKanban, MessageSquare, CheckSquare, FileText, GitFork,
-  AlertTriangle, Map, Network, Sparkles, CalendarCheck2, Dna, GitBranch, Command,
+  AlertTriangle, Map, Network, Sparkles, CalendarCheck2, Dna, GitBranch, Command, Target,
 } from 'lucide-react'
 
 const LOOP = ['Capture', 'Organise', 'Plan', 'Execute', 'Review', 'Improve'] as const
 
 const FEATURES = [
   {
-    icon: Lightbulb,
-    title: 'Idea Vault',
-    desc: 'Capture raw ideas, analyse them with AI, and convert the best ones into projects.',
+    icon: Target,
+    title: 'Goals',
+    desc: 'Set goals across business, learning, health, career and life. Track progress and run AI goal reviews.',
   },
   {
     icon: FolderKanban,
-    title: 'Projects',
-    desc: 'Each project is an execution system with chat, tasks, notes, decisions, risks, roadmap and files.',
+    title: 'AI Worlds',
+    desc: 'Each world is a structured environment for a goal, idea, project or life area — with memory, tasks, reviews and DNA.',
+  },
+  {
+    icon: Lightbulb,
+    title: 'Idea Vault',
+    desc: 'Capture raw ideas, analyse them with AI, and convert the best ones into worlds.',
   },
   {
     icon: MessageSquare,
     title: 'AI Chat',
-    desc: 'Chat with AI in full project context — goals, tasks, risks and linked memory.',
+    desc: 'Chat with AI in full world context — goals, world type, tasks, risks and linked memory.',
   },
   {
     icon: CheckSquare,
@@ -30,37 +35,37 @@ const FEATURES = [
   {
     icon: FileText,
     title: 'Files',
-    desc: 'Upload documents, get AI summaries, and connect files to project memory.',
+    desc: 'Upload documents, get AI summaries, and connect files to world memory.',
   },
   {
     icon: Network,
     title: 'Memory Graph',
-    desc: 'See how ideas, chats, files, decisions and tasks connect across your workspace.',
+    desc: 'See how ideas, chats, files, decisions, goals and tasks connect across your workspace.',
   },
   {
     icon: Sparkles,
-    title: 'Project Reviews',
-    desc: 'Generate structured reviews with next steps, risks and focus areas for one project.',
+    title: 'World & Goal Reviews',
+    desc: 'Generate structured reviews with next steps, blockers and focus areas for one world or goal.',
   },
   {
     icon: CalendarCheck2,
     title: 'Weekly Reviews',
-    desc: 'Review your whole workspace and decide what to focus on next week.',
+    desc: 'Review your whole workspace — goals, worlds and momentum — and decide what to focus on next week.',
   },
   {
     icon: Dna,
-    title: 'Project DNA',
-    desc: 'A living profile of each project\'s identity, evolution and strategic direction.',
+    title: 'World DNA',
+    desc: 'A living profile of each world\'s identity, evolution and strategic direction.',
   },
   {
     icon: GitBranch,
     title: 'Pattern Detection',
-    desc: 'Cross-project insights about recurring strengths, bottlenecks and how you work.',
+    desc: 'Cross-world insights about recurring strengths, bottlenecks and how you work.',
   },
   {
     icon: Command,
     title: 'Command Bar',
-    desc: 'Search everything and navigate fast with ⌘K from anywhere in the app.',
+    desc: 'Search everything — goals, worlds, tasks — and navigate fast with ⌘K from anywhere in the app.',
   },
 ] as const
 
@@ -86,13 +91,18 @@ export default function HowItWorksPage() {
         <div className="text-center max-w-2xl mx-auto space-y-4">
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900">How FounderOS works</h1>
           <p className="text-zinc-500 leading-relaxed">
-            FounderOS is an AI operating system that turns your ideas, chats, notes and files into structured
-            projects — then helps you review, learn and improve over time.
+            FounderOS is an AI operating system that helps you organise goals, ideas, knowledge and work into
+            living AI worlds — then remember, plan, review and improve over time. You stay in control.
           </p>
         </div>
 
-        <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-8 text-center">
-          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-4">The core loop</p>
+        <div className="bg-zinc-50 rounded-2xl border border-zinc-100 p-8 text-center space-y-4">
+          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">The vision</p>
+          <p className="text-sm text-zinc-700 leading-relaxed max-w-xl mx-auto">
+            Type any goal, responsibility, life area, idea or problem — FounderOS creates a world for it that
+            remembers, plans, reviews and evolves with you.
+          </p>
+          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider pt-2">The core loop</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             {LOOP.map((step, i) => (
               <span key={step} className="flex items-center gap-2">

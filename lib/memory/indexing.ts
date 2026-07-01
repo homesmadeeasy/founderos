@@ -7,7 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Project, Task, Note, Decision, Risk, RoadmapItem, Idea, IdeaAnalysis,
   ProjectReview, WeeklyReview, ProjectFile, ProjectDna, PatternAnalysis, Link,
-  MemoryEntityType,
+  MemoryEntityType, Goal, GoalReview,
 } from '@/lib/types'
 import { generateEmbedding } from '@/lib/ai/embeddings'
 import { upsertMemoryEmbeddingRow, deleteMemoryEmbeddingRow } from '@/lib/db/embeddings'
@@ -17,6 +17,7 @@ import { loadWeeklyReviews } from '@/lib/db/weekly-reviews'
 import { loadLatestProjectDnaForAllProjects } from '@/lib/db/dna'
 import { loadPatternAnalyses } from '@/lib/db/patterns'
 import { loadIdeaAnalyses } from '@/lib/db/ideas'
+import { loadGoals, loadGoalReviews } from '@/lib/db/goals'
 import { describeLink, buildLabelResolver } from '@/lib/links'
 import type { AppState } from '@/lib/types'
 
@@ -49,7 +50,10 @@ function joinParts(parts: (string | undefined | null)[]): string {
 
 export function buildMemoryContentForProject(project: Project): MemoryContentPayload | null {
   const content = joinParts([
-    `Project: ${project.title}`,
+    `World: ${project.title}`,
+    `World type: ${project.worldType}`,
+    project.worldPurpose && `Purpose: ${project.worldPurpose}`,
+    project.lifeArea && `Life area: ${project.lifeArea}`,
     project.description && `Description: ${project.description}`,
     project.goal && `Goal: ${project.goal}`,
     `Status: ${project.status}`,
@@ -460,6 +464,64 @@ export async function indexIdeaAnalysis(
   return upsertMemoryEmbedding(supabase, userId, 'idea_analysis', analysis.id, payload)
 }
 
+export function buildMemoryContentForGoal(goal: Goal): MemoryContentPayload | null {
+  const content = joinParts([
+    `Goal: ${goal.title}`,
+    goal.description && `Description: ${goal.description}`,
+    goal.whyItMatters && `Why it matters: ${goal.whyItMatters}`,
+    goal.successCriteria && `Success criteria: ${goal.successCriteria}`,
+    goal.constraints && `Constraints: ${goal.constraints}`,
+    goal.timeframe && `Timeframe: ${goal.timeframe}`,
+    `Category: ${goal.category}`,
+    `Status: ${goal.status}`,
+    `Progress: ${goal.progress}%`,
+  ])
+  if (!isIndexable(content)) return null
+  return {
+    title: goal.title,
+    content,
+    contentPreview: buildContentPreview(content),
+    projectId: null,
+    metadata: { category: goal.category, status: goal.status },
+  }
+}
+
+export function buildMemoryContentForGoalReview(review: GoalReview, goalTitle: string): MemoryContentPayload | null {
+  const content = joinParts([
+    `Goal review for: ${goalTitle}`,
+    review.progressReview && `Progress: ${review.progressReview}`,
+    review.blockers && `Blockers: ${review.blockers}`,
+    review.conflicts && `Conflicts: ${review.conflicts}`,
+    review.nextActions && `Next actions: ${review.nextActions}`,
+    review.recommendedFocus && `Focus: ${review.recommendedFocus}`,
+  ])
+  if (!isIndexable(content)) return null
+  return {
+    title: `Review: ${goalTitle}`,
+    content,
+    contentPreview: buildContentPreview(content),
+    projectId: null,
+    metadata: { goalId: review.goalId, confidenceScore: review.confidenceScore },
+  }
+}
+
+export async function indexGoal(supabase: SupabaseClient, userId: string, goal: Goal): Promise<boolean> {
+  const payload = buildMemoryContentForGoal(goal)
+  if (!payload) return false
+  return upsertMemoryEmbedding(supabase, userId, 'goal', goal.id, payload)
+}
+
+export async function indexGoalReview(
+  supabase: SupabaseClient,
+  userId: string,
+  review: GoalReview,
+  goalTitle: string,
+): Promise<boolean> {
+  const payload = buildMemoryContentForGoalReview(review, goalTitle)
+  if (!payload) return false
+  return upsertMemoryEmbedding(supabase, userId, 'goal_review', review.id, payload)
+}
+
 // ─── Index by entity id (for auto-index API) ──────────────────────────────────
 
 export async function indexEntityById(
@@ -554,6 +616,18 @@ export async function indexEntityById(
       }
       return false
     }
+    case 'goal': {
+      const goal = state.goals.find(g => g.id === entityId)
+      return goal ? indexGoal(supabase, userId, goal) : false
+    }
+    case 'goal_review': {
+      for (const goal of state.goals) {
+        const reviews = await loadGoalReviews(supabase, goal.id)
+        const review = reviews.find(r => r.id === entityId)
+        if (review) return indexGoalReview(supabase, userId, review, goal.title)
+      }
+      return false
+    }
     default:
       return false
   }
@@ -626,6 +700,14 @@ export async function reindexAllUserMemory(
   const patterns = await loadPatternAnalyses(supabase)
   for (const analysis of patterns) {
     if (await indexPatternAnalysis(supabase, userId, analysis)) count++
+  }
+
+  for (const goal of state.goals) {
+    if (await indexGoal(supabase, userId, goal)) count++
+    const reviews = await loadGoalReviews(supabase, goal.id)
+    for (const review of reviews) {
+      if (await indexGoalReview(supabase, userId, review, goal.title)) count++
+    }
   }
 
   return count

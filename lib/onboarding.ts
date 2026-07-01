@@ -8,13 +8,13 @@ import type { AppState, Project, Task, Risk, ProjectReview, ProjectDna, Message 
 export const DEMO_PROJECT_TITLE = '[Demo] AI Study Planner'
 
 export const ONBOARDING_STEPS = [
-  { step: 1, title: 'Capture an idea', body: 'Save raw ideas in Idea Vault before they become projects.' },
-  { step: 2, title: 'Analyse it with AI', body: 'Use AI idea analysis to validate problem, solution and fit.' },
-  { step: 3, title: 'Turn it into a project', body: 'Convert the best ideas into structured execution systems.' },
-  { step: 4, title: 'Chat inside the project', body: 'Plan with AI that knows your goal, tasks and progress.' },
+  { step: 1, title: 'Set a goal', body: 'Define what you want to achieve — across work, learning, health, career or life admin.' },
+  { step: 2, title: 'Create a world', body: 'Turn a goal, idea or responsibility into a structured AI world with memory, tasks and reviews.' },
+  { step: 3, title: 'Capture ideas', body: 'Save raw ideas in Idea Vault before they become worlds or projects.' },
+  { step: 4, title: 'Plan with AI chat', body: 'Chat inside a world with full context — goals, tasks, risks and linked memory.' },
   { step: 5, title: 'Convert AI into objects', body: 'Turn chat responses into tasks, notes, decisions, risks or roadmap items.' },
-  { step: 6, title: 'Review progress', body: 'Use Project Review and Weekly Review to stay focused.' },
-  { step: 7, title: 'Improve over time', body: 'Project DNA and Patterns learn how you work across projects.' },
+  { step: 6, title: 'Review progress', body: 'Use Goal Review, World Review and Weekly Review to stay focused across everything.' },
+  { step: 7, title: 'Improve over time', body: 'World DNA, Patterns and semantic memory learn how you work and what matters.' },
 ] as const
 
 export interface StartHereStep {
@@ -52,8 +52,8 @@ export function computeStartHereSteps(state: AppState, ctx: StartHereContext): S
     },
     {
       id: 'project',
-      title: 'Turn it into a project',
-      description: 'Convert a validated idea into a project with chat, tasks and reviews.',
+      title: 'Create your first world',
+      description: 'Turn a goal or idea into a world with chat, tasks and reviews.',
       href: '/projects',
       complete: projects.filter(p => p.status !== 'archived').length > 0,
     },
@@ -73,8 +73,8 @@ export function computeStartHereSteps(state: AppState, ctx: StartHereContext): S
     },
     {
       id: 'review',
-      title: 'Generate your first project review',
-      description: 'Get AI-powered next steps for a project you are building.',
+      title: 'Generate your first world review',
+      description: 'Get AI-powered next steps for a world you are building.',
       href: firstProject ? `/projects/${firstProject.id}/review` : '/projects',
       complete: ctx.hasProjectReview,
     },

@@ -21,6 +21,8 @@ Run these in the Supabase SQL Editor **in order** for a fresh project.
 | `pattern_analyses.sql` | `pattern_analyses` + extends `links` entity types |
 | `onboarding.sql` | `profiles.onboarding_completed`, `profiles.demo_workspace_loaded` |
 | `vector_memory.sql` | `memory_embeddings` + pgvector + `match_memory_embeddings()` |
+| `world_types.sql` | `projects.world_type`, `world_purpose`, `life_area` |
+| `goals.sql` | `goals`, `goal_links`, `goal_reviews` |
 
 ## RLS
 

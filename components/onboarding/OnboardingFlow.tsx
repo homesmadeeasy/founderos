@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Lightbulb, FolderKanban, MessageSquare, Sparkles, Dna, GitBranch,
-  ArrowRight, Check, Loader2, Zap,
+  ArrowRight, Check, Loader2, Zap, Target,
 } from 'lucide-react'
 import { ONBOARDING_STEPS } from '@/lib/onboarding'
 
-const STEP_ICONS = [Lightbulb, Sparkles, FolderKanban, MessageSquare, Zap, Sparkles, Dna] as const
+const STEP_ICONS = [Target, FolderKanban, Lightbulb, MessageSquare, Zap, Sparkles, Dna] as const
 
 export default function OnboardingFlow() {
   const router = useRouter()
@@ -58,7 +58,7 @@ export default function OnboardingFlow() {
         <div className="text-center mb-8">
           <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Welcome to FounderOS</p>
           <h1 className="text-2xl font-bold text-zinc-900">
-            {isIntro ? 'Your AI operating system for building' : isFinal ? 'You\'re ready to build' : ONBOARDING_STEPS[step - 1].title}
+            {isIntro ? 'Your AI operating system for goals and worlds' : isFinal ? 'You\'re ready to build' : ONBOARDING_STEPS[step - 1].title}
           </h1>
         </div>
 
@@ -66,8 +66,8 @@ export default function OnboardingFlow() {
           {isIntro ? (
             <div className="p-8 space-y-6">
               <p className="text-sm text-zinc-600 leading-relaxed text-center">
-                FounderOS turns your ideas, chats, notes and files into structured projects with tasks,
-                decisions, risks, roadmaps and progress — then helps you review and improve over time.
+                FounderOS helps you create AI worlds for goals, ideas, projects, learning, business, personal
+                systems and life areas. Each world can remember, plan, review and evolve — with you in control.
               </p>
               <div className="rounded-xl bg-zinc-50 border border-zinc-100 p-4">
                 <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3 text-center">The core loop</p>
@@ -85,8 +85,8 @@ export default function OnboardingFlow() {
                 <Check size={22} className="text-emerald-600" />
               </div>
               <p className="text-sm text-zinc-600 leading-relaxed">
-                Start with Idea Vault, open a project chat, convert AI responses into tasks, and use reviews
-                to stay focused. Project DNA and Patterns get smarter as you build.
+                Start with Goals or Idea Vault, create a world, use AI chat to plan, and run reviews to stay
+                focused. World DNA, Patterns and semantic memory get smarter as you build.
               </p>
               <button
                 type="button"

@@ -11,7 +11,7 @@ const tabs = [
   { label: 'Decisions', slug: 'decisions' },
   { label: 'Risks',     slug: 'risks' },
   { label: 'Roadmap',   slug: 'roadmap' },
-  { label: 'Project Review', slug: 'review' },
+  { label: 'World Review', slug: 'review' },
   { label: 'DNA', slug: 'dna' },
   { label: 'Memory Graph', slug: 'memory' },
   { label: 'Memory Search', slug: 'memory-search' },

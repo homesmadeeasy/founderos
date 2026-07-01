@@ -6,7 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   AppState, Project, Task, Note, Decision, Risk, RoadmapItem, Message,
   ProjectReview, Idea, IdeaAnalysis, Link, EntityType, ProjectFile,
-  MessageRole, WeeklyReview, ProjectDna, PatternAnalysis, UserProfile,
+  MessageRole, WeeklyReview, ProjectDna, PatternAnalysis, UserProfile, Goal,
 } from '@/lib/types'
 import type {
   NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem,
@@ -15,16 +15,16 @@ import type {
 import {
   toProject, toTask, toNote, toDecision, toRisk, toRoadmap, toMessage,
   toIdea, toIdeaAnalysis, toLink, toProjectFile, toProjectReview,
-  toWeeklyReview, toProjectDna, toPatternAnalysis,
+  toWeeklyReview, toProjectDna, toPatternAnalysis, toGoal,
   type ProjectRow, type TaskRow, type NoteRow, type DecisionRow, type RiskRow,
   type RoadmapRow, type MessageRow, type IdeaRow, type IdeaAnalysisRow,
   type LinkRow, type ProjectFileRow, type ProjectReviewRow, type WeeklyReviewRow,
-  type ProjectDnaRow, type PatternAnalysisRow,
+  type ProjectDnaRow, type PatternAnalysisRow, type GoalRow,
 } from './mappers'
 
 
 export async function loadAppState(supabase: SupabaseClient): Promise<AppState> {
-  const [projects, tasks, notes, decisions, risks, roadmap, messages, ideas, links, projectFiles] = await Promise.all([
+  const [projects, tasks, notes, decisions, risks, roadmap, messages, ideas, links, projectFiles, goals] = await Promise.all([
     supabase.from('projects').select('*').order('updated_at', { ascending: false }),
     supabase.from('tasks').select('*').order('created_at', { ascending: false }),
     supabase.from('notes').select('*').order('created_at', { ascending: false }),
@@ -35,10 +35,12 @@ export async function loadAppState(supabase: SupabaseClient): Promise<AppState> 
     supabase.from('ideas').select('*').order('updated_at', { ascending: false }),
     supabase.from('links').select('*').order('created_at', { ascending: false }),
     supabase.from('project_files').select('*').order('created_at', { ascending: false }),
+    supabase.from('goals').select('*').order('updated_at', { ascending: false }),
   ])
 
   const firstError = projects.error || tasks.error || notes.error || decisions.error
-    || risks.error || roadmap.error || messages.error || ideas.error || links.error || projectFiles.error
+    || risks.error || roadmap.error || messages.error || ideas.error || links.error
+    || projectFiles.error || goals.error
   if (firstError) throw firstError
 
   // Group messages by project
@@ -57,6 +59,7 @@ export async function loadAppState(supabase: SupabaseClient): Promise<AppState> 
     ideas:        (ideas.data     ?? []).map(toIdea),
     projectFiles: (projectFiles.data ?? []).map(toProjectFile),
     links:        (links.data     ?? []).map(toLink),
+    goals:        (goals.data     ?? []).map(r => toGoal(r as GoalRow)),
     chatMessages,
   }
 }

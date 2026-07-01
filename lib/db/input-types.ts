@@ -6,16 +6,32 @@
 import type {
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority,
   RiskSeverity, RiskStatus, RoadmapStatus, IdeaStatus,
-  EntityType, RelationshipType,
+  EntityType, RelationshipType, WorldType, GoalCategory, GoalPriority, GoalStatus,
 } from '@/lib/types'
 
 export type NewProject = {
   title: string
   description: string
   goal: string
+  worldType?: WorldType
+  worldPurpose?: string
+  lifeArea?: string
   status: ProjectStatus
   priority: ProjectPriority
   progress: number
+}
+
+export type NewGoal = {
+  title: string
+  description?: string
+  category?: GoalCategory
+  priority?: GoalPriority
+  status?: GoalStatus
+  progress?: number
+  timeframe?: string
+  successCriteria?: string
+  whyItMatters?: string
+  constraints?: string
 }
 
 export type NewTask = {

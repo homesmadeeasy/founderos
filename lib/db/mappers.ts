@@ -4,13 +4,15 @@
 
 import type {
   Project, Task, Note, Decision, Risk, RoadmapItem, Message, Idea, IdeaAnalysis, Link,
-  ProjectFile, ProjectReview, WeeklyReview, ProjectDna, PatternAnalysis,
+  ProjectFile, ProjectReview, WeeklyReview, ProjectDna, PatternAnalysis, Goal, GoalReview, GoalLink,
   ProjectStatus, ProjectPriority, TaskStatus, TaskPriority, RiskSeverity, RiskStatus,
-  RoadmapStatus, MessageRole, IdeaStatus, EntityType, FileStatus,
+  RoadmapStatus, MessageRole, IdeaStatus, EntityType, FileStatus, WorldType,
+  GoalCategory, GoalPriority, GoalStatus,
 } from '@/lib/types'
 import { normalizeSuggestedTasks, normalizeSuggestedRoadmapItems } from '@/lib/review'
 import { normalizeSuggestedWeeklyTasks, normalizeSuggestedProjectReviews } from '@/lib/weekly-review'
 import { normalizeSuggestedPatternActions } from '@/lib/pattern-analysis'
+import { normalizeSuggestedGoalTasks } from '@/lib/goal'
 import {
   normalizeSuggestedProject, normalizeSuggestedIdeaTasks,
   normalizeSuggestedIdeaRisks, normalizeSuggestedIdeaRoadmapItems,
@@ -18,7 +20,11 @@ import {
 
 // ─── DB row types (snake_case) ──────────────────────────────────────────────
 
-export interface ProjectRow  { id: string; title: string; description: string | null; goal: string | null; status: string; priority: string; progress: number; created_at: string; updated_at: string }
+export interface ProjectRow  {
+  id: string; title: string; description: string | null; goal: string | null
+  world_type: string | null; world_purpose: string | null; life_area: string | null
+  status: string; priority: string; progress: number; created_at: string; updated_at: string
+}
 export interface TaskRow     { id: string; project_id: string; title: string; description: string | null; status: string; priority: string; due_date: string | null; created_at: string }
 export interface NoteRow     { id: string; project_id: string; title: string; content: string | null; created_at: string }
 export interface DecisionRow { id: string; project_id: string; decision: string; reasoning: string | null; created_at: string }
@@ -79,10 +85,31 @@ export interface PatternAnalysisRow {
   suggested_actions: unknown; created_at: string
 }
 
+export interface GoalRow {
+  id: string; title: string; description: string | null; category: string | null
+  priority: string | null; status: string | null; progress: number | null
+  timeframe: string | null; success_criteria: string | null; why_it_matters: string | null
+  constraints: string | null; created_at: string; updated_at: string
+}
+
+export interface GoalLinkRow {
+  id: string; goal_id: string; entity_type: string; entity_id: string
+  relationship_type: string | null; created_at: string
+}
+
+export interface GoalReviewRow {
+  id: string; goal_id: string; progress_review: string | null; blockers: string | null
+  conflicts: string | null; next_actions: string | null; recommended_focus: string | null
+  confidence_score: number | null; suggested_tasks: unknown; created_at: string
+}
+
 // ─── Row → app mappers ──────────────────────────────────────────────────────
 
 export const toProject = (r: ProjectRow): Project => ({
   id: r.id, title: r.title, description: r.description ?? '', goal: r.goal ?? '',
+  worldType: (r.world_type ?? 'Custom') as WorldType,
+  worldPurpose: r.world_purpose ?? '',
+  lifeArea: r.life_area ?? '',
   status: r.status as ProjectStatus, priority: r.priority as ProjectPriority,
   progress: r.progress ?? 0, createdAt: r.created_at, updatedAt: r.updated_at,
 })
@@ -213,6 +240,44 @@ export const toPatternAnalysis = (r: PatternAnalysisRow): PatternAnalysis => ({
   opportunities: r.opportunities ?? '',
   recommendedChanges: r.recommended_changes ?? '',
   suggestedActions: normalizeSuggestedPatternActions(r.suggested_actions),
+  createdAt: r.created_at,
+})
+
+export const toGoal = (r: GoalRow): Goal => ({
+  id: r.id,
+  title: r.title,
+  description: r.description ?? '',
+  category: (r.category ?? 'Other') as GoalCategory,
+  priority: (r.priority ?? 'Medium') as GoalPriority,
+  status: (r.status ?? 'Active') as GoalStatus,
+  progress: r.progress ?? 0,
+  timeframe: r.timeframe ?? '',
+  successCriteria: r.success_criteria ?? '',
+  whyItMatters: r.why_it_matters ?? '',
+  constraints: r.constraints ?? '',
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+})
+
+export const toGoalLink = (r: GoalLinkRow): GoalLink => ({
+  id: r.id,
+  goalId: r.goal_id,
+  entityType: r.entity_type,
+  entityId: r.entity_id,
+  relationshipType: r.relationship_type ?? 'supports',
+  createdAt: r.created_at,
+})
+
+export const toGoalReview = (r: GoalReviewRow): GoalReview => ({
+  id: r.id,
+  goalId: r.goal_id,
+  progressReview: r.progress_review ?? '',
+  blockers: r.blockers ?? '',
+  conflicts: r.conflicts ?? '',
+  nextActions: r.next_actions ?? '',
+  recommendedFocus: r.recommended_focus ?? '',
+  confidenceScore: r.confidence_score ?? 50,
+  suggestedTasks: normalizeSuggestedGoalTasks(r.suggested_tasks),
   createdAt: r.created_at,
 })
 

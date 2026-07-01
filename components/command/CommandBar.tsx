@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Search, Loader2, ArrowRight, Plus, LayoutDashboard, FolderKanban, Lightbulb,
   Settings, MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map,
-  Sparkles, Network, AlertCircle, File, CalendarCheck2, Dna, GitBranch, HelpCircle,
+  Sparkles, Network, AlertCircle, File, CalendarCheck2, Dna, GitBranch, HelpCircle, Target,
 } from 'lucide-react'
 import { useAppContext } from '@/contexts/AppContext'
 import { createClient } from '@/lib/supabase/client'
@@ -33,7 +33,7 @@ const inputCls = 'w-full px-3 py-2.5 text-sm border border-zinc-200 rounded-lg o
 export default function CommandBar({ onClose }: Props) {
   const router = useRouter()
   const pathname = usePathname()
-  const { appState, isHydrated, loadError, createProject, createIdea, addTask, addNote, addDecision, addRisk, addRoadmapItem } = useAppContext()
+  const { appState, isHydrated, loadError, createProject, createGoal, createIdea, addTask, addNote, addDecision, addRisk, addRoadmapItem } = useAppContext()
 
   const projectId = parseProjectIdFromPath(pathname)
   const projectMap = useMemo(() => buildProjectMap(appState), [appState])
@@ -200,6 +200,16 @@ export default function CommandBar({ onClose }: Props) {
           })
           close()
           router.push(`/projects/${p.id}`)
+          break
+        }
+        case 'goal': {
+          if (!draft.title.trim()) throw new Error('Goal title is required.')
+          const goal = await createGoal({
+            title: draft.title.trim(),
+            description: draft.description,
+          })
+          close()
+          router.push(`/goals/${goal.id}`)
           break
         }
         case 'idea': {
@@ -598,6 +608,7 @@ function actionIcon(action: CommandAction) {
   if (href.includes('/roadmap')) return Map
   if (href.includes('/dna')) return Dna
   if (href.includes('/patterns')) return GitBranch
+  if (href.includes('/goals')) return Target
   if (href.includes('/how-it-works')) return HelpCircle
   if (href.includes('/weekly-review')) return CalendarCheck2
   if (href.includes('/review')) return Sparkles
@@ -612,6 +623,7 @@ function objectIcon(type: CommandSearchResult['objectType']) {
   switch (type) {
     case 'project': return FolderKanban
     case 'idea': return Lightbulb
+    case 'goal': return Target
     case 'task': return CheckSquare
     case 'note': return FileText
     case 'decision': return GitFork

@@ -15,6 +15,7 @@ import { createContext, useContext, useState, useEffect, useMemo, useCallback } 
 import { useAppContext } from './AppContext'
 import { createClient } from '@/lib/supabase/client'
 import * as db from '@/lib/db'
+import { loadGoalLinksForEntity } from '@/lib/db'
 import { buildChatContext, buildChatHistory } from '@/lib/ai'
 import { collectProjectEntityIds, getProjectLinks, buildLabelResolver, summarizeLinks } from '@/lib/links'
 import type {
@@ -193,12 +194,29 @@ export function ProjectProvider({
         // Non-blocking — chat works without semantic memory
       }
 
+      let linkedGoals: string[] = []
+      try {
+        const goalLinks = await loadGoalLinksForEntity(supabase, 'project', pid)
+        linkedGoals = goalLinks
+          .map(l => app.appState.goals.find(g => g.id === l.goalId))
+          .filter(Boolean)
+          .map(g => `${g!.title} [${g!.status}, ${g!.progress}%]`)
+        if (!linkedGoals.length) {
+          linkedGoals = app.appState.goals
+            .filter(g => g.status === 'Active')
+            .slice(0, 3)
+            .map(g => `${g.title} [${g.category}]`)
+        }
+      } catch {
+        // Non-blocking
+      }
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userText,
-          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles, dnaSnapshot, patternSnapshot, semanticMemory),
+          context: buildChatContext(project, tasks, notes, decisions, risks, roadmapItems, linkedMemory, projectFiles, dnaSnapshot, patternSnapshot, semanticMemory, linkedGoals),
           history: buildChatHistory(history),
         }),
       })
@@ -215,7 +233,7 @@ export function ProjectProvider({
     } finally {
       setIsAiTyping(false)
     }
-  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems, projectFiles, latestDna, latestPattern])
+  }, [app, pid, project, tasks, notes, decisions, risks, roadmapItems, projectFiles, latestDna, latestPattern, supabase])
 
   const sendMessage = useCallback((content: string) => {
     const historyBefore = messages

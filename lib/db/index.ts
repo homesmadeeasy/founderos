@@ -6,7 +6,7 @@
 
 export type {
   NewProject, NewTask, NewNote, NewDecision, NewRisk, NewRoadmapItem,
-  NewIdea, NewLink, NewProjectFile,
+  NewIdea, NewLink, NewProjectFile, NewGoal,
 } from './input-types'
 
 export type { DemoWorkspaceResult } from './onboarding'
@@ -17,6 +17,7 @@ export * from './decisions'
 export * from './embeddings'
 export * from './dna'
 export * from './files'
+export * from './goals'
 export * from './ideas'
 export * from './memory'
 export * from './messages'

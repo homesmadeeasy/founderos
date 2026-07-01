@@ -26,6 +26,8 @@ import {
 export async function createProject(supabase: SupabaseClient, userId: string, d: NewProject): Promise<Project> {
   const { data, error } = await supabase.from('projects').insert({
     user_id: userId, title: d.title, description: d.description, goal: d.goal,
+    world_type: d.worldType ?? 'Custom', world_purpose: d.worldPurpose ?? '',
+    life_area: d.lifeArea ?? '',
     status: d.status, priority: d.priority, progress: d.progress,
   }).select('*').single()
   if (error) throw error
@@ -34,12 +36,15 @@ export async function createProject(supabase: SupabaseClient, userId: string, d:
 
 export async function updateProject(supabase: SupabaseClient, id: string, d: Partial<Omit<Project, 'id' | 'createdAt'>>) {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  if (d.title       !== undefined) patch.title = d.title
-  if (d.description !== undefined) patch.description = d.description
-  if (d.goal        !== undefined) patch.goal = d.goal
-  if (d.status      !== undefined) patch.status = d.status
-  if (d.priority    !== undefined) patch.priority = d.priority
-  if (d.progress    !== undefined) patch.progress = d.progress
+  if (d.title         !== undefined) patch.title = d.title
+  if (d.description   !== undefined) patch.description = d.description
+  if (d.goal          !== undefined) patch.goal = d.goal
+  if (d.worldType     !== undefined) patch.world_type = d.worldType
+  if (d.worldPurpose  !== undefined) patch.world_purpose = d.worldPurpose
+  if (d.lifeArea      !== undefined) patch.life_area = d.lifeArea
+  if (d.status        !== undefined) patch.status = d.status
+  if (d.priority      !== undefined) patch.priority = d.priority
+  if (d.progress      !== undefined) patch.progress = d.progress
   const { error } = await supabase.from('projects').update(patch).eq('id', id)
   if (error) throw error
 }

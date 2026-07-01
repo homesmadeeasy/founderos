@@ -25,10 +25,11 @@ FounderOS is a personal AI operating system for young builders, founders, coders
 Your job is to review the user's entire workspace and help them maintain momentum.
 
 Analyse:
-- active projects
+- active goals and goal progress
+- active projects / worlds and world types
 - completed tasks
 - open tasks
-- stuck projects
+- stuck projects / worlds
 - risks
 - decisions
 - roadmap items
@@ -37,6 +38,7 @@ Analyse:
 - project reviews
 - linked memory
 - recent activity
+- goal conflicts if visible
 
 Be honest, practical and action-oriented.
 
@@ -109,6 +111,7 @@ export interface WeeklyReviewContextInput {
   weekStart: string
   weekEnd: string
   projects: Project[]
+  goals: import('./types').Goal[]
   ideas: Idea[]
   tasks: Task[]
   notes: Note[]
@@ -136,7 +139,7 @@ export interface ProjectDnaSummary {
 
 export function renderWeeklyContext(input: WeeklyReviewContextInput): string {
   const {
-    weekStart, weekEnd, projects, ideas, tasks, notes, decisions, risks,
+    weekStart, weekEnd, projects, goals, ideas, tasks, notes, decisions, risks,
     roadmapItems, projectReviews, projectDnaSummaries, latestPatternAnalysis,
     projectFiles, recentMessages, linkedMemorySummaries,
   } = input
@@ -144,6 +147,7 @@ export function renderWeeklyContext(input: WeeklyReviewContextInput): string {
   const list = <T,>(items: T[], fmt: (item: T) => string, empty: string) =>
     items.length ? items.map(i => `  - ${fmt(i)}`).join('\n') : `  (${empty})`
 
+  const activeGoals = goals.filter(g => g.status === 'Active')
   const activeProjects = projects.filter(p => p.status !== 'archived')
   const openTasks = tasks.filter(t => t.status !== 'done')
   const doneTasks = tasks.filter(t => t.status === 'done')
@@ -158,10 +162,15 @@ export function renderWeeklyContext(input: WeeklyReviewContextInput): string {
   return `Review the user's entire FounderOS workspace. Use ONLY the information below.
 Week under review: ${weekStart} to ${weekEnd}
 
-PROJECTS (${activeProjects.length} active)
+ACTIVE GOALS (${activeGoals.length})
+${list(activeGoals.slice(0, 12), g =>
+  `${g.title} [${g.category}, ${g.status}, ${g.progress}%] — ${g.successCriteria || g.whyItMatters || 'no criteria'}`,
+  'no active goals')}
+
+PROJECTS / WORLDS (${activeProjects.length} active)
 ${list(activeProjects.slice(0, 20), p =>
-  `[id: ${p.id}] ${p.title} — status: ${p.status}, priority: ${p.priority}, progress: ${p.progress}%, updated: ${p.updatedAt.slice(0, 10)}`,
-  'no active projects')}
+  `[id: ${p.id}] ${p.title} — type: ${p.worldType}, status: ${p.status}, priority: ${p.priority}, progress: ${p.progress}%, purpose: ${p.worldPurpose || '(none)'}`,
+  'no active worlds')}
 
 COMPLETED TASKS THIS WEEK (${weekDoneTasks.length} of ${doneTasks.length} total done)
 ${list(weekDoneTasks.slice(0, 20), t =>

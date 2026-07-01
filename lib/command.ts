@@ -21,9 +21,11 @@ export type CommandObjectType =
   | 'weekly_review'
   | 'project_dna'
   | 'pattern_analysis'
+  | 'goal'
 
 export type CommandCreateType =
   | 'project'
+  | 'goal'
   | 'idea'
   | 'task'
   | 'note'
@@ -89,10 +91,12 @@ export const OBJECT_TYPE_LABEL: Record<CommandObjectType, string> = {
   weekly_review: 'Weekly Review',
   project_dna: 'Project DNA',
   pattern_analysis: 'Pattern Analysis',
+  goal: 'Goal',
 }
 
 export const CREATE_TYPE_LABEL: Record<CommandCreateType, string> = {
   project: 'New project',
+  goal: 'New goal',
   idea: 'New idea',
   task: 'New task',
   note: 'New note',
@@ -120,8 +124,9 @@ export function buildProjectMap(state: AppState): Map<string, string> {
 
 export function buildNavigationActions(projectId: string | null): CommandAction[] {
   const global: CommandAction[] = [
-    { id: 'nav-dashboard', kind: 'navigate', label: 'Dashboard', href: '/dashboard', keywords: ['home'] },
-    { id: 'nav-projects', kind: 'navigate', label: 'Projects', href: '/projects', keywords: ['project list'] },
+    { id: 'nav-dashboard', kind: 'navigate', label: 'Dashboard', href: '/dashboard', keywords: ['home', 'life hub', 'command centre'] },
+    { id: 'nav-goals', kind: 'navigate', label: 'Goals', href: '/goals', keywords: ['goal', 'outcomes', 'objectives'] },
+    { id: 'nav-projects', kind: 'navigate', label: 'Worlds', href: '/projects', keywords: ['project list', 'worlds'] },
     { id: 'nav-ideas', kind: 'navigate', label: 'Idea Vault', href: '/ideas', keywords: ['ideas', 'vault'] },
     { id: 'nav-weekly-review', kind: 'navigate', label: 'Weekly Review', href: '/weekly-review', keywords: ['review', 'weekly', 'summary'] },
     { id: 'nav-patterns', kind: 'navigate', label: 'Patterns', href: '/patterns', keywords: ['pattern', 'cross-project', 'analysis', 'insights'] },
@@ -153,8 +158,9 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
 
 export function buildCreateActions(projectId: string | null): CommandAction[] {
   const global: CommandAction[] = [
+    { id: 'create-goal', kind: 'create', label: CREATE_TYPE_LABEL.goal, createType: 'goal', keywords: ['new goal', 'objective'] },
     { id: 'create-idea', kind: 'create', label: CREATE_TYPE_LABEL.idea, createType: 'idea', keywords: ['capture idea'] },
-    { id: 'create-project', kind: 'create', label: CREATE_TYPE_LABEL.project, createType: 'project', keywords: ['start project'] },
+    { id: 'create-project', kind: 'create', label: CREATE_TYPE_LABEL.project, createType: 'project', keywords: ['start project', 'create world'] },
   ]
 
   if (!projectId) return global
@@ -256,6 +262,18 @@ export function searchAppData(
         title: i.title,
         preview: i.description || i.problem || '',
         href: `/ideas/${i.id}`,
+      })
+    }
+  }
+
+  for (const g of state.goals) {
+    if (matchesQuery(q, g.title, g.description, g.successCriteria, g.whyItMatters, g.category)) {
+      results.push({
+        id: g.id,
+        objectType: 'goal',
+        title: g.title,
+        preview: g.description || g.successCriteria || g.status,
+        href: `/goals/${g.id}`,
       })
     }
   }
@@ -433,8 +451,10 @@ export function searchPatternAnalyses(
 // ─── Natural-language create commands ─────────────────────────────────────────
 
 const CREATE_TYPE_ALIASES: Record<string, CommandCreateType> = {
+  goal: 'goal',
   idea: 'idea',
   project: 'project',
+  world: 'project',
   task: 'task',
   note: 'note',
   decision: 'decision',
@@ -461,7 +481,7 @@ export function parseAskMemoryCommand(input: string): ParsedAskMemoryCommand | n
 /** Rule-based parsing: "new task: Build upload" → create draft. */
 export function parseCreateCommand(input: string, inProject: boolean): ParsedCreateCommand | null {
   const trimmed = input.trim()
-  const match = trimmed.match(/^(?:new|create)\s+(idea|project|task|note|decision|risk|roadmap(?:\s*item)?)\s*:\s*(.+)$/i)
+  const match = trimmed.match(/^(?:new|create)\s+(goal|idea|project|world|task|note|decision|risk|roadmap(?:\s*item)?)\s*:\s*(.+)$/i)
   if (!match) return null
 
   const createType = normalizeCreateType(match[1])
@@ -471,6 +491,10 @@ export function parseCreateCommand(input: string, inProject: boolean): ParsedCre
   if (!text) return null
 
   if (!inProject && PROJECT_ONLY_CREATES.includes(createType)) return null
+  if (createType === 'goal' && !inProject) {
+    return { createType: 'goal', text }
+  }
+  if (createType === 'goal') return null
 
   return { createType, text }
 }

@@ -62,6 +62,9 @@ export interface ChatContext {
   title: string
   description: string
   goal: string
+  worldType?: string
+  worldPurpose?: string
+  lifeArea?: string
   status: string
   progress: number
   tasks:        { title: string; status: string; priority: string }[]
@@ -71,6 +74,7 @@ export interface ChatContext {
   roadmapItems: { title: string; stage: string; status: string }[]
   linkedMemory?: string[]
   semanticMemory?: string[]
+  linkedGoals?: string[]
   projectFiles?: string[]
   projectDna?: ProjectDnaSnapshot
   patternAnalysis?: PatternAnalysisSnapshot
@@ -109,11 +113,15 @@ export function buildChatContext(
   projectDna?: ProjectDnaSnapshot,
   patternAnalysis?: PatternAnalysisSnapshot,
   semanticMemory: string[] = [],
+  linkedGoals: string[] = [],
 ): ChatContext {
   return {
     title:       project.title,
     description: project.description,
     goal:        project.goal,
+    worldType:   project.worldType,
+    worldPurpose: project.worldPurpose,
+    lifeArea:    project.lifeArea,
     status:      project.status,
     progress:    project.progress,
     tasks:        tasks.slice(0, 20).map(t => ({ title: t.title, status: t.status, priority: t.priority })),
@@ -123,6 +131,7 @@ export function buildChatContext(
     roadmapItems: roadmapItems.slice(0, 15).map(r => ({ title: r.title, stage: r.stage, status: r.status })),
     linkedMemory: linkedMemory.slice(0, 15),
     semanticMemory: semanticMemory.slice(0, 3),
+    linkedGoals: linkedGoals.slice(0, 5),
     projectFiles: summarizeProjectFiles(projectFiles, 10),
     projectDna,
     patternAnalysis,
@@ -150,10 +159,16 @@ export function renderContextPrompt(ctx: ChatContext): string {
 
 PROJECT
   Title: ${ctx.title}
+  World type: ${ctx.worldType ?? 'Custom'}
+  Life area: ${ctx.lifeArea || '(none)'}
+  Purpose: ${ctx.worldPurpose || '(none)'}
   Description: ${ctx.description || '(none)'}
   Goal: ${ctx.goal || '(none)'}
   Status: ${ctx.status}
   Progress: ${ctx.progress}%
+
+LINKED GOALS (top-level outcomes this world supports)
+${list(ctx.linkedGoals ?? [], s => s, 'no linked goals')}
 
 EXISTING TASKS
 ${list(ctx.tasks, t => `${t.title} [${t.status}, ${t.priority}]`, 'no tasks yet')}

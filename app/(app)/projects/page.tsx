@@ -15,9 +15,9 @@ function ProjectsEmptyState() {
       <div className="bg-white rounded-xl border border-zinc-100">
         <EmptyState
           icon={FolderKanban}
-          title="No projects yet"
-          description="Projects are where your ideas become execution systems with AI chat, tasks, decisions, risks, files and reviews."
-          action={{ label: 'Create your first project', onClick: () => setShowCreate(true) }}
+          title="No worlds yet"
+          description="Worlds are structured AI environments with memory, tasks, decisions, risks, reviews and semantic search."
+          action={{ label: 'Create your first world', onClick: () => setShowCreate(true) }}
         />
       </div>
       {showCreate && (
@@ -52,9 +52,9 @@ export default function ProjectsPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-900">Projects</h1>
+          <h1 className="text-xl font-semibold text-zinc-900">Worlds</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            {activeProjects.length} active · {archivedProjects.length} archived
+            Living AI environments for projects, learning, health, business and life areas.
           </p>
         </div>
         <CreateProjectModal />

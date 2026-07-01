@@ -20,12 +20,14 @@ export const MEMORY_ENTITY_LABEL: Record<MemoryEntityType, string> = {
   project_dna: 'Project DNA',
   pattern_analysis: 'Pattern analysis',
   link: 'Memory link',
+  goal: 'Goal',
+  goal_review: 'Goal review',
 }
 
 export const MEMORY_ENTITY_TYPES: MemoryEntityType[] = [
   'idea', 'idea_analysis', 'project', 'message', 'task', 'note', 'decision',
   'risk', 'roadmap_item', 'project_review', 'weekly_review', 'project_file',
-  'project_dna', 'pattern_analysis', 'link',
+  'project_dna', 'pattern_analysis', 'link', 'goal', 'goal_review',
 ]
 
 /** Build a user-facing route for a memory search result. */
@@ -65,6 +67,10 @@ export function memoryEntityHref(
       return '/patterns'
     case 'link':
       return projectId ? `/projects/${projectId}/memory` : '/memory-search'
+    case 'goal':
+      return `/goals/${entityId}`
+    case 'goal_review':
+      return metadata?.goalId ? `/goals/${metadata.goalId}` : '/goals'
     default:
       return '/memory-search'
   }

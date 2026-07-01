@@ -6,7 +6,7 @@ import {
   Target, CheckSquare, AlertTriangle, Activity, Lightbulb, Sparkles, Network,
   FolderKanban, ArrowRight, MessageSquare, CalendarCheck2, GitBranch, Loader2,
 } from 'lucide-react'
-import { loadWeeklyReviews, loadLatestPatternAnalysis } from '@/lib/db'
+import { loadWeeklyReviews, loadLatestPatternAnalysis, loadLatestGoalReviews } from '@/lib/db'
 import { useAppContext } from '@/contexts/AppContext'
 import { createClient } from '@/lib/supabase/client'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -15,7 +15,8 @@ import LoadingScreen, { ErrorScreen } from '@/components/ui/LoadingScreen'
 import EmptyState from '@/components/ui/EmptyState'
 import StartHereSection from '@/components/dashboard/StartHereSection'
 import { buildLabelResolver, describeLink } from '@/lib/links'
-import type { Project, Task, WeeklyReview, PatternAnalysis } from '@/lib/types'
+import type { Project, Task, WeeklyReview, PatternAnalysis, GoalReview } from '@/lib/types'
+import { WORLD_TYPE_COLOUR } from '@/lib/world'
 
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 } as const
 
@@ -58,6 +59,7 @@ export default function DashboardPage() {
   const [recentReviews, setRecentReviews] = useState<ReviewPreview[]>([])
   const [latestWeeklyReview, setLatestWeeklyReview] = useState<WeeklyReview | null>(null)
   const [latestPatternAnalysis, setLatestPatternAnalysis] = useState<PatternAnalysis | null>(null)
+  const [latestGoalReview, setLatestGoalReview] = useState<GoalReview | null>(null)
   const [generatingPattern, setGeneratingPattern] = useState(false)
 
   useEffect(() => {
@@ -91,6 +93,13 @@ export default function DashboardPage() {
         setLatestPatternAnalysis(pattern)
       } catch (err) {
         console.error('[Dashboard] loadLatestPatternAnalysis failed:', err)
+      }
+
+      try {
+        const goalReviews = await loadLatestGoalReviews(supabase, 1)
+        setLatestGoalReview(goalReviews[0] ?? null)
+      } catch (err) {
+        console.error('[Dashboard] loadLatestGoalReviews failed:', err)
       }
     })()
   }, [isHydrated, appState.projects])
@@ -183,6 +192,26 @@ export default function DashboardPage() {
     })
     const recentActivity = activity.sort((a, b) => b.at - a.at).slice(0, 6)
 
+    const activeWorlds = projects.filter(p => !['archived', 'paused'].includes(p.status))
+    const worldsByType = Object.entries(
+      activeWorlds.reduce<Record<string, number>>((acc, p) => {
+        const key = p.worldType ?? 'Custom'
+        acc[key] = (acc[key] ?? 0) + 1
+        return acc
+      }, {}),
+    ).sort((a, b) => b[1] - a[1])
+
+    const stuckWorlds = activeWorlds
+      .map(p => {
+        const pTasks = tasks.filter(t => t.projectId === p.id && t.status !== 'done')
+        const daysStale = (Date.now() - new Date(p.updatedAt).getTime()) / 86400000
+        const isStuck = daysStale > 14 && pTasks.length > 0 && p.progress < 30
+        return { project: p, daysStale: Math.floor(daysStale), openTasks: pTasks.length, isStuck }
+      })
+      .filter(x => x.isStuck)
+      .sort((a, b) => b.daysStale - a.daysStale)
+      .slice(0, 4)
+
     const stats = {
       activeProjects: projects.filter(p => !['archived', 'paused'].includes(p.status)).length,
       openTasks: openTasks.length,
@@ -192,7 +221,7 @@ export default function DashboardPage() {
 
     return {
       nextTasks, focusTask, focusProject, needingAttention, ideasToRevisit,
-      memoryLinks, recentActivity, stats,
+      memoryLinks, recentActivity, stats, worldsByType, stuckWorlds,
     }
   }, [appState])
 
@@ -206,19 +235,52 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">FounderOS</p>
-          <h1 className="text-xl font-bold text-zinc-900 mt-0.5">Home base</h1>
-          <p className="text-sm text-zinc-500 mt-1">Your operating system for building, planning and momentum.</p>
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider">Life Hub</p>
+          <h1 className="text-xl font-bold text-zinc-900 mt-0.5">Your AI command centre</h1>
+          <p className="text-sm text-zinc-500 mt-1">Goals, worlds, memory and momentum — in one place.</p>
         </div>
         <CreateProjectModal />
       </div>
 
       <StartHereSection />
 
+      {appState.goals.filter(g => g.status === 'Active').length > 0 && (
+        <Section title="Active goals" icon={Target} href="/goals">
+          <ul className="divide-y divide-zinc-50">
+            {appState.goals.filter(g => g.status === 'Active').slice(0, 4).map(g => (
+              <li key={g.id}>
+                <Link href={`/goals/${g.id}`} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors">
+                  <div>
+                    <p className="text-sm font-medium text-zinc-900">{g.title}</p>
+                    <p className="text-xs text-zinc-500">{g.category} · {g.progress}%</p>
+                  </div>
+                  <ArrowRight size={14} className="text-zinc-300" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      {derived.worldsByType.length > 0 && (
+        <Section title="Active worlds by type" icon={FolderKanban} href="/projects">
+          <div className="px-5 py-4 flex flex-wrap gap-2">
+            {derived.worldsByType.map(([type, count]) => (
+              <span
+                key={type}
+                className={`text-xs font-medium rounded-full px-3 py-1 ${WORLD_TYPE_COLOUR[type as keyof typeof WORLD_TYPE_COLOUR] ?? WORLD_TYPE_COLOUR.Custom}`}
+              >
+                {type} · {count}
+              </span>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* Quick stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Active projects', value: derived.stats.activeProjects, color: 'text-blue-600' },
+          { label: 'Active worlds', value: derived.stats.activeProjects, color: 'text-blue-600' },
           { label: 'Open tasks', value: derived.stats.openTasks, color: 'text-orange-600' },
           { label: 'Open risks', value: derived.stats.openRisks, color: 'text-red-600' },
           { label: 'Ideas captured', value: derived.stats.ideas, color: 'text-emerald-600' },
@@ -248,7 +310,7 @@ export default function DashboardPage() {
             {derived.focusProject && (
               <Link href={`/projects/${derived.focusProject.id}/chat`} className="flex items-center justify-between rounded-lg border border-zinc-100 px-4 py-3 hover:bg-zinc-50 transition-colors">
                 <div>
-                  <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-0.5">Focus project</p>
+                  <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-0.5">Focus world</p>
                   <p className="text-sm font-medium text-zinc-800">{derived.focusProject.title}</p>
                 </div>
                 <span className="text-xs text-zinc-400 flex items-center gap-1">
@@ -261,11 +323,30 @@ export default function DashboardPage() {
           <EmptyState
             icon={Target}
             title="Nothing queued yet"
-            description="Create a project or capture an idea to set your focus for today."
-            action={{ label: 'Create project', href: '/projects' }}
+            description="Create a world or capture an idea to set your focus for today."
+            action={{ label: 'Create world', href: '/projects' }}
           />
         )}
       </Section>
+
+      {latestGoalReview && (
+        <Section title="Latest goal review" icon={Target} href={`/goals/${latestGoalReview.goalId}`}>
+          <Link href={`/goals/${latestGoalReview.goalId}`} className="block px-5 py-4 hover:bg-zinc-50 transition-colors">
+            <p className="text-[11px] text-zinc-400">
+              {appState.goals.find(g => g.id === latestGoalReview.goalId)?.title ?? 'Goal'}
+              {' · '}
+              {new Date(latestGoalReview.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+            <p className="text-sm font-medium text-zinc-800 mt-1 line-clamp-2">{latestGoalReview.progressReview}</p>
+            {latestGoalReview.recommendedFocus && (
+              <p className="text-xs text-zinc-500 mt-2 line-clamp-2">
+                <span className="font-medium text-zinc-600">Focus: </span>
+                {latestGoalReview.recommendedFocus}
+              </p>
+            )}
+          </Link>
+        </Section>
+      )}
 
       {/* Latest Pattern Insight */}
       <Section title="Latest Pattern Insight" icon={GitBranch} href="/patterns">
@@ -349,10 +430,10 @@ export default function DashboardPage() {
           )}
         </Section>
 
-        {/* Projects needing attention */}
-        <Section title="Projects needing attention" icon={AlertTriangle} href="/projects">
+        {/* Worlds needing attention */}
+        <Section title="Worlds needing attention" icon={AlertTriangle} href="/projects">
           {derived.needingAttention.length === 0 ? (
-            <EmptyState icon={FolderKanban} title="Looking healthy" description="No projects flagged for attention. Keep building momentum." />
+            <EmptyState icon={FolderKanban} title="Looking healthy" description="No worlds flagged for attention. Keep building momentum." />
           ) : (
             <div className="divide-y divide-zinc-50">
               {derived.needingAttention.map(({ project, openTasks, openRisks }) => (
@@ -371,6 +452,24 @@ export default function DashboardPage() {
           )}
         </Section>
       </div>
+
+      {derived.stuckWorlds.length > 0 && (
+        <Section title="Stuck worlds" icon={AlertTriangle} href="/projects">
+          <div className="divide-y divide-zinc-50">
+            {derived.stuckWorlds.map(({ project, daysStale, openTasks }) => (
+              <Link key={project.id} href={`/projects/${project.id}`} className="flex items-center justify-between px-5 py-3.5 hover:bg-zinc-50 transition-colors group">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-zinc-800 truncate group-hover:text-zinc-900">{project.title}</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    No progress in {daysStale} days · {openTasks} open task{openTasks === 1 ? '' : 's'}
+                  </p>
+                </div>
+                <StatusBadge status={project.status} />
+              </Link>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Recent activity */}
       <Section title="Recent activity" icon={Activity}>

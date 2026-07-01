@@ -15,11 +15,11 @@ import type {
 import {
   toProject, toTask, toNote, toDecision, toRisk, toRoadmap, toMessage,
   toIdea, toIdeaAnalysis, toLink, toProjectFile, toProjectReview,
-  toWeeklyReview, toProjectDna, toPatternAnalysis,
+  toWeeklyReview, toProjectDna, toPatternAnalysis, toGoal,
   type ProjectRow, type TaskRow, type NoteRow, type DecisionRow, type RiskRow,
   type RoadmapRow, type MessageRow, type IdeaRow, type IdeaAnalysisRow,
   type LinkRow, type ProjectFileRow, type ProjectReviewRow, type WeeklyReviewRow,
-  type ProjectDnaRow, type PatternAnalysisRow,
+  type ProjectDnaRow, type PatternAnalysisRow, type GoalRow,
 } from './mappers'
 import type { WeeklyReviewContextInput } from '@/lib/weekly-review'
 import { getWeekBounds, type NormalizedWeeklyReviewFields } from '@/lib/weekly-review'
@@ -49,7 +49,7 @@ export async function loadGlobalWorkspaceContext(
 
   const [
     projectsRes, tasksRes, notesRes, decisionsRes, risksRes, roadmapRes,
-    ideasRes, linksRes, filesRes, reviewsRes, messagesRes,
+    ideasRes, linksRes, filesRes, reviewsRes, messagesRes, goalsRes,
   ] = await Promise.all([
     supabase.from('projects').select('*').order('updated_at', { ascending: false }),
     supabase.from('tasks').select('*').order('created_at', { ascending: false }),
@@ -62,12 +62,13 @@ export async function loadGlobalWorkspaceContext(
     supabase.from('project_files').select('*').order('created_at', { ascending: false }).limit(20),
     supabase.from('project_reviews').select('id, project_id, summary, created_at').order('created_at', { ascending: false }).limit(15),
     supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(30),
+    supabase.from('goals').select('*').order('updated_at', { ascending: false }),
   ])
 
   const firstError =
     projectsRes.error || tasksRes.error || notesRes.error || decisionsRes.error ||
     risksRes.error || roadmapRes.error || ideasRes.error || linksRes.error ||
-    filesRes.error || reviewsRes.error || messagesRes.error
+    filesRes.error || reviewsRes.error || messagesRes.error || goalsRes.error
   if (firstError) throw firstError
 
   const projects = (projectsRes.data ?? []).map(toProject)
@@ -78,6 +79,7 @@ export async function loadGlobalWorkspaceContext(
   const risks = (risksRes.data ?? []).map(toRisk)
   const roadmapItems = (roadmapRes.data ?? []).map(toRoadmap)
   const ideas = (ideasRes.data ?? []).map(toIdea)
+  const goals = (goalsRes.data ?? []).map(r => toGoal(r as GoalRow))
   const links = (linksRes.data ?? []).map(toLink)
   const projectFiles = (filesRes.data ?? []).map(toProjectFile)
 
@@ -110,7 +112,7 @@ export async function loadGlobalWorkspaceContext(
 
   const stateForLinks: AppState = {
     projects, tasks, notes, decisions, risks, roadmapItems,
-    ideas, projectFiles, links, chatMessages,
+    ideas, projectFiles, links, goals, chatMessages,
   }
   const resolve = buildLabelResolver(stateForLinks)
   const linkedMemorySummaries = summarizeLinks(links, resolve, 12)
@@ -132,7 +134,7 @@ export async function loadGlobalWorkspaceContext(
     : undefined
 
   return {
-    weekStart, weekEnd, projects, ideas, tasks, notes, decisions, risks,
+    weekStart, weekEnd, projects, goals, ideas, tasks, notes, decisions, risks,
     roadmapItems, projectReviews, projectDnaSummaries, latestPatternAnalysis,
     projectFiles, links, recentMessages, linkedMemorySummaries,
   }

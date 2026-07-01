@@ -1,4 +1,17 @@
-// ─── Project ──────────────────────────────────────────────────────────────────
+// ─── Project / World ──────────────────────────────────────────────────────────
+
+export type WorldType =
+  | 'Business'
+  | 'Learning'
+  | 'Health'
+  | 'Career'
+  | 'Finance'
+  | 'Creative'
+  | 'Personal'
+  | 'Life Admin'
+  | 'Research'
+  | 'Relationship'
+  | 'Custom'
 
 export type ProjectStatus =
   | 'idea'
@@ -16,12 +29,75 @@ export interface Project {
   title: string
   description: string
   goal: string
+  worldType: WorldType
+  worldPurpose: string
+  lifeArea: string
   status: ProjectStatus
   priority: ProjectPriority
   /** Manual progress override: 0–100. Falls back to task completion if 0. */
   progress: number
   createdAt: string
   updatedAt: string
+}
+
+// ─── Goals Engine ─────────────────────────────────────────────────────────────
+
+export type GoalCategory =
+  | 'Business'
+  | 'Learning'
+  | 'Health'
+  | 'Career'
+  | 'Finance'
+  | 'Creative'
+  | 'Personal'
+  | 'Relationship'
+  | 'Other'
+
+export type GoalStatus = 'Active' | 'Paused' | 'Completed' | 'Abandoned'
+export type GoalPriority = 'Low' | 'Medium' | 'High'
+
+export interface Goal {
+  id: string
+  title: string
+  description: string
+  category: GoalCategory
+  priority: GoalPriority
+  status: GoalStatus
+  progress: number
+  timeframe: string
+  successCriteria: string
+  whyItMatters: string
+  constraints: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface GoalLink {
+  id: string
+  goalId: string
+  entityType: string
+  entityId: string
+  relationshipType: string
+  createdAt: string
+}
+
+export interface SuggestedGoalReviewTask {
+  title: string
+  description: string
+  priority: 'Low' | 'Medium' | 'High'
+}
+
+export interface GoalReview {
+  id: string
+  goalId: string
+  progressReview: string
+  blockers: string
+  conflicts: string
+  nextActions: string
+  recommendedFocus: string
+  confidenceScore: number
+  suggestedTasks: SuggestedGoalReviewTask[]
+  createdAt: string
 }
 
 // ─── Task ─────────────────────────────────────────────────────────────────────
@@ -396,6 +472,8 @@ export type MemoryEntityType =
   | 'project_dna'
   | 'pattern_analysis'
   | 'link'
+  | 'goal'
+  | 'goal_review'
 
 export interface MemoryEmbedding {
   id: string
@@ -474,5 +552,6 @@ export interface AppState {
   ideas: Idea[]
   projectFiles: ProjectFile[]
   links: Link[]
+  goals: Goal[]
   chatMessages: Record<string, Message[]>
 }

@@ -126,7 +126,7 @@ export async function loadProjectDnaContext(
     projects: [base.project],
     tasks: base.tasks, notes: base.notes, decisions: base.decisions,
     risks: base.risks, roadmapItems: base.roadmapItems,
-    projectFiles: base.projectFiles ?? [], ideas: [],
+    projectFiles: base.projectFiles ?? [], ideas: [], goals: [],
     links: allLinks, chatMessages: { [projectId]: base.messages },
   }
   const ids = collectProjectEntityIds(stateForLinks, projectId)

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard,
   FolderKanban,
+  Target,
   Lightbulb,
   CalendarCheck2,
   GitBranch,
@@ -20,7 +21,8 @@ import { useCommandBar, commandShortcutLabel } from '@/components/command/Comman
 
 const nav = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Projects',  href: '/projects',  icon: FolderKanban },
+  { label: 'Goals', href: '/goals', icon: Target },
+  { label: 'Worlds',  href: '/projects',  icon: FolderKanban },
   { label: 'Idea Vault', href: '/ideas',    icon: Lightbulb },
   { label: 'Weekly Review', href: '/weekly-review', icon: CalendarCheck2 },
   { label: 'Patterns', href: '/patterns', icon: GitBranch },
