@@ -18,6 +18,7 @@ import {
 } from '@/lib/object-engine/objectStorage'
 import { searchObjects, sortObjectsByUpdated } from '@/lib/object-engine/objectSearch'
 import { generateObjectSummary } from '@/lib/object-engine/objectSummaries'
+import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import type {
   CreateObjectInput, FounderObject, FounderObjectType, LifeArea,
   ObjectRelationship, RelationshipType, UpdateObjectInput,
@@ -48,6 +49,7 @@ const ObjectEngineContext = createContext<ObjectEngineContextValue | null>(null)
 export function ObjectEngineProvider({ children }: { children: React.ReactNode }) {
   const [objects, setObjects] = useState<FounderObject[]>([])
   const [ready, setReady] = useState(false)
+  const memoryEngine = useMemoryEngine()
 
   const refresh = useCallback(() => {
     setObjects(reloadStore().objects)
@@ -64,27 +66,36 @@ export function ObjectEngineProvider({ children }: { children: React.ReactNode }
 
   const createObject = useCallback((input: CreateObjectInput) => {
     const created = storageCreate(input)
+    memoryEngine.recordObjectAction('created', created)
     refresh()
     return created
-  }, [refresh])
+  }, [refresh, memoryEngine])
 
   const updateObject = useCallback((id: string, updates: UpdateObjectInput) => {
+    const prev = storageGetById(id)
     const updated = storageUpdate(id, updates)
+    if (updated && prev && (updates.title || updates.status || updates.type || updates.area)) {
+      memoryEngine.recordObjectAction('updated', updated, { previousTitle: prev.title })
+    }
     refresh()
     return updated
-  }, [refresh])
+  }, [refresh, memoryEngine])
 
   const deleteObject = useCallback((id: string) => {
+    const existing = storageGetById(id)
     persist(() => storageDelete(id))
-  }, [persist])
+    if (existing) memoryEngine.recordObjectAction('deleted', existing)
+  }, [persist, memoryEngine])
 
   const createRelationship = useCallback((
     fromId: string, toId: string, type: RelationshipType, strength?: number,
   ) => {
+    const from = storageGetById(fromId)
     const rel = storageCreateRel(fromId, toId, type, strength)
+    if (rel && from) memoryEngine.recordObjectAction('relationship_created', from, { relationship: rel })
     refresh()
     return rel
-  }, [refresh])
+  }, [refresh, memoryEngine])
 
   const deleteRelationship = useCallback((relationshipId: string) => {
     persist(() => storageDeleteRel(relationshipId))

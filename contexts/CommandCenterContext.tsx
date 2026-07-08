@@ -7,6 +7,11 @@ import { generateDailyBriefing } from '@/lib/command-center/briefingLogic'
 import { generateAssistantResponse } from '@/lib/command-center/assistantLogic'
 import { loadCommandCenterState, saveCommandCenterState } from '@/lib/command-center/storage'
 import { useObjectEngine } from '@/contexts/ObjectEngineContext'
+import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
+import {
+  memoryForCapture, memoryForHealthLog, memoryForMissionSet,
+  memoryForProjectAdded, memoryForTaskAdded, memoryForTaskUpdated,
+} from '@/lib/memory-engine/commandCenterMemoryBridge'
 import type {
   CCAIMessage, CCCaptureItem, CCDailyLog, CCProject, CCTask,
   CaptureType, CommandCenterState, LifeArea, ProjectStatus, TaskPriority, TaskStatus,
@@ -43,6 +48,7 @@ function persist(state: CommandCenterState): CommandCenterState {
 export function CommandCenterProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<CommandCenterState | null>(null)
   const objectEngine = useObjectEngine()
+  const memoryEngine = useMemoryEngine()
 
   useEffect(() => {
     setState(loadCommandCenterState())
@@ -58,35 +64,43 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
   const setMission = useCallback((mission: string) => {
     const today = todayISO()
     update(s => ({ ...s, mission, missionDate: today }))
-  }, [update])
+    const mem = memoryForMissionSet(mission)
+    if (mem) memoryEngine.recordMemory(mem)
+  }, [update, memoryEngine])
 
   const addTask = useCallback((input: Omit<CCTask, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = nowISO()
     const task: CCTask = { ...input, id: newId(), createdAt: now, updatedAt: now }
     update(s => ({ ...s, tasks: [task, ...s.tasks] }))
     objectEngine.syncTaskFromCommandCenter(task)
-  }, [update, objectEngine])
+    memoryEngine.recordMemory(memoryForTaskAdded(task))
+  }, [update, objectEngine, memoryEngine])
 
   const updateTask = useCallback((id: string, patch: Partial<CCTask>) => {
     update(s => {
       const next = s.tasks.map(t => t.id === id ? { ...t, ...patch, updatedAt: nowISO() } : t)
       const task = next.find(t => t.id === id)
-      if (task) objectEngine.syncTaskFromCommandCenter(task)
+      if (task) {
+        objectEngine.syncTaskFromCommandCenter(task)
+        const mem = memoryForTaskUpdated(task, patch)
+        if (mem) memoryEngine.recordMemory(mem)
+      }
       return { ...s, tasks: next }
     })
-  }, [update, objectEngine])
+  }, [update, objectEngine, memoryEngine])
 
   const deleteTask = useCallback((id: string) => {
     update(s => ({ ...s, tasks: s.tasks.filter(t => t.id !== id) }))
     objectEngine.syncDeleteFromCommandCenter(id)
-  }, [update, objectEngine])
+  }, [update, objectEngine, memoryEngine])
 
   const addProject = useCallback((input: Omit<CCProject, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = nowISO()
     const project: CCProject = { ...input, id: newId(), createdAt: now, updatedAt: now }
     update(s => ({ ...s, projects: [project, ...s.projects] }))
     objectEngine.syncProjectFromCommandCenter(project)
-  }, [update, objectEngine])
+    memoryEngine.recordMemory(memoryForProjectAdded(project))
+  }, [update, objectEngine, memoryEngine])
 
   const updateProject = useCallback((id: string, patch: Partial<CCProject>) => {
     update(s => {
@@ -95,7 +109,7 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
       if (project) objectEngine.syncProjectFromCommandCenter(project)
       return { ...s, projects: next }
     })
-  }, [update, objectEngine])
+  }, [update, objectEngine, memoryEngine])
 
   const deleteProject = useCallback((id: string) => {
     update(s => ({
@@ -104,22 +118,27 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
       tasks: s.tasks.map(t => t.projectId === id ? { ...t, projectId: null, updatedAt: nowISO() } : t),
     }))
     objectEngine.syncDeleteFromCommandCenter(id)
-  }, [update, objectEngine])
+  }, [update, objectEngine, memoryEngine])
 
   const upsertTodayLog = useCallback((patch: Partial<Omit<CCDailyLog, 'id' | 'date' | 'createdAt' | 'updatedAt'>>) => {
     const today = todayISO()
     const now = nowISO()
+    const hasHealthData = (
+      'sleepHours' in patch || 'weight' in patch || 'proteinGrams' in patch
+      || 'waterLitres' in patch || 'workoutCompleted' in patch
+    )
     update(s => {
       const existing = s.dailyLogs.find(l => l.date === today)
+      let entry: CCDailyLog
       if (existing) {
+        entry = { ...existing, ...patch, updatedAt: now }
+        if (hasHealthData) memoryEngine.recordMemory(memoryForHealthLog(entry))
         return {
           ...s,
-          dailyLogs: s.dailyLogs.map(l =>
-            l.date === today ? { ...l, ...patch, updatedAt: now } : l,
-          ),
+          dailyLogs: s.dailyLogs.map(l => l.date === today ? entry : l),
         }
       }
-      const entry: CCDailyLog = {
+      entry = {
         id: newId(),
         date: today,
         sleepHours: null,
@@ -133,16 +152,18 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
         updatedAt: now,
         ...patch,
       }
+      if (hasHealthData) memoryEngine.recordMemory(memoryForHealthLog(entry))
       return { ...s, dailyLogs: [entry, ...s.dailyLogs] }
     })
-  }, [update])
+  }, [update, memoryEngine])
 
   const addCapture = useCallback((type: CaptureType, content: string) => {
     const now = nowISO()
     const capture: CCCaptureItem = { id: newId(), type, content, status: 'inbox', createdAt: now }
     update(s => ({ ...s, captureItems: [capture, ...s.captureItems] }))
     objectEngine.syncCaptureFromCommandCenter(capture)
-  }, [update, objectEngine])
+    memoryEngine.recordMemory(memoryForCapture(capture))
+  }, [update, objectEngine, memoryEngine])
 
   const updateCapture = useCallback((id: string, patch: Partial<CCCaptureItem>) => {
     update(s => {
@@ -151,12 +172,12 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
       if (capture) objectEngine.syncCaptureFromCommandCenter(capture)
       return { ...s, captureItems: next }
     })
-  }, [update, objectEngine])
+  }, [update, objectEngine, memoryEngine])
 
   const deleteCapture = useCallback((id: string) => {
     update(s => ({ ...s, captureItems: s.captureItems.filter(c => c.id !== id) }))
     objectEngine.syncDeleteFromCommandCenter(id)
-  }, [update, objectEngine])
+  }, [update, objectEngine, memoryEngine])
 
   const askAssistant = useCallback(async (prompt: string) => {
     const trimmed = prompt.trim()
@@ -166,11 +187,11 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
       if (!prev) return prev
       const userMsg: CCAIMessage = { id: newId(), role: 'user', content: trimmed, createdAt: nowISO() }
       const withUser = { ...prev, aiMessages: [...prev.aiMessages, userMsg] }
-      const reply = generateAssistantResponse(withUser, trimmed, objectEngine.objects)
+      const reply = generateAssistantResponse(withUser, trimmed, objectEngine.objects, memoryEngine.memories)
       const assistantMsg: CCAIMessage = { id: newId(), role: 'assistant', content: reply, createdAt: nowISO() }
       return persist({ ...withUser, aiMessages: [...withUser.aiMessages, assistantMsg] })
     })
-  }, [objectEngine.objects])
+  }, [objectEngine.objects, memoryEngine.memories])
 
   const clearAssistant = useCallback(() => {
     update(s => ({ ...s, aiMessages: [] }))

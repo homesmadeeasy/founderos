@@ -126,6 +126,7 @@ export function buildNavigationActions(projectId: string | null): CommandAction[
   const global: CommandAction[] = [
     { id: 'nav-dashboard', kind: 'navigate', label: 'Command Center', href: '/dashboard', keywords: ['home', 'life hub', 'command centre', 'command center', 'today'] },
     { id: 'nav-objects', kind: 'navigate', label: 'Object Engine', href: '/objects', keywords: ['objects', 'memory', 'graph', 'founder objects'] },
+    { id: 'nav-memory-engine', kind: 'navigate', label: 'Memory Engine', href: '/memory', keywords: ['memory', 'history', 'timeline', 'remember'] },
     { id: 'nav-goals', kind: 'navigate', label: 'Goals', href: '/goals', keywords: ['goal', 'outcomes', 'objectives'] },
     { id: 'nav-projects', kind: 'navigate', label: 'Worlds', href: '/projects', keywords: ['project list', 'worlds'] },
     { id: 'nav-ideas', kind: 'navigate', label: 'Idea Vault', href: '/ideas', keywords: ['ideas', 'vault'] },

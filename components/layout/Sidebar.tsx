@@ -12,6 +12,7 @@ import {
   GitBranch,
   Brain,
   Boxes,
+  History,
   Settings,
   LogOut,
   Command,
@@ -23,6 +24,7 @@ import { useCommandBar, commandShortcutLabel } from '@/components/command/Comman
 const nav = [
   { label: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Object Engine', href: '/objects', icon: Boxes },
+  { label: 'Memory Engine', href: '/memory', icon: History },
   { label: 'Goals', href: '/goals', icon: Target },
   { label: 'Worlds',  href: '/projects',  icon: FolderKanban },
   { label: 'Idea Vault', href: '/ideas',    icon: Lightbulb },
