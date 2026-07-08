@@ -6,6 +6,7 @@ import {
 import { generateDailyBriefing } from '@/lib/command-center/briefingLogic'
 import { generateAssistantResponse } from '@/lib/command-center/assistantLogic'
 import { loadCommandCenterState, saveCommandCenterState } from '@/lib/command-center/storage'
+import { useObjectEngine } from '@/contexts/ObjectEngineContext'
 import type {
   CCAIMessage, CCCaptureItem, CCDailyLog, CCProject, CCTask,
   CaptureType, CommandCenterState, LifeArea, ProjectStatus, TaskPriority, TaskStatus,
@@ -41,6 +42,7 @@ function persist(state: CommandCenterState): CommandCenterState {
 
 export function CommandCenterProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<CommandCenterState | null>(null)
+  const objectEngine = useObjectEngine()
 
   useEffect(() => {
     setState(loadCommandCenterState())
@@ -60,37 +62,40 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
 
   const addTask = useCallback((input: Omit<CCTask, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = nowISO()
-    update(s => ({
-      ...s,
-      tasks: [{ ...input, id: newId(), createdAt: now, updatedAt: now }, ...s.tasks],
-    }))
-  }, [update])
+    const task: CCTask = { ...input, id: newId(), createdAt: now, updatedAt: now }
+    update(s => ({ ...s, tasks: [task, ...s.tasks] }))
+    objectEngine.syncTaskFromCommandCenter(task)
+  }, [update, objectEngine])
 
   const updateTask = useCallback((id: string, patch: Partial<CCTask>) => {
-    update(s => ({
-      ...s,
-      tasks: s.tasks.map(t => t.id === id ? { ...t, ...patch, updatedAt: nowISO() } : t),
-    }))
-  }, [update])
+    update(s => {
+      const next = s.tasks.map(t => t.id === id ? { ...t, ...patch, updatedAt: nowISO() } : t)
+      const task = next.find(t => t.id === id)
+      if (task) objectEngine.syncTaskFromCommandCenter(task)
+      return { ...s, tasks: next }
+    })
+  }, [update, objectEngine])
 
   const deleteTask = useCallback((id: string) => {
     update(s => ({ ...s, tasks: s.tasks.filter(t => t.id !== id) }))
-  }, [update])
+    objectEngine.syncDeleteFromCommandCenter(id)
+  }, [update, objectEngine])
 
   const addProject = useCallback((input: Omit<CCProject, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = nowISO()
-    update(s => ({
-      ...s,
-      projects: [{ ...input, id: newId(), createdAt: now, updatedAt: now }, ...s.projects],
-    }))
-  }, [update])
+    const project: CCProject = { ...input, id: newId(), createdAt: now, updatedAt: now }
+    update(s => ({ ...s, projects: [project, ...s.projects] }))
+    objectEngine.syncProjectFromCommandCenter(project)
+  }, [update, objectEngine])
 
   const updateProject = useCallback((id: string, patch: Partial<CCProject>) => {
-    update(s => ({
-      ...s,
-      projects: s.projects.map(p => p.id === id ? { ...p, ...patch, updatedAt: nowISO() } : p),
-    }))
-  }, [update])
+    update(s => {
+      const next = s.projects.map(p => p.id === id ? { ...p, ...patch, updatedAt: nowISO() } : p)
+      const project = next.find(p => p.id === id)
+      if (project) objectEngine.syncProjectFromCommandCenter(project)
+      return { ...s, projects: next }
+    })
+  }, [update, objectEngine])
 
   const deleteProject = useCallback((id: string) => {
     update(s => ({
@@ -98,7 +103,8 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
       projects: s.projects.filter(p => p.id !== id),
       tasks: s.tasks.map(t => t.projectId === id ? { ...t, projectId: null, updatedAt: nowISO() } : t),
     }))
-  }, [update])
+    objectEngine.syncDeleteFromCommandCenter(id)
+  }, [update, objectEngine])
 
   const upsertTodayLog = useCallback((patch: Partial<Omit<CCDailyLog, 'id' | 'date' | 'createdAt' | 'updatedAt'>>) => {
     const today = todayISO()
@@ -133,24 +139,24 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
 
   const addCapture = useCallback((type: CaptureType, content: string) => {
     const now = nowISO()
-    update(s => ({
-      ...s,
-      captureItems: [{
-        id: newId(), type, content, status: 'inbox', createdAt: now,
-      }, ...s.captureItems],
-    }))
-  }, [update])
+    const capture: CCCaptureItem = { id: newId(), type, content, status: 'inbox', createdAt: now }
+    update(s => ({ ...s, captureItems: [capture, ...s.captureItems] }))
+    objectEngine.syncCaptureFromCommandCenter(capture)
+  }, [update, objectEngine])
 
   const updateCapture = useCallback((id: string, patch: Partial<CCCaptureItem>) => {
-    update(s => ({
-      ...s,
-      captureItems: s.captureItems.map(c => c.id === id ? { ...c, ...patch } : c),
-    }))
-  }, [update])
+    update(s => {
+      const next = s.captureItems.map(c => c.id === id ? { ...c, ...patch } : c)
+      const capture = next.find(c => c.id === id)
+      if (capture) objectEngine.syncCaptureFromCommandCenter(capture)
+      return { ...s, captureItems: next }
+    })
+  }, [update, objectEngine])
 
   const deleteCapture = useCallback((id: string) => {
     update(s => ({ ...s, captureItems: s.captureItems.filter(c => c.id !== id) }))
-  }, [update])
+    objectEngine.syncDeleteFromCommandCenter(id)
+  }, [update, objectEngine])
 
   const askAssistant = useCallback(async (prompt: string) => {
     const trimmed = prompt.trim()
@@ -160,11 +166,11 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
       if (!prev) return prev
       const userMsg: CCAIMessage = { id: newId(), role: 'user', content: trimmed, createdAt: nowISO() }
       const withUser = { ...prev, aiMessages: [...prev.aiMessages, userMsg] }
-      const reply = generateAssistantResponse(withUser, trimmed)
+      const reply = generateAssistantResponse(withUser, trimmed, objectEngine.objects)
       const assistantMsg: CCAIMessage = { id: newId(), role: 'assistant', content: reply, createdAt: nowISO() }
       return persist({ ...withUser, aiMessages: [...withUser.aiMessages, assistantMsg] })
     })
-  }, [])
+  }, [objectEngine.objects])
 
   const clearAssistant = useCallback(() => {
     update(s => ({ ...s, aiMessages: [] }))
