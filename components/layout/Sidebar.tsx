@@ -20,7 +20,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useCommandBar, commandShortcutLabel } from '@/components/command/CommandBarProvider'
 
 const nav = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Goals', href: '/goals', icon: Target },
   { label: 'Worlds',  href: '/projects',  icon: FolderKanban },
   { label: 'Idea Vault', href: '/ideas',    icon: Lightbulb },

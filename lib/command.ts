@@ -124,7 +124,7 @@ export function buildProjectMap(state: AppState): Map<string, string> {
 
 export function buildNavigationActions(projectId: string | null): CommandAction[] {
   const global: CommandAction[] = [
-    { id: 'nav-dashboard', kind: 'navigate', label: 'Dashboard', href: '/dashboard', keywords: ['home', 'life hub', 'command centre'] },
+    { id: 'nav-dashboard', kind: 'navigate', label: 'Command Center', href: '/dashboard', keywords: ['home', 'life hub', 'command centre', 'command center', 'today'] },
     { id: 'nav-goals', kind: 'navigate', label: 'Goals', href: '/goals', keywords: ['goal', 'outcomes', 'objectives'] },
     { id: 'nav-projects', kind: 'navigate', label: 'Worlds', href: '/projects', keywords: ['project list', 'worlds'] },
     { id: 'nav-ideas', kind: 'navigate', label: 'Idea Vault', href: '/ideas', keywords: ['ideas', 'vault'] },
