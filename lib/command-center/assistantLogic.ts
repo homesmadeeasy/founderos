@@ -12,11 +12,49 @@ import {
   generateRecentMemoryDigest, summarizeMemoriesByType,
 } from '@/lib/memory-engine/memorySummaries'
 import { sortMemoriesByOccurred } from '@/lib/memory-engine/memorySearch'
+import type { ExecutiveBriefing, ExecutiveRecommendation } from '@/lib/executive-engine/executiveTypes'
+
+export interface ExecutiveAssistantSnapshot {
+  topFocus: { title: string; summary: string; score?: number }
+  briefing: ExecutiveBriefing | null
+  recommendations: ExecutiveRecommendation[]
+  warnings: string[]
+}
 
 export interface AssistantContext {
   commandCenter: CommandCenterState
   objects: FounderObject[]
   memories: MemoryRecord[]
+  executive?: ExecutiveAssistantSnapshot | null
+}
+
+function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): string {
+  const lines: string[] = ['**Executive Engine**']
+
+  if (executive.briefing) {
+    lines.push(executive.briefing.summary)
+    if (executive.briefing.priorities.length > 0) {
+      lines.push(`Priorities:\n${executive.briefing.priorities.map(p => `• ${p}`).join('\n')}`)
+    }
+  }
+
+  lines.push(`**Top focus:** ${executive.topFocus.title}`)
+  lines.push(executive.topFocus.summary)
+  if (executive.topFocus.score != null) {
+    lines.push(`Attention score: ${executive.topFocus.score}/100`)
+  }
+
+  const primary = executive.recommendations.find(r => r.priority === 'high')
+  if (primary && !primary.title.includes(executive.topFocus.title)) {
+    lines.push(`Recommendation: ${primary.title} — ${primary.rationale}`)
+  }
+
+  if (executive.warnings.length > 0) {
+    lines.push(`Warnings:\n${executive.warnings.slice(0, 2).map(w => `• ${w}`).join('\n')}`)
+  }
+
+  lines.push('Open Executive Engine (/executive) for full attention scores and decisions.')
+  return lines.join('\n\n')
 }
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
@@ -62,7 +100,11 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
   },
   {
     keywords: ['focus', 'today', 'priority', 'priorities', 'should i'],
-    handler: ({ commandCenter: s, objects, memories }) => {
+    handler: ({ commandCenter: s, objects, memories, executive }) => {
+      if (executive?.topFocus?.title) {
+        return formatExecutiveFocusResponse(executive)
+      }
+
       const today = todayISO()
       const mission = s.missionDate === today ? s.mission.trim() : ''
       const open = s.tasks.filter(t => t.status !== 'done')
@@ -166,7 +208,18 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
   },
   {
     keywords: ['block', 'stuck', 'overdue', 'behind'],
-    handler: ({ commandCenter: s }) => {
+    handler: ({ commandCenter: s, executive }) => {
+      if (executive?.warnings?.length) {
+        const lines = [
+          '**Executive Engine blockers & warnings:**',
+          ...executive.warnings.map(w => `• ${w}`),
+        ]
+        if (executive.topFocus.title) {
+          lines.push(`\nSuggested focus instead: ${executive.topFocus.title}`)
+        }
+        return lines.join('\n')
+      }
+
       const today = todayISO()
       const overdue = s.tasks.filter(t => t.status !== 'done' && isOverdue(t.dueDate, today))
       const paused = s.projects.filter(p => p.status === 'paused')
@@ -223,11 +276,12 @@ export function generateAssistantResponse(
   prompt: string,
   objects: FounderObject[] = [],
   memories: MemoryRecord[] = [],
+  executive?: ExecutiveAssistantSnapshot | null,
 ): string {
   const normalized = prompt.trim().toLowerCase()
   if (!normalized) return 'Ask me about your focus, projects, objects, memories, blockers or health today.'
 
-  const ctx: AssistantContext = { commandCenter, objects, memories }
+  const ctx: AssistantContext = { commandCenter, objects, memories, executive }
 
   for (const { keywords, handler } of PROMPT_MATCHERS) {
     if (keywords.some(k => normalized.includes(k))) {
@@ -257,8 +311,9 @@ export async function fetchAssistantResponse(
   prompt: string,
   objects: FounderObject[] = [],
   memories: MemoryRecord[] = [],
+  executive?: ExecutiveAssistantSnapshot | null,
 ): Promise<string> {
-  return generateAssistantResponse(commandCenter, prompt, objects, memories)
+  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive)
 }
 
 export const SUGGESTED_PROMPTS = [

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AppProvider } from '@/contexts/AppContext'
+import { ExecutiveEngineProvider } from '@/contexts/ExecutiveEngineContext'
 import { MemoryEngineProvider } from '@/contexts/MemoryEngineContext'
 import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
 import CommandBarProvider from '@/components/command/CommandBarProvider'
@@ -17,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppProvider userId={user.id}>
       <MemoryEngineProvider>
         <ObjectEngineProvider>
+          <ExecutiveEngineProvider>
           <CommandBarProvider>
             <div className="flex h-screen overflow-hidden bg-zinc-50">
               <Sidebar userEmail={user.email} />
@@ -28,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </div>
             </div>
           </CommandBarProvider>
+          </ExecutiveEngineProvider>
         </ObjectEngineProvider>
       </MemoryEngineProvider>
     </AppProvider>

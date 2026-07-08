@@ -8,6 +8,8 @@ import { generateAssistantResponse } from '@/lib/command-center/assistantLogic'
 import { loadCommandCenterState, saveCommandCenterState } from '@/lib/command-center/storage'
 import { useObjectEngine } from '@/contexts/ObjectEngineContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
+import { useExecutiveEngine } from '@/contexts/ExecutiveEngineContext'
+import type { ExecutiveAssistantSnapshot } from '@/lib/command-center/assistantLogic'
 import {
   memoryForCapture, memoryForHealthLog, memoryForMissionSet,
   memoryForProjectAdded, memoryForTaskAdded, memoryForTaskUpdated,
@@ -49,6 +51,7 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
   const [state, setState] = useState<CommandCenterState | null>(null)
   const objectEngine = useObjectEngine()
   const memoryEngine = useMemoryEngine()
+  const executiveEngine = useExecutiveEngine()
 
   useEffect(() => {
     setState(loadCommandCenterState())
@@ -187,11 +190,25 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
       if (!prev) return prev
       const userMsg: CCAIMessage = { id: newId(), role: 'user', content: trimmed, createdAt: nowISO() }
       const withUser = { ...prev, aiMessages: [...prev.aiMessages, userMsg] }
-      const reply = generateAssistantResponse(withUser, trimmed, objectEngine.objects, memoryEngine.memories)
+      const executiveSnapshot: ExecutiveAssistantSnapshot | null = executiveEngine.ready
+        ? {
+            topFocus: executiveEngine.getTopFocus(),
+            briefing: executiveEngine.dailyBriefing,
+            recommendations: executiveEngine.recommendations,
+            warnings: executiveEngine.getWarnings(),
+          }
+        : null
+      const reply = generateAssistantResponse(
+        withUser,
+        trimmed,
+        objectEngine.objects,
+        memoryEngine.memories,
+        executiveSnapshot,
+      )
       const assistantMsg: CCAIMessage = { id: newId(), role: 'assistant', content: reply, createdAt: nowISO() }
       return persist({ ...withUser, aiMessages: [...withUser.aiMessages, assistantMsg] })
     })
-  }, [objectEngine.objects, memoryEngine.memories])
+  }, [objectEngine.objects, memoryEngine.memories, executiveEngine])
 
   const clearAssistant = useCallback(() => {
     update(s => ({ ...s, aiMessages: [] }))
