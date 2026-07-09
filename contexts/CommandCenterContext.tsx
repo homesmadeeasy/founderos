@@ -232,6 +232,7 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
         morningPlan: morningExecution.morningPlan,
         reasoningOutput: morningExecution.reasoningOutput,
         firstAction: morningExecution.getFirstAction(),
+        decisionOutput: morningExecution.decisionOutput,
         regenerate: () => morningExecution.regenerateMorningPlan(true),
       }
       const eveningSnapshot: EveningAssistantSnapshot = {

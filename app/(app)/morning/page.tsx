@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import {
-  Sun, RefreshCw, Target, AlertTriangle, BookOpen, History, Brain,
+  Sun, RefreshCw, Target, AlertTriangle, BookOpen, History, Brain, Ban, Scale,
 } from 'lucide-react'
 import UniversalCaptureInput from '@/components/capture/UniversalCaptureInput'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
@@ -18,6 +18,7 @@ export default function MorningPage() {
     dailyContext,
     reasoningOutput,
     morningPlan,
+    decisionOutput,
     regenerateMorningPlan,
     updatePrimaryMission,
     markPlanCompleted,
@@ -113,6 +114,73 @@ export default function MorningPage() {
             </div>
           )}
         </section>
+
+        {decisionOutput && (
+          <section className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-white p-5 sm:p-6 shadow-sm">
+            <h2 className="text-sm font-semibold text-indigo-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Scale size={16} /> Today&apos;s Decision
+            </h2>
+            <h3 className="text-lg font-bold text-zinc-900">{decisionOutput.primaryDecision.action}</h3>
+            <p className="text-sm text-zinc-600 mt-2">{decisionOutput.primaryDecision.reason}</p>
+
+            <div className="mt-3 flex items-center gap-2">
+              <span className={`text-[10px] font-semibold uppercase px-2 py-1 rounded-full border ${
+                decisionOutput.confidenceLabel === 'high'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  : decisionOutput.confidenceLabel === 'medium'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-zinc-50 text-zinc-500 border-zinc-200'
+              }`}>
+                {decisionOutput.confidenceLabel} confidence · {decisionOutput.confidence}%
+              </span>
+            </div>
+
+            <p className="text-sm text-zinc-700 mt-4 leading-relaxed">{decisionOutput.explanation}</p>
+
+            {decisionOutput.evidence.length > 0 && (
+              <div className="mt-4">
+                <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                  Evidence summary
+                </p>
+                <ul className="text-sm text-zinc-600 space-y-1">
+                  {decisionOutput.evidence.filter(e => e.supports).slice(0, 5).map(e => (
+                    <li key={`${e.sourceType}-${e.sourceId}`}>
+                      • [{e.sourceType}] {e.title} — {e.summary.slice(0, 100)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {decisionOutput.ignoreToday.length > 0 && (
+              <div className="mt-4 rounded-xl bg-zinc-50 border border-zinc-100 px-4 py-3">
+                <p className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                  <Ban size={12} /> Ignore today
+                </p>
+                <ul className="text-sm text-zinc-600 space-y-1">
+                  {decisionOutput.ignoreToday.map((item, i) => (
+                    <li key={i}>• {item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {decisionOutput.tradeoffs.length > 0 && (
+              <div className="mt-4">
+                <p className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider mb-1">
+                  Tradeoffs
+                </p>
+                <ul className="text-xs text-amber-800 space-y-2">
+                  {decisionOutput.tradeoffs.map((t, i) => (
+                    <li key={i}>
+                      <strong>{t.optionA}</strong> vs <strong>{t.optionB}</strong> → {t.recommendation}. {t.reason}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Context Summary */}

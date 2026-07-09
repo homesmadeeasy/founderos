@@ -3,6 +3,7 @@
 import MissionHeader from './MissionHeader'
 import EveningReviewCard from './EveningReviewCard'
 import MorningExecutionBriefingCard from './MorningExecutionBriefingCard'
+import TodayDecisionCard from './TodayDecisionCard'
 import DailyBriefingCard from './DailyBriefingCard'
 import TodayPrioritiesCard from './TodayPrioritiesCard'
 import ActiveProjectsCard from './ActiveProjectsCard'
@@ -19,6 +20,7 @@ export default function CommandCenter() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-5">
             <MorningExecutionBriefingCard />
+            <TodayDecisionCard />
             <EveningReviewCard />
             <DailyBriefingCard />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

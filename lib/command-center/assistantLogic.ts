@@ -29,12 +29,14 @@ import type { CaptureSignal } from '@/lib/capture-engine/captureTypes'
 import type { Signal } from '@/lib/signal-engine/signalTypes'
 import type { SignalSummary } from '@/lib/signal-engine/signalSearch'
 import type { AdapterConnectionState } from '@/lib/source-adapters/adapterTypes'
+import type { DecisionOutput } from '@/lib/decision-engine/decisionTypes'
 import { formatSignalTimestamp, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
 import { tomorrowISO } from '@/lib/signal-engine/signalUtils'
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
   reasoningOutput: DailyReasoningOutput | null
   firstAction: RecommendedPlanItem | null
+  decisionOutput?: DecisionOutput | null
   regenerate?: () => void
 }
 
@@ -117,6 +119,88 @@ function formatMorningPlanResponse(morning: MorningAssistantSnapshot): string {
 
   lines.push('Full plan: /morning')
   return lines.join('\n\n')
+}
+
+function formatDecisionResponse(decision?: DecisionOutput | null, mode: 'full' | 'ignore' | 'why' | 'tradeoff' = 'full'): string {
+  if (!decision) {
+    return 'Decision Engine needs more context. Open **/morning** or **/dashboard** after your morning plan compiles, then ask again.'
+  }
+
+  if (mode === 'ignore') {
+    if (decision.ignoreToday.length === 0) return 'No explicit ignore list — focus on the primary decision.'
+    return `**Ignore today:**\n${decision.ignoreToday.map(i => `• ${i}`).join('\n')}`
+  }
+
+  if (mode === 'why') {
+    const top = decision.evidence.filter(e => e.supports).slice(0, 4)
+    const lines = [
+      `**Why ${decision.primaryDecision.title}:** ${decision.primaryDecision.reason}`,
+      decision.explanation,
+    ]
+    if (top.length > 0) {
+      lines.push(`**Evidence:**\n${top.map(e => `• [${e.sourceType}] ${e.title}: ${e.summary.slice(0, 100)}`).join('\n')}`)
+    }
+    lines.push(`Confidence: ${decision.confidence}% (${decision.confidenceLabel})`)
+    return lines.join('\n\n')
+  }
+
+  if (mode === 'tradeoff') {
+    if (decision.tradeoffs.length === 0) {
+      return `No major tradeoffs detected. Primary: **${decision.primaryDecision.action}**.`
+    }
+    return decision.tradeoffs.map(t =>
+      `**${t.optionA}** vs **${t.optionB}**\n→ Choose **${t.recommendation}**\n${t.reason}`,
+    ).join('\n\n')
+  }
+
+  const lines = [
+    `**Today's decision:** ${decision.primaryDecision.action}`,
+    decision.primaryDecision.reason,
+    decision.explanation,
+  ]
+  if (decision.secondaryDecisions.length > 0) {
+    lines.push(`**If time allows:**\n${decision.secondaryDecisions.map(d => `• ${d.action}`).join('\n')}`)
+  }
+  if (decision.ignoreToday.length > 0) {
+    lines.push(`**Ignore:** ${decision.ignoreToday.slice(0, 2).join('; ')}`)
+  }
+  return lines.join('\n\n')
+}
+
+function formatFounderOSvsStudyResponse(decision?: DecisionOutput | null): string {
+  if (!decision) return formatDecisionResponse(null)
+  const tradeoff = decision.tradeoffs.find(t =>
+    t.optionA.toLowerCase().includes('study') || t.optionB.toLowerCase().includes('study')
+    || t.optionA.toLowerCase().includes('founderos') || t.optionB.toLowerCase().includes('founderos'),
+  )
+  if (tradeoff) {
+    return `**${tradeoff.optionA}** vs **${tradeoff.optionB}**\n→ **${tradeoff.recommendation}**\n${tradeoff.reason}\n\nConfidence: ${decision.confidence}%`
+  }
+  const study = decision.primaryDecision.area === 'knowledge'
+    || decision.primaryDecision.title.toLowerCase().includes('study')
+    || decision.primaryDecision.title.toLowerCase().includes('economics')
+  if (study) {
+    return `**Study wins today.** ${decision.primaryDecision.reason} FounderOS can wait unless study block is complete.`
+  }
+  return `**FounderOS can lead today.** ${decision.primaryDecision.reason} No urgent study deadline detected in signals.`
+}
+
+function formatTrainVsRecoverResponse(decision?: DecisionOutput | null): string {
+  if (!decision) return formatDecisionResponse(null)
+  const tradeoff = decision.tradeoffs.find(t =>
+    t.optionA.toLowerCase().includes('workout') || t.optionB.toLowerCase().includes('recover')
+    || t.optionA.toLowerCase().includes('train') || t.optionB.toLowerCase().includes('recover'),
+  )
+  if (tradeoff) {
+    return `**${tradeoff.optionA}** vs **${tradeoff.optionB}**\n→ **${tradeoff.recommendation}**\n${tradeoff.reason}`
+  }
+  if (decision.primaryDecision.area === 'recovery' || decision.primaryDecision.title.toLowerCase().includes('recover')) {
+    return `**Recover first.** ${decision.primaryDecision.reason}`
+  }
+  if (decision.primaryDecision.area === 'health') {
+    return `**Train today.** ${decision.primaryDecision.reason}`
+  }
+  return 'No strong train vs recover conflict. Check health signals in **/signals** or log sleep in Health Snapshot.'
 }
 
 function formatEveningReviewResponse(evening: EveningAssistantSnapshot): string {
@@ -238,6 +322,30 @@ function googleCalendarStatusMessage(sync?: SyncAssistantSnapshot | null): strin
 }
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['what should i do next', 'should i do next', 'do next'],
+    handler: ({ morning }) => formatDecisionResponse(morning?.decisionOutput),
+  },
+  {
+    keywords: ['what should i ignore', 'should i ignore', 'ignore today'],
+    handler: ({ morning }) => formatDecisionResponse(morning?.decisionOutput, 'ignore'),
+  },
+  {
+    keywords: ['why is this the priority', 'why is this priority', 'why this priority'],
+    handler: ({ morning }) => formatDecisionResponse(morning?.decisionOutput, 'why'),
+  },
+  {
+    keywords: ['what is the tradeoff', 'what is the trade off', 'what tradeoff', 'the tradeoff'],
+    handler: ({ morning }) => formatDecisionResponse(morning?.decisionOutput, 'tradeoff'),
+  },
+  {
+    keywords: ['should i work on founderos or study', 'founderos or study', 'study or founderos', 'work on founderos or study'],
+    handler: ({ morning }) => formatFounderOSvsStudyResponse(morning?.decisionOutput),
+  },
+  {
+    keywords: ['should i train or recover', 'train or recover', 'workout or recover'],
+    handler: ({ morning }) => formatTrainVsRecoverResponse(morning?.decisionOutput),
+  },
   {
     keywords: ['sync my calendar', 'sync calendar'],
     handler: () => {
@@ -594,6 +702,7 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
   {
     keywords: ['focus', 'today', 'priority', 'priorities', 'should i'],
     handler: ({ commandCenter: s, objects, memories, executive, morning }) => {
+      if (morning?.decisionOutput) return formatDecisionResponse(morning.decisionOutput)
       if (morning?.morningPlan) return formatMorningPlanResponse(morning)
       if (executive?.topFocus?.title) return formatExecutiveFocusResponse(executive)
 

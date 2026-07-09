@@ -25,12 +25,16 @@ import {
 } from '@/lib/morning-execution/morningStorage'
 import type { MorningExecutionPlan } from '@/lib/morning-execution/morningTypes'
 import type { RecommendedPlanItem } from '@/lib/reasoning-engine/reasoningTypes'
+import { getEveningReview } from '@/lib/evening-review/eveningStorage'
+import { buildDecisionInputFromMorningState, decide } from '@/lib/decision-engine/decisionEngine'
+import type { DecisionOutput } from '@/lib/decision-engine/decisionTypes'
 
 interface MorningExecutionContextValue {
   ready: boolean
   dailyContext: DailyContext | null
   reasoningOutput: DailyReasoningOutput | null
   morningPlan: MorningExecutionPlan | null
+  decisionOutput: DecisionOutput | null
   regenerateMorningPlan: (writeMemory?: boolean) => void
   markPlanCompleted: () => void
   updatePrimaryMission: (mission: string) => void
@@ -194,11 +198,36 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
     setTick(t => t + 1)
   }, [])
 
+  const decisionOutput = useMemo<DecisionOutput | null>(() => {
+    if (!ready || !dailyContext || !morningPlan) return null
+    const commandCenterState = loadCommandCenterState()
+    return decide(buildDecisionInputFromMorningState({
+      objects,
+      memories,
+      knowledge,
+      signals: dailyContext.recentSignals ?? [],
+      morningPlan,
+      eveningReview: getEveningReview(todayISO()),
+      reasoningOutput,
+      executiveState: {
+        recommendations: executive.recommendations,
+        warnings: executive.warnings,
+        tradeoffs: executive.tradeoffs,
+        healthSignals: executive.executiveContext?.healthSignals ?? dailyContext.healthSignals,
+      },
+      unresolvedCaptureCount: (commandCenterState.captureItems ?? []).filter(c => c.status === 'inbox').length,
+    }))
+  }, [
+    ready, dailyContext, morningPlan, reasoningOutput,
+    objects, memories, knowledge, executive,
+  ])
+
   const value = useMemo<MorningExecutionContextValue>(() => ({
     ready,
     dailyContext,
     reasoningOutput,
     morningPlan,
+    decisionOutput,
     regenerateMorningPlan,
     markPlanCompleted,
     updatePrimaryMission,
@@ -206,7 +235,7 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
     getFirstAction: () => morningPlan?.topPriorities.find(p => !p.completed) ?? null,
     refresh,
   }), [
-    ready, dailyContext, reasoningOutput, morningPlan,
+    ready, dailyContext, reasoningOutput, morningPlan, decisionOutput,
     regenerateMorningPlan, markPlanCompleted, updatePrimaryMission,
     updatePlanItem, refresh,
   ])
