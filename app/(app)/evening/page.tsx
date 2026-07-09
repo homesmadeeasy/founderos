@@ -6,7 +6,10 @@ import {
   Sparkles, CheckCircle2, RefreshCw,
 } from 'lucide-react'
 import { useEveningReview } from '@/contexts/EveningReviewContext'
+import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
+import UniversalCaptureInput from '@/components/capture/UniversalCaptureInput'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
+import { CAPTURE_CLASSIFICATION_LABEL } from '@/lib/capture-engine/captureTypes'
 import type { EnergyLevel } from '@/lib/evening-review/eveningTypes'
 
 const inputClass =
@@ -90,6 +93,7 @@ function ListSection({
 
 export default function EveningPage() {
   const { morningPlan } = useMorningExecution()
+  const { todaySignals } = useUniversalCapture()
   const {
     ready,
     eveningReview,
@@ -158,10 +162,36 @@ export default function EveningPage() {
           </div>
         </header>
 
+        <section className="rounded-2xl border border-violet-100 bg-white p-4">
+          <UniversalCaptureInput variant="compact" placeholder="Capture a reflection before closing the loop…" />
+        </section>
+
         {eveningReview.completed && (
           <div className="rounded-2xl border border-violet-200 bg-violet-50/80 px-5 py-4 text-sm text-violet-900">
             Review completed. Memories written and tomorrow context saved.
           </div>
+        )}
+
+        {/* Today's Captures */}
+        {todaySignals.length > 0 && (
+          <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-3">
+              Today&apos;s Captures ({todaySignals.length})
+            </h2>
+            <ul className="space-y-2 text-sm">
+              {todaySignals.slice(0, 8).map(s => (
+                <li key={s.id} className="flex items-start gap-2">
+                  <span className="text-[10px] font-semibold text-zinc-400 uppercase w-20 shrink-0">
+                    {CAPTURE_CLASSIFICATION_LABEL[s.classification]}
+                  </span>
+                  <span className="text-zinc-700">{s.parsedContent}</span>
+                  {s.knowledgeSuggestionPending && (
+                    <span className="text-[10px] text-indigo-600 shrink-0">→ knowledge?</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         {/* Morning Plan Summary */}

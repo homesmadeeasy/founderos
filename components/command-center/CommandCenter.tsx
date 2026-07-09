@@ -7,7 +7,7 @@ import DailyBriefingCard from './DailyBriefingCard'
 import TodayPrioritiesCard from './TodayPrioritiesCard'
 import ActiveProjectsCard from './ActiveProjectsCard'
 import HealthSnapshotCard from './HealthSnapshotCard'
-import QuickCaptureCard from './QuickCaptureCard'
+import UniversalCaptureCard from './UniversalCaptureCard'
 import AIAssistantPanel from './AIAssistantPanel'
 
 export default function CommandCenter() {
@@ -26,7 +26,7 @@ export default function CommandCenter() {
               <HealthSnapshotCard />
             </div>
             <ActiveProjectsCard />
-            <QuickCaptureCard />
+            <UniversalCaptureCard />
           </div>
 
           <div className="lg:col-span-1">

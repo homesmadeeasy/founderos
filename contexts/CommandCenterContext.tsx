@@ -12,7 +12,8 @@ import { useExecutiveEngine } from '@/contexts/ExecutiveEngineContext'
 import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { useEveningReview } from '@/contexts/EveningReviewContext'
-import type { ExecutiveAssistantSnapshot, EveningAssistantSnapshot, MorningAssistantSnapshot } from '@/lib/command-center/assistantLogic'
+import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
+import type { CaptureAssistantSnapshot, ExecutiveAssistantSnapshot, EveningAssistantSnapshot, MorningAssistantSnapshot } from '@/lib/command-center/assistantLogic'
 import {
   memoryForCapture, memoryForHealthLog, memoryForMissionSet,
   memoryForProjectAdded, memoryForTaskAdded, memoryForTaskUpdated,
@@ -58,6 +59,7 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
   const knowledgeEngine = useKnowledgeEngine()
   const morningExecution = useMorningExecution()
   const eveningReview = useEveningReview()
+  const universalCapture = useUniversalCapture()
 
   useEffect(() => {
     setState(loadCommandCenterState())
@@ -215,6 +217,10 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
         dailyLearningLoop: eveningReview.dailyLearningLoop,
         tomorrowContext: eveningReview.tomorrowContext,
       }
+      const captureSnapshot: CaptureAssistantSnapshot = {
+        todaySignals: universalCapture.todaySignals,
+        unprocessedCount: universalCapture.unprocessedCount,
+      }
       if (!morningSnapshot.morningPlan && morningExecution.ready) {
         morningExecution.regenerateMorningPlan(true)
       }
@@ -227,11 +233,12 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
         knowledgeEngine.knowledge,
         morningSnapshot,
         eveningSnapshot,
+        captureSnapshot,
       )
       const assistantMsg: CCAIMessage = { id: newId(), role: 'assistant', content: reply, createdAt: nowISO() }
       return persist({ ...withUser, aiMessages: [...withUser.aiMessages, assistantMsg] })
     })
-  }, [objectEngine.objects, memoryEngine.memories, executiveEngine, knowledgeEngine.knowledge, morningExecution, eveningReview])
+  }, [objectEngine.objects, memoryEngine.memories, executiveEngine, knowledgeEngine.knowledge, morningExecution, eveningReview, universalCapture])
 
   const clearAssistant = useCallback(() => {
     update(s => ({ ...s, aiMessages: [] }))

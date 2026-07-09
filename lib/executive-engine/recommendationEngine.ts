@@ -160,7 +160,56 @@ export function generateExecutiveRecommendations(
     })
   }
 
-  return recommendations.slice(0, 5)
+  const inboxCaptures = context.captures.filter(c => c.status === 'inbox')
+  const inboxIdeas = context.objects.filter(o => o.type === 'idea' && o.status === 'inbox')
+
+  if (inboxCaptures.length >= 5) {
+    recommendations.push({
+      id: newExecutiveId('rec'),
+      title: 'Too many unresolved captures',
+      summary: `${inboxCaptures.length} inbox signals need triage before adding more.`,
+      rationale: 'Universal Capture is filling the inbox faster than you process it. Clear 3 items in Inbox first.',
+      confidence: 'high',
+      priority: 'medium',
+      relatedObjectIds: inboxCaptures.slice(0, 5).map(c => c.id),
+      relatedMemoryIds: [],
+      createdAt: now,
+    })
+  }
+
+  if (inboxIdeas.length >= 3) {
+    recommendations.push({
+      id: newExecutiveId('rec'),
+      title: 'Ideas piling up',
+      summary: `${inboxIdeas.length} ideas waiting — one may be strategically important.`,
+      rationale: 'Review Inbox ideas and promote or archive before morning planning dilutes focus.',
+      confidence: 'medium',
+      priority: 'medium',
+      relatedObjectIds: inboxIdeas.slice(0, 3).map(o => o.id),
+      relatedMemoryIds: [],
+      createdAt: now,
+    })
+  }
+
+  const todayCaptureMemories = context.recentMemories.filter(m =>
+    m.tags.includes('universal-capture')
+    && m.occurredAt.slice(0, 10) === context.date,
+  )
+  if (todayCaptureMemories.length >= 4) {
+    recommendations.push({
+      id: newExecutiveId('rec'),
+      title: 'High capture volume today',
+      summary: `${todayCaptureMemories.length} captures today — protect deep work blocks.`,
+      rationale: 'Capture is working. Batch processing in Inbox prevents context switching during execution.',
+      confidence: 'medium',
+      priority: 'low',
+      relatedObjectIds: [],
+      relatedMemoryIds: todayCaptureMemories.slice(0, 3).map(m => m.id),
+      createdAt: now,
+    })
+  }
+
+  return recommendations.slice(0, 6)
 }
 
 export function answerExecutiveQuestion(

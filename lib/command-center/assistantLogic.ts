@@ -25,6 +25,7 @@ import type { DailyReasoningOutput } from '@/lib/reasoning-engine/reasoningTypes
 import type { RecommendedPlanItem } from '@/lib/reasoning-engine/reasoningTypes'
 import type { EveningReview } from '@/lib/evening-review/eveningTypes'
 import type { DailyLearningLoopOutput, TomorrowContextData } from '@/lib/daily-learning-loop/dailyLoopTypes'
+import type { CaptureSignal } from '@/lib/capture-engine/captureTypes'
 
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
@@ -37,6 +38,11 @@ export interface EveningAssistantSnapshot {
   eveningReview: EveningReview | null
   dailyLearningLoop: DailyLearningLoopOutput | null
   tomorrowContext: TomorrowContextData | null
+}
+
+export interface CaptureAssistantSnapshot {
+  todaySignals: CaptureSignal[]
+  unprocessedCount: number
 }
 
 export interface ExecutiveAssistantSnapshot {
@@ -54,6 +60,7 @@ export interface AssistantContext {
   executive?: ExecutiveAssistantSnapshot | null
   morning?: MorningAssistantSnapshot | null
   evening?: EveningAssistantSnapshot | null
+  capture?: CaptureAssistantSnapshot | null
 }
 
 function formatMorningPlanResponse(morning: MorningAssistantSnapshot): string {
@@ -187,6 +194,42 @@ function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): st
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
   {
+    keywords: ['what did i capture today', 'captured today', 'capture today'],
+    handler: ({ capture }) => {
+      if (!capture?.todaySignals?.length) return 'No captures today yet. Press ⌘K and capture anything — FounderOS classifies it.'
+      const lines = capture.todaySignals.slice(0, 8).map(s =>
+        `• [${s.classification}] ${s.parsedContent}`,
+      )
+      return `**Today's captures (${capture.todaySignals.length}):**\n${lines.join('\n')}\n\nOpen /inbox to process.`
+    },
+  },
+  {
+    keywords: ['unanswered question', 'open question', 'show questions'],
+    handler: ({ capture }) => {
+      const questions = capture?.todaySignals?.filter(s => s.classification === 'question') ?? []
+      if (questions.length === 0) return 'No question captures today. Capture with "question: …" or ask naturally.'
+      return questions.map(q => `• ${q.parsedContent}`).join('\n')
+    },
+  },
+  {
+    keywords: ['show ideas', 'my ideas today', 'ideas today', 'business ideas'],
+    handler: ({ capture, objects }) => {
+      const ideaSignals = capture?.todaySignals?.filter(s => s.classification === 'idea') ?? []
+      const ideaObjects = objects.filter(o => o.type === 'idea' && o.status === 'inbox')
+      const lines: string[] = []
+      if (ideaSignals.length > 0) {
+        lines.push('**Captured today:**')
+        ideaSignals.forEach(s => lines.push(`• ${s.parsedContent}`))
+      }
+      if (ideaObjects.length > 0) {
+        lines.push('**Inbox ideas:**')
+        ideaObjects.slice(0, 6).forEach(o => lines.push(`• ${o.title}`))
+      }
+      if (lines.length === 0) return 'No ideas captured recently. Try: idea: Better AI memory'
+      return lines.join('\n')
+    },
+  },
+  {
     keywords: ['close the loop', 'close loop', 'evening review'],
     handler: ({ evening }) => {
       if (!evening?.eveningReview) return 'Open **/evening** to close the loop for today.'
@@ -202,16 +245,18 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
   },
   {
     keywords: ['what did i learn today', 'learn today', 'today lesson', 'lessons today'],
-    handler: ({ evening }) => {
-      if (!evening?.eveningReview) return 'No evening review yet. Open **/evening** to capture what you learned today.'
-      if (!evening.eveningReview.completed) {
-        const lessons = evening.dailyLearningLoop?.lessons ?? evening.eveningReview.lessons
-        if (lessons.length === 0) return 'Add lessons in **/evening**, then complete the review.'
-        return `**Lessons so far:**\n${lessons.map(l => `• ${l}`).join('\n')}\n\nComplete the review at /evening to lock them in.`
+    handler: ({ evening, capture }) => {
+      if (evening?.eveningReview?.lessons?.length) {
+        return `**Today's lessons:**\n${evening.eveningReview.lessons.map(l => `• ${l}`).join('\n')}`
       }
-      const lessons = evening.dailyLearningLoop?.lessons ?? evening.eveningReview.lessons
-      if (lessons.length === 0) return 'No lessons captured in today\'s review.'
-      return `**Today\'s lessons:**\n${lessons.map(l => `• ${l}`).join('\n')}`
+      const reflections = capture?.todaySignals?.filter(s =>
+        s.classification === 'reflection' || s.classification === 'memory',
+      ) ?? []
+      if (reflections.length > 0) {
+        return `**Learning from captures:**\n${reflections.map(r => `• ${r.parsedContent}`).join('\n')}`
+      }
+      if (!evening?.eveningReview) return 'No evening review yet. Open **/evening** to capture what you learned today.'
+      return 'No lessons captured in today\'s review yet.'
     },
   },
   {
@@ -534,11 +579,12 @@ export function generateAssistantResponse(
   knowledge: KnowledgeRecord[] = [],
   morning?: MorningAssistantSnapshot | null,
   evening?: EveningAssistantSnapshot | null,
+  capture?: CaptureAssistantSnapshot | null,
 ): string {
   const normalized = prompt.trim().toLowerCase()
-  if (!normalized) return 'Ask me about your focus, plan, evening review, projects, objects, memories, knowledge, or health today.'
+  if (!normalized) return 'Ask me about your focus, plan, captures, evening review, projects, objects, memories, knowledge, or health today.'
 
-  const ctx: AssistantContext = { commandCenter, objects, memories, knowledge, executive, morning, evening }
+  const ctx: AssistantContext = { commandCenter, objects, memories, knowledge, executive, morning, evening, capture }
 
   for (const { keywords, handler } of PROMPT_MATCHERS) {
     if (keywords.some(k => normalized.includes(k))) {
@@ -577,8 +623,9 @@ export async function fetchAssistantResponse(
   knowledge: KnowledgeRecord[] = [],
   morning?: MorningAssistantSnapshot | null,
   evening?: EveningAssistantSnapshot | null,
+  capture?: CaptureAssistantSnapshot | null,
 ): Promise<string> {
-  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive, knowledge, morning, evening)
+  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive, knowledge, morning, evening, capture)
 }
 
 export const SUGGESTED_PROMPTS = [

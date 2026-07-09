@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   Sun, RefreshCw, Target, AlertTriangle, BookOpen, History, Brain,
 } from 'lucide-react'
+import UniversalCaptureInput from '@/components/capture/UniversalCaptureInput'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { KNOWLEDGE_TYPE_LABEL } from '@/lib/knowledge-engine/knowledgeTypes'
 import { MEMORY_TYPE_LABEL } from '@/lib/memory-engine/memoryTypes'
@@ -67,6 +68,10 @@ export default function MorningPage() {
             )}
           </div>
         </header>
+
+        <section className="rounded-2xl border border-amber-200 bg-white p-4">
+          <UniversalCaptureInput variant="compact" placeholder="Capture before you execute…" />
+        </section>
 
         {/* Morning Plan */}
         <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/80 to-white p-5 sm:p-6 shadow-sm">

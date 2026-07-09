@@ -5,9 +5,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Search, Loader2, ArrowRight, Plus, LayoutDashboard, FolderKanban, Lightbulb,
   Settings, MessageSquare, CheckSquare, FileText, GitFork, AlertTriangle, Map,
-  Sparkles, Network, AlertCircle, File, CalendarCheck2, Dna, GitBranch, HelpCircle, Target,
+  Sparkles, Network, AlertCircle, File, CalendarCheck2, Dna, GitBranch, HelpCircle, Target, Zap,
 } from 'lucide-react'
 import { useAppContext } from '@/contexts/AppContext'
+import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
+import { parseCaptureIntent } from '@/lib/capture-engine/captureCommand'
+import { classifyCapture } from '@/lib/capture-engine/captureClassifier'
+import { parseCaptureInput } from '@/lib/capture-engine/captureParser'
+import { CAPTURE_CLASSIFICATION_LABEL } from '@/lib/capture-engine/captureTypes'
 import { createClient } from '@/lib/supabase/client'
 import { loadWeeklyReviews, loadLatestProjectDnaForAllProjects, loadPatternAnalyses } from '@/lib/db'
 import type { WeeklyReview, ProjectDna, PatternAnalysis } from '@/lib/types'
@@ -22,6 +27,7 @@ type PaletteRow =
   | { kind: 'action'; action: CommandAction }
   | { kind: 'result'; result: CommandSearchResult }
   | { kind: 'parsed'; label: string; draft: CreateDraft }
+  | { kind: 'capture'; text: string; label: string }
   | { kind: 'askMemory'; question: string }
 
 interface Props {
@@ -34,6 +40,7 @@ export default function CommandBar({ onClose }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const { appState, isHydrated, loadError, createProject, createGoal, createIdea, addTask, addNote, addDecision, addRisk, addRoadmapItem } = useAppContext()
+  const { capture } = useUniversalCapture()
 
   const projectId = parseProjectIdFromPath(pathname)
   const projectMap = useMemo(() => buildProjectMap(appState), [appState])
@@ -64,6 +71,8 @@ export default function CommandBar({ onClose }: Props) {
     ]).catch(err => console.error('[CommandBar] failed to load search data:', err))
   }, [isHydrated])
 
+  const captureIntent = useMemo(() => parseCaptureIntent(query), [query])
+
   const { actions, results, parsed, askMemory } = useMemo(
     () => filterCommandPalette(appState, query, projectId, weeklyReviews, projectDnaRecords, patternAnalyses),
     [appState, query, projectId, weeklyReviews, projectDnaRecords, patternAnalyses],
@@ -87,6 +96,16 @@ export default function CommandBar({ onClose }: Props) {
       })
     }
 
+    if (captureIntent) {
+      const parsedCap = parseCaptureInput(captureIntent.text)
+      const cls = classifyCapture(parsedCap)
+      list.push({
+        kind: 'capture',
+        text: captureIntent.text,
+        label: `Capture as ${CAPTURE_CLASSIFICATION_LABEL[cls.classification]} — "${captureIntent.text}"`,
+      })
+    }
+
     if (askMemory) {
       list.push({
         kind: 'askMemory',
@@ -102,7 +121,7 @@ export default function CommandBar({ onClose }: Props) {
     }
 
     return list
-  }, [mode, parsed, askMemory, actions, results, recent, query])
+  }, [mode, parsed, askMemory, captureIntent, actions, results, recent, query])
 
   useEffect(() => { setSelected(0) }, [query, mode])
 
@@ -136,15 +155,21 @@ export default function CommandBar({ onClose }: Props) {
     router.push(`${base}?q=${encodeURIComponent(question)}&mode=ask`)
   }, [close, router, projectId])
 
+  const runCapture = useCallback((text: string) => {
+    capture(text, 'command_palette')
+    close()
+  }, [capture, close])
+
   const runRow = useCallback((row: PaletteRow) => {
-    if (row.kind === 'action') runAction(row.action)
+    if (row.kind === 'capture') runCapture(row.text)
+    else if (row.kind === 'action') runAction(row.action)
     else if (row.kind === 'parsed') openCreate(row.draft)
     else if (row.kind === 'askMemory') runAskMemory(row.question)
     else if (row.kind === 'result') {
       close()
       router.push(row.result.href)
     }
-  }, [runAction, openCreate, runAskMemory, close, router])
+  }, [runCapture, runAction, openCreate, runAskMemory, close, router])
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (mode === 'create') {
@@ -174,9 +199,10 @@ export default function CommandBar({ onClose }: Props) {
       return
     }
 
-    if (e.key === 'Enter' && rows.length > 0) {
+    if (e.key === 'Enter') {
       e.preventDefault()
-      runRow(rows[selected])
+      if (rows.length > 0) runRow(rows[selected])
+      else if (captureIntent) runCapture(captureIntent.text)
     }
   }
 
@@ -520,6 +546,7 @@ export default function CommandBar({ onClose }: Props) {
 function rowKey(row: PaletteRow, index: number): string {
   if (row.kind === 'action') return row.action.id
   if (row.kind === 'result') return `${row.result.objectType}-${row.result.id}`
+  if (row.kind === 'capture') return `capture-${index}`
   if (row.kind === 'askMemory') return `ask-memory-${index}`
   return `parsed-${index}`
 }
@@ -537,27 +564,35 @@ function PaletteRowItem({
     ? actionIcon(row.action)
     : row.kind === 'parsed'
       ? Plus
-      : row.kind === 'askMemory'
-        ? Sparkles
-        : objectIcon(row.result.objectType)
+      : row.kind === 'capture'
+        ? Zap
+        : row.kind === 'askMemory'
+          ? Sparkles
+          : objectIcon(row.result.objectType)
 
   const label = row.kind === 'action'
     ? row.action.label
     : row.kind === 'parsed'
       ? row.label
-      : row.kind === 'askMemory'
-        ? `Ask Memory — "${row.question}"`
-        : row.result.title
+      : row.kind === 'capture'
+        ? row.label
+        : row.kind === 'askMemory'
+          ? `Ask Memory — "${row.question}"`
+          : row.result.title
 
   const description = row.kind === 'action'
     ? row.action.description ?? (row.action.kind === 'create' ? 'Create' : 'Go to page')
     : row.kind === 'parsed'
       ? 'Press Enter to open create form'
-      : row.kind === 'askMemory'
+      : row.kind === 'capture'
+        ? 'Press Enter to capture — FounderOS classifies automatically'
+        : row.kind === 'askMemory'
         ? 'Press Enter to ask using your workspace memory'
         : row.result.preview
 
-  const badge = row.kind === 'result'
+  const badge = row.kind === 'capture'
+    ? 'Capture'
+    : row.kind === 'result'
     ? OBJECT_TYPE_LABEL[row.result.objectType]
     : row.kind === 'askMemory'
       ? 'Ask Memory'

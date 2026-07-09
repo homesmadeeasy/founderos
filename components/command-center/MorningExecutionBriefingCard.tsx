@@ -3,6 +3,7 @@
 import { RefreshCw, Sun, AlertTriangle, Target, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
+import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 import CardShell from './CardShell'
 
 export default function MorningExecutionBriefingCard() {
@@ -14,6 +15,8 @@ export default function MorningExecutionBriefingCard() {
     updatePlanItem,
     getFirstAction,
   } = useMorningExecution()
+  const { getYesterdayCaptureSummary } = useUniversalCapture()
+  const yesterdayCaptures = getYesterdayCaptureSummary()
 
   if (!ready || !morningPlan) {
     return (
@@ -57,6 +60,15 @@ export default function MorningExecutionBriefingCard() {
         </div>
 
         <p className="text-sm text-zinc-600 leading-relaxed">{morningPlan.summary}</p>
+
+        {yesterdayCaptures && (
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">
+            <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider mb-1">
+              Yesterday&apos;s captures
+            </p>
+            <p className="text-sm text-amber-900">{yesterdayCaptures}</p>
+          </div>
+        )}
 
         {morningPlan.topPriorities.length > 0 && (
           <div>

@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import CommandBar from './CommandBar'
+import UniversalCaptureInput from '@/components/capture/UniversalCaptureInput'
+import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 
 interface CommandBarContextValue {
   open: boolean
@@ -28,6 +30,7 @@ export function commandShortcutLabel(): string {
 
 export default function CommandBarProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
+  const { openCapture } = useUniversalCapture()
 
   const openCommandBar = useCallback(() => setOpen(true), [])
   const closeCommandBar = useCallback(() => setOpen(false), [])
@@ -37,12 +40,12 @@ export default function CommandBarProvider({ children }: { children: React.React
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setOpen(o => !o)
+        openCapture()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [openCapture])
 
   const value = useMemo(
     () => ({ open, openCommandBar, closeCommandBar, toggleCommandBar }),
@@ -53,6 +56,7 @@ export default function CommandBarProvider({ children }: { children: React.React
     <CommandBarContext.Provider value={value}>
       {children}
       {open && <CommandBar onClose={closeCommandBar} />}
+      <UniversalCaptureInput variant="modal" />
     </CommandBarContext.Provider>
   )
 }

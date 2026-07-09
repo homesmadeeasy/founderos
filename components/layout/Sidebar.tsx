@@ -5,8 +5,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard,
+  Inbox,
   Sun,
   Moon,
+  Zap,
   FolderKanban,
   Target,
   Lightbulb,
@@ -24,9 +26,11 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCommandBar, commandShortcutLabel } from '@/components/command/CommandBarProvider'
+import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 
 const nav = [
   { label: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Inbox', href: '/inbox', icon: Inbox },
   { label: 'Morning Execution', href: '/morning', icon: Sun },
   { label: 'Evening Review', href: '/evening', icon: Moon },
   { label: 'Object Engine', href: '/objects', icon: Boxes },
@@ -46,6 +50,7 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
   const pathname = usePathname()
   const router = useRouter()
   const { openCommandBar } = useCommandBar()
+  const { openCapture, unprocessedCount } = useUniversalCapture()
   const [loggingOut, setLoggingOut] = useState(false)
 
   async function handleLogout() {
@@ -74,6 +79,26 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
         >
           <Command size={15} strokeWidth={1.8} />
           <span className="flex-1 text-left">Command</span>
+          <kbd className="text-[10px] font-medium text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
+            {commandShortcutLabel()}
+          </kbd>
+        </button>
+      </div>
+
+      {/* Capture */}
+      <div className="px-2 pb-1">
+        <button
+          type="button"
+          onClick={openCapture}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-amber-700 hover:text-amber-900 hover:bg-amber-50 border border-amber-200/80 transition-colors"
+        >
+          <Zap size={15} strokeWidth={1.8} />
+          <span className="flex-1 text-left">Capture</span>
+          {unprocessedCount > 0 && (
+            <span className="text-[10px] font-semibold bg-amber-100 text-amber-800 rounded-full px-1.5">
+              {unprocessedCount}
+            </span>
+          )}
           <kbd className="text-[10px] font-medium text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
             {commandShortcutLabel()}
           </kbd>
