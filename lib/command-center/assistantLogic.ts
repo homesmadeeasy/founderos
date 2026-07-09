@@ -20,6 +20,16 @@ import {
   summarizeTopPrinciples,
 } from '@/lib/knowledge-engine/knowledgeSummaries'
 import { SEED_KNOWLEDGE_IDS } from '@/lib/knowledge-engine/knowledgeSeedData'
+import type { MorningExecutionPlan } from '@/lib/morning-execution/morningTypes'
+import type { DailyReasoningOutput } from '@/lib/reasoning-engine/reasoningTypes'
+import type { RecommendedPlanItem } from '@/lib/reasoning-engine/reasoningTypes'
+
+export interface MorningAssistantSnapshot {
+  morningPlan: MorningExecutionPlan | null
+  reasoningOutput: DailyReasoningOutput | null
+  firstAction: RecommendedPlanItem | null
+  regenerate?: () => void
+}
 
 export interface ExecutiveAssistantSnapshot {
   topFocus: { title: string; summary: string; score?: number }
@@ -34,6 +44,44 @@ export interface AssistantContext {
   memories: MemoryRecord[]
   knowledge: KnowledgeRecord[]
   executive?: ExecutiveAssistantSnapshot | null
+  morning?: MorningAssistantSnapshot | null
+}
+
+function formatMorningPlanResponse(morning: MorningAssistantSnapshot): string {
+  const plan = morning.morningPlan
+  const reasoning = morning.reasoningOutput
+  if (!plan) return 'Morning plan is still compiling. Open /morning or wait a moment.'
+
+  const lines: string[] = ['**Morning Execution**', plan.summary]
+
+  lines.push(`**Mission:** ${plan.primaryMission}`)
+
+  if (plan.topPriorities.length > 0) {
+    lines.push('**Priorities:**')
+    plan.topPriorities.forEach((p, i) => {
+      lines.push(`${i + 1}. ${p.title}${p.completed ? ' ✓' : ''} — ${p.reason}`)
+    })
+  }
+
+  if (morning.firstAction && !morning.firstAction.completed) {
+    lines.push(`**Start here:** ${morning.firstAction.title}`)
+    lines.push(morning.firstAction.reason)
+  }
+
+  if (plan.warnings.length > 0) {
+    lines.push(`**Warnings:**\n${plan.warnings.slice(0, 2).map(w => `• ${w}`).join('\n')}`)
+  }
+
+  if (plan.deferList.length > 0) {
+    lines.push(`**Defer:** ${plan.deferList.slice(0, 3).join(' · ')}`)
+  }
+
+  if (reasoning?.rationale) {
+    lines.push(`**Why:** ${reasoning.rationale}`)
+  }
+
+  lines.push('Full plan: /morning')
+  return lines.join('\n\n')
 }
 
 function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): string {
@@ -67,7 +115,45 @@ function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): st
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
   {
-    keywords: ['remember', 'what do you remember', 'memory', 'memories'],
+    keywords: ['do first', 'first today', 'start with', 'start today'],
+    handler: ({ morning }) => {
+      if (morning?.morningPlan) return formatMorningPlanResponse(morning)
+      return 'Open Command Center — your morning plan generates automatically on load.'
+    },
+  },
+  {
+    keywords: ['plan today', 'my plan', 'what is my plan'],
+    handler: ({ morning }) => {
+      if (morning?.morningPlan) return formatMorningPlanResponse(morning)
+      morning?.regenerate?.()
+      return 'Generating your morning plan… refresh and ask again.'
+    },
+  },
+  {
+    keywords: ['why is this the priority', 'why this priority', 'why is this priority'],
+    handler: ({ morning, executive }) => {
+      if (morning?.reasoningOutput?.rationale) {
+        return `**Morning reasoning:** ${morning.reasoningOutput.rationale}`
+      }
+      if (executive?.topFocus?.summary) return executive.topFocus.summary
+      return 'No reasoning output yet. Open /morning to generate a plan.'
+    },
+  },
+  {
+    keywords: ['ignore', 'defer', 'should i skip', 'what to skip'],
+    handler: ({ morning, executive }) => {
+      if (morning?.morningPlan?.deferList?.length) {
+        return `**Defer today:**\n${morning.morningPlan.deferList.map(d => `• ${d}`).join('\n')}`
+      }
+      const deferRec = executive?.recommendations?.find(r =>
+        r.title.toLowerCase().includes('defer'),
+      )
+      if (deferRec) return deferRec.summary
+      return 'Defer low-priority tasks and inbox noise until primary work is done.'
+    },
+  },
+  {
+    keywords: ['remember', 'what do you remember', 'memories', 'recall'],
     handler: ({ memories }) => {
       if (memories.length === 0) return 'No memories recorded yet. Use the Memory Engine or take actions in Command Center to build history.'
       return `${generateRecentMemoryDigest(memories, 6)}\n\nOpen Memory Engine for the full timeline.`
@@ -108,10 +194,9 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
   },
   {
     keywords: ['focus', 'today', 'priority', 'priorities', 'should i'],
-    handler: ({ commandCenter: s, objects, memories, executive }) => {
-      if (executive?.topFocus?.title) {
-        return formatExecutiveFocusResponse(executive)
-      }
+    handler: ({ commandCenter: s, objects, memories, executive, morning }) => {
+      if (morning?.morningPlan) return formatMorningPlanResponse(morning)
+      if (executive?.topFocus?.title) return formatExecutiveFocusResponse(executive)
 
       const today = todayISO()
       const mission = s.missionDate === today ? s.mission.trim() : ''
@@ -335,11 +420,12 @@ export function generateAssistantResponse(
   memories: MemoryRecord[] = [],
   executive?: ExecutiveAssistantSnapshot | null,
   knowledge: KnowledgeRecord[] = [],
+  morning?: MorningAssistantSnapshot | null,
 ): string {
   const normalized = prompt.trim().toLowerCase()
-  if (!normalized) return 'Ask me about your focus, projects, objects, memories, knowledge, blockers or health today.'
+  if (!normalized) return 'Ask me about your focus, plan, projects, objects, memories, knowledge, or health today.'
 
-  const ctx: AssistantContext = { commandCenter, objects, memories, knowledge, executive }
+  const ctx: AssistantContext = { commandCenter, objects, memories, knowledge, executive, morning }
 
   for (const { keywords, handler } of PROMPT_MATCHERS) {
     if (keywords.some(k => normalized.includes(k))) {
@@ -373,8 +459,9 @@ export async function fetchAssistantResponse(
   memories: MemoryRecord[] = [],
   executive?: ExecutiveAssistantSnapshot | null,
   knowledge: KnowledgeRecord[] = [],
+  morning?: MorningAssistantSnapshot | null,
 ): Promise<string> {
-  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive, knowledge)
+  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive, knowledge, morning)
 }
 
 export const SUGGESTED_PROMPTS = [

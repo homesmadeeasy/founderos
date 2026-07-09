@@ -125,6 +125,7 @@ export function buildProjectMap(state: AppState): Map<string, string> {
 export function buildNavigationActions(projectId: string | null): CommandAction[] {
   const global: CommandAction[] = [
     { id: 'nav-dashboard', kind: 'navigate', label: 'Command Center', href: '/dashboard', keywords: ['home', 'life hub', 'command centre', 'command center', 'today'] },
+    { id: 'nav-morning', kind: 'navigate', label: 'Morning Execution', href: '/morning', keywords: ['morning', 'daily plan', 'execution', 'start day', 'first action'] },
     { id: 'nav-objects', kind: 'navigate', label: 'Object Engine', href: '/objects', keywords: ['objects', 'memory', 'graph', 'founder objects'] },
     { id: 'nav-memory-engine', kind: 'navigate', label: 'Memory Engine', href: '/memory', keywords: ['memory', 'history', 'timeline', 'remember'] },
     { id: 'nav-knowledge-engine', kind: 'navigate', label: 'Knowledge Engine', href: '/knowledge', keywords: ['knowledge', 'principles', 'rules', 'lessons', 'playbooks', 'learned'] },

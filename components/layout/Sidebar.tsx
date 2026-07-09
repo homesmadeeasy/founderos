@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard,
+  Sun,
   FolderKanban,
   Target,
   Lightbulb,
@@ -25,6 +26,7 @@ import { useCommandBar, commandShortcutLabel } from '@/components/command/Comman
 
 const nav = [
   { label: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Morning Execution', href: '/morning', icon: Sun },
   { label: 'Object Engine', href: '/objects', icon: Boxes },
   { label: 'Memory Engine', href: '/memory', icon: History },
   { label: 'Knowledge Engine', href: '/knowledge', icon: BookOpen },
