@@ -13,6 +13,7 @@ import {
   newExecutiveId,
   nowISO,
 } from './executiveUtils'
+import { formatKnowledgeForRationale } from './knowledgeIntegration'
 
 function topScoredObject(
   scores: AttentionScore[],
@@ -63,7 +64,8 @@ export function generateExecutiveRecommendations(
         ccTask?.dueDate ? `Due: ${ccTask.dueDate.slice(0, 10)}.` : null,
         context.userMission ? `Mission: "${context.userMission}".` : null,
         memIds.length > 0 ? `${memIds.length} recent memories support this focus.` : null,
-      ].filter(Boolean).join(' '),
+      ].filter(Boolean).join(' ')
+        + formatKnowledgeForRationale(context.relevantKnowledge),
       confidence: primary.score.totalScore >= 75 ? 'high' : 'medium',
       priority: 'high',
       area: obj.area,
@@ -100,7 +102,10 @@ export function generateExecutiveRecommendations(
       id: newExecutiveId('rec'),
       title: 'Health action: protect recovery',
       summary: context.healthSignals.summary,
-      rationale: `Health score is ${context.healthSignals.score}/100. ${context.healthSignals.workoutCompleted ? 'Workout done — maintain nutrition and sleep.' : 'Complete workout and hit protein target before intense work.'}`,
+      rationale: `Health score is ${context.healthSignals.score}/100. ${context.healthSignals.workoutCompleted ? 'Workout done — maintain nutrition and sleep.' : 'Complete workout and hit protein target before intense work.'}`
+        + formatKnowledgeForRationale(
+          context.relevantKnowledge.filter(k => k.domain === 'health'),
+        ),
       confidence: 'high',
       priority: 'high',
       area: 'health',

@@ -9,6 +9,7 @@ import { loadCommandCenterState, saveCommandCenterState } from '@/lib/command-ce
 import { useObjectEngine } from '@/contexts/ObjectEngineContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import { useExecutiveEngine } from '@/contexts/ExecutiveEngineContext'
+import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
 import type { ExecutiveAssistantSnapshot } from '@/lib/command-center/assistantLogic'
 import {
   memoryForCapture, memoryForHealthLog, memoryForMissionSet,
@@ -52,6 +53,7 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
   const objectEngine = useObjectEngine()
   const memoryEngine = useMemoryEngine()
   const executiveEngine = useExecutiveEngine()
+  const knowledgeEngine = useKnowledgeEngine()
 
   useEffect(() => {
     setState(loadCommandCenterState())
@@ -204,11 +206,12 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
         objectEngine.objects,
         memoryEngine.memories,
         executiveSnapshot,
+        knowledgeEngine.knowledge,
       )
       const assistantMsg: CCAIMessage = { id: newId(), role: 'assistant', content: reply, createdAt: nowISO() }
       return persist({ ...withUser, aiMessages: [...withUser.aiMessages, assistantMsg] })
     })
-  }, [objectEngine.objects, memoryEngine.memories, executiveEngine])
+  }, [objectEngine.objects, memoryEngine.memories, executiveEngine, knowledgeEngine.knowledge])
 
   const clearAssistant = useCallback(() => {
     update(s => ({ ...s, aiMessages: [] }))

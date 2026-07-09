@@ -17,6 +17,7 @@ import {
   isFounderOSObject,
   isOpenTaskObject,
 } from './executiveUtils'
+import { findRelevantKnowledge } from './knowledgeIntegration'
 
 function buildHealthSignals(
   commandCenterState: CreateExecutiveContextInput['commandCenterState'],
@@ -136,7 +137,7 @@ function identifyBlockers(
 }
 
 export function createExecutiveContext(input: CreateExecutiveContextInput): ExecutiveContext {
-  const { objects, memories, commandCenterState } = input
+  const { objects, memories, knowledge, commandCenterState } = input
   const today = todayISO()
 
   const activeGoals = objects.filter(isActiveGoalObject)
@@ -170,10 +171,12 @@ export function createExecutiveContext(input: CreateExecutiveContextInput): Exec
     }
   }
 
-  return {
+  const base: ExecutiveContext = {
     date: today,
     objects,
     memories,
+    knowledge,
+    relevantKnowledge: [],
     activeGoals,
     activeProjects,
     openTasks,
@@ -185,6 +188,9 @@ export function createExecutiveContext(input: CreateExecutiveContextInput): Exec
     captures: commandCenterState.captureItems,
     commandCenter: commandCenterState,
   }
+
+  base.relevantKnowledge = findRelevantKnowledge(base)
+  return base
 }
 
 export function getFounderOSProject(context: ExecutiveContext): FounderObject | undefined {

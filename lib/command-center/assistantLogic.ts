@@ -13,6 +13,13 @@ import {
 } from '@/lib/memory-engine/memorySummaries'
 import { sortMemoriesByOccurred } from '@/lib/memory-engine/memorySearch'
 import type { ExecutiveBriefing, ExecutiveRecommendation } from '@/lib/executive-engine/executiveTypes'
+import type { KnowledgeRecord } from '@/lib/knowledge-engine/knowledgeTypes'
+import {
+  explainMemoryVsKnowledge,
+  summarizeKnowledgeByDomain,
+  summarizeTopPrinciples,
+} from '@/lib/knowledge-engine/knowledgeSummaries'
+import { SEED_KNOWLEDGE_IDS } from '@/lib/knowledge-engine/knowledgeSeedData'
 
 export interface ExecutiveAssistantSnapshot {
   topFocus: { title: string; summary: string; score?: number }
@@ -25,6 +32,7 @@ export interface AssistantContext {
   commandCenter: CommandCenterState
   objects: FounderObject[]
   memories: MemoryRecord[]
+  knowledge: KnowledgeRecord[]
   executive?: ExecutiveAssistantSnapshot | null
 }
 
@@ -269,6 +277,55 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
       return parts.join('\n')
     },
   },
+  {
+    keywords: ['what have i learned', 'have i learned', 'what did i learn'],
+    handler: ({ knowledge }) => {
+      if (knowledge.length === 0) return 'No knowledge recorded yet. Open Knowledge Engine to add principles.'
+      const lessons = knowledge.filter(k => k.type === 'lesson' || k.type === 'insight')
+      const items = lessons.length > 0 ? lessons : knowledge
+      return items.slice(0, 6).map(k => `• ${k.title}: ${k.principle}`).join('\n')
+    },
+  },
+  {
+    keywords: ['principles guide founder', 'principles guide founderos', 'founderos principles', 'guide founderos', 'principles guide'],
+    handler: ({ knowledge }) => {
+      const founder = knowledge.filter(k => k.domain === 'founder' || k.domain === 'systems')
+      if (founder.length === 0) return summarizeTopPrinciples(knowledge)
+      return founder.map(k => `• **${k.title}** — ${k.principle}`).join('\n')
+    },
+  },
+  {
+    keywords: ['knowledge about gym', 'about gym', 'gym knowledge', 'gym principles'],
+    handler: ({ knowledge }) => summarizeKnowledgeByDomain(knowledge, 'gym'),
+  },
+  {
+    keywords: ['difference between memory and knowledge', 'memory and knowledge', 'memory vs knowledge', 'memory versus knowledge'],
+    handler: () => explainMemoryVsKnowledge(),
+  },
+  {
+    keywords: ['rule should guide', 'rule guide today', 'what rule', 'principle today', 'guide today'],
+    handler: ({ knowledge, executive }) => {
+      const daily = knowledge.find(k => k.id === SEED_KNOWLEDGE_IDS.dailyFocus)
+      const health = knowledge.find(k => k.id === SEED_KNOWLEDGE_IDS.healthProtects)
+      const lines: string[] = []
+      if (daily) lines.push(`**${daily.title}:** ${daily.principle}`)
+      if (executive?.topFocus?.title) {
+        lines.push(`Executive focus: ${executive.topFocus.title}`)
+      }
+      if (health && executive?.warnings?.some(w => w.toLowerCase().includes('health'))) {
+        lines.push(`**${health.title}:** ${health.principle}`)
+      }
+      if (lines.length === 0) return summarizeTopPrinciples(knowledge, 3)
+      return lines.join('\n\n')
+    },
+  },
+  {
+    keywords: ['knowledge', 'principle', 'principles', 'playbook', 'lesson learned'],
+    handler: ({ knowledge }) => {
+      if (knowledge.length === 0) return 'No knowledge in Knowledge Engine yet.'
+      return summarizeTopPrinciples(knowledge, 5)
+    },
+  },
 ]
 
 export function generateAssistantResponse(
@@ -277,11 +334,12 @@ export function generateAssistantResponse(
   objects: FounderObject[] = [],
   memories: MemoryRecord[] = [],
   executive?: ExecutiveAssistantSnapshot | null,
+  knowledge: KnowledgeRecord[] = [],
 ): string {
   const normalized = prompt.trim().toLowerCase()
-  if (!normalized) return 'Ask me about your focus, projects, objects, memories, blockers or health today.'
+  if (!normalized) return 'Ask me about your focus, projects, objects, memories, knowledge, blockers or health today.'
 
-  const ctx: AssistantContext = { commandCenter, objects, memories, executive }
+  const ctx: AssistantContext = { commandCenter, objects, memories, knowledge, executive }
 
   for (const { keywords, handler } of PROMPT_MATCHERS) {
     if (keywords.some(k => normalized.includes(k))) {
@@ -298,6 +356,8 @@ export function generateAssistantResponse(
     '• "Why did we choose object-first?"',
     '• "What is related to FounderOS?"',
     '• "What is blocking me?"',
+    '• "What principles guide FounderOS?"',
+    '• "What is the difference between memory and knowledge?"',
     '',
     generateRecentMemoryDigest(memories, 3),
     '',
@@ -312,8 +372,9 @@ export async function fetchAssistantResponse(
   objects: FounderObject[] = [],
   memories: MemoryRecord[] = [],
   executive?: ExecutiveAssistantSnapshot | null,
+  knowledge: KnowledgeRecord[] = [],
 ): Promise<string> {
-  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive)
+  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive, knowledge)
 }
 
 export const SUGGESTED_PROMPTS = [

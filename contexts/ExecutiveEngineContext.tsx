@@ -6,6 +6,7 @@ import {
 import { loadCommandCenterState } from '@/lib/command-center/storage'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import { useObjectEngine } from '@/contexts/ObjectEngineContext'
+import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
 import { scoreAllObjects } from '@/lib/executive-engine/attentionScoring'
 import { generateDailyExecutiveBriefing } from '@/lib/executive-engine/briefingEngine'
 import { resolveExecutiveConflicts } from '@/lib/executive-engine/conflictResolution'
@@ -51,9 +52,10 @@ const ExecutiveEngineContext = createContext<ExecutiveEngineContextValue | null>
 function computeExecutive(
   objects: ReturnType<typeof useObjectEngine>['objects'],
   memories: ReturnType<typeof useMemoryEngine>['memories'],
+  knowledge: ReturnType<typeof useKnowledgeEngine>['knowledge'],
 ) {
   const commandCenterState = loadCommandCenterState()
-  const executiveContext = createExecutiveContext({ objects, memories, commandCenterState })
+  const executiveContext = createExecutiveContext({ objects, memories, knowledge, commandCenterState })
   const attentionScores = scoreAllObjects(executiveContext)
   const { warnings, tradeoffs } = resolveExecutiveConflicts(executiveContext, attentionScores)
   const recommendations = generateExecutiveRecommendations(executiveContext, attentionScores)
@@ -69,17 +71,18 @@ function computeExecutive(
 export function ExecutiveEngineProvider({ children }: { children: React.ReactNode }) {
   const { objects, ready: objectsReady } = useObjectEngine()
   const { memories, ready: memoriesReady } = useMemoryEngine()
+  const { knowledge, ready: knowledgeReady } = useKnowledgeEngine()
   const [storedBriefings, setStoredBriefings] = useState(getRecentBriefings)
   const [recentDecisions, setRecentDecisions] = useState(getRecentDecisions)
   const [tick, setTick] = useState(0)
 
-  const ready = objectsReady && memoriesReady
+  const ready = objectsReady && memoriesReady && knowledgeReady
 
   const computed = useMemo(() => {
     if (!ready) return null
-    return computeExecutive(objects, memories)
+    return computeExecutive(objects, memories, knowledge)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, objects, memories, tick])
+  }, [ready, objects, memories, knowledge, tick])
 
   useEffect(() => {
     if (!computed) return
@@ -95,11 +98,11 @@ export function ExecutiveEngineProvider({ children }: { children: React.ReactNod
 
   const regenerateBriefing = useCallback(() => {
     if (!ready) return
-    const result = computeExecutive(objects, memories)
+    const result = computeExecutive(objects, memories, knowledge)
     const saved = saveBriefing(result.dailyBriefing)
     setStoredBriefings(prev => [saved, ...prev.filter(b => b.id !== saved.id)])
     setTick(t => t + 1)
-  }, [ready, objects, memories])
+  }, [ready, objects, memories, knowledge])
 
   const makeDecision = useCallback((question: string): ExecutiveDecision => {
     if (!computed) {

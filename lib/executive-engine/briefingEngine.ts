@@ -6,6 +6,7 @@ import type {
 } from './executiveTypes'
 import { getFounderOSProject } from './executiveContext'
 import { formatExecutiveDate, newExecutiveId, nowISO } from './executiveUtils'
+import { formatKnowledgeForBriefing } from './knowledgeIntegration'
 
 export function generateDailyExecutiveBriefing(
   context: ExecutiveContext,
@@ -42,12 +43,21 @@ export function generateDailyExecutiveBriefing(
   if (context.activeGoals.length > 0 && context.openTasks.length > 0) {
     opportunities.push(`${context.openTasks.length} open tasks can advance ${context.activeGoals.length} active goal(s).`)
   }
+  if (context.relevantKnowledge.length > 0) {
+    opportunities.push(
+      `Guiding knowledge: ${formatKnowledgeForBriefing(context.relevantKnowledge).slice(0, 2).join(' ')}`,
+    )
+  }
   if (opportunities.length === 0) {
     opportunities.push('Clear headroom today — define one high-leverage next action per active project.')
   }
 
   const memoryNote = context.recentMemories.length > 0
     ? ` ${context.recentMemories.length} recent memories inform this briefing.`
+    : ''
+
+  const knowledgeNote = context.relevantKnowledge.length > 0
+    ? ` ${context.relevantKnowledge.length} knowledge principle(s) inform priorities.`
     : ''
 
   const summaryParts = [
@@ -61,6 +71,7 @@ export function generateDailyExecutiveBriefing(
       ? `${context.blockers.length} blocker(s) need resolution.`
       : null,
     memoryNote.trim(),
+    knowledgeNote.trim(),
   ].filter(Boolean)
 
   return {

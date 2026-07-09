@@ -4,6 +4,7 @@
  */
 
 import type { CommandCenterState } from '@/lib/command-center/types'
+import type { KnowledgeRecord } from '@/lib/knowledge-engine/knowledgeTypes'
 import type { MemoryRecord } from '@/lib/memory-engine/memoryTypes'
 import type { FounderObject, LifeArea } from '@/lib/object-engine/objectTypes'
 
@@ -33,6 +34,8 @@ export interface ExecutiveContext {
   date: string
   objects: FounderObject[]
   memories: MemoryRecord[]
+  knowledge: KnowledgeRecord[]
+  relevantKnowledge: KnowledgeRecord[]
   activeGoals: FounderObject[]
   activeProjects: FounderObject[]
   openTasks: FounderObject[]
@@ -107,5 +110,6 @@ export interface ExecutiveState {
 export interface CreateExecutiveContextInput {
   objects: FounderObject[]
   memories: MemoryRecord[]
+  knowledge: KnowledgeRecord[]
   commandCenterState: CommandCenterState
 }
