@@ -33,6 +33,13 @@ import type { DecisionOutput } from '@/lib/decision-engine/decisionTypes'
 import type { OutcomeStats } from '@/lib/outcome-engine/outcomeTypes'
 import type { OutcomeHistoryEntry } from '@/lib/outcome-engine/outcomeTypes'
 import { getOutcomeHistory } from '@/lib/outcome-engine/outcomeEngine'
+import type { DomainIntelligenceOutput } from '@/lib/domain-intelligence/domainTypes'
+import {
+  findDomainEvaluation,
+  formatDomainSnapshotSummary,
+  formatDomainTradeoffResponse,
+  formatSingleDomainResponse,
+} from '@/lib/domain-intelligence/domainSummaries'
 import { formatSignalTimestamp, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
 import { tomorrowISO } from '@/lib/signal-engine/signalUtils'
 export interface MorningAssistantSnapshot {
@@ -42,6 +49,7 @@ export interface MorningAssistantSnapshot {
   decisionOutput?: DecisionOutput | null
   outcomeStats?: OutcomeStats | null
   yesterdayOutcome?: OutcomeHistoryEntry | null
+  domainIntelligence?: DomainIntelligenceOutput | null
   regenerate?: () => void
 }
 
@@ -328,6 +336,100 @@ function googleCalendarStatusMessage(sync?: SyncAssistantSnapshot | null): strin
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
   {
+    keywords: ['which area needs attention', 'area of my life needs attention', 'what needs attention', 'domain needs attention'],
+    handler: ({ morning }) => {
+      const coord = morning?.domainIntelligence?.coordinator
+      if (!coord) return 'Domain evaluations not ready. Open **/morning** first.'
+      const urgent = coord.evaluations
+        .filter(e => e.priority === 'critical' || e.status === 'at_risk' || e.status === 'needs_attention')
+        .sort((a, b) => a.score - b.score)
+      if (urgent.length === 0) return `All domains look stable. Top focus today: **${coord.topDomainName}**.`
+      return `**Needs attention:**\n${urgent.map(e =>
+        `• ${e.domainName} (${e.status}, score ${e.score}) — ${e.recommendation}`,
+      ).join('\n')}`
+    },
+  },
+  {
+    keywords: ['how is my health domain', 'health domain', 'how is health'],
+    handler: ({ morning }) => formatSingleDomainResponse(
+      findDomainEvaluation(morning?.domainIntelligence?.evaluations, 'health'),
+      'Health',
+    ),
+  },
+  {
+    keywords: ['how is my school domain', 'school domain', 'how is school'],
+    handler: ({ morning }) => formatSingleDomainResponse(
+      findDomainEvaluation(morning?.domainIntelligence?.evaluations, 'school'),
+      'School',
+    ),
+  },
+  {
+    keywords: ['how is founderos going', 'founder domain', 'how is founder', 'founderos domain'],
+    handler: ({ morning }) => formatSingleDomainResponse(
+      findDomainEvaluation(morning?.domainIntelligence?.evaluations, 'founder'),
+      'Founder',
+    ),
+  },
+  {
+    keywords: ['what domain should win', 'which domain should win', 'domain should win today'],
+    handler: ({ morning }) => {
+      const coord = morning?.domainIntelligence?.coordinator
+      if (!coord) return 'Domain coordinator not ready yet.'
+      return `**${coord.topDomainName}** should win today.\n\n${coord.globalRecommendation}\n\n${coord.explanation}`
+    },
+  },
+  {
+    keywords: ['what am i neglecting', 'neglected domains', 'what domains am i neglecting'],
+    handler: ({ morning }) => {
+      const coord = morning?.domainIntelligence?.coordinator
+      if (!coord || coord.neglectedDomains.length === 0) {
+        return 'No clearly neglected domains right now. Keep closing daily loops.'
+      }
+      return `**Neglected domains:**\n${coord.neglectedDomains.map(id => {
+        const e = coord.evaluations.find(ev => ev.domainId === id)
+        return e ? `• ${e.domainName} — ${e.recommendation}` : `• ${id}`
+      }).join('\n')}`
+    },
+  },
+  {
+    keywords: ['tradeoff between school and founderos', 'school and founderos tradeoff', 'school vs founderos'],
+    handler: ({ morning }) => formatDomainTradeoffResponse(
+      morning?.domainIntelligence?.coordinator,
+      'school',
+      'founder',
+    ),
+  },
+  {
+    keywords: ['work on founderos or study', 'founderos or study', 'should i work on founderos'],
+    handler: ({ morning }) => {
+      const tradeoff = formatDomainTradeoffResponse(
+        morning?.domainIntelligence?.coordinator,
+        'school',
+        'founder',
+      )
+      if (morning?.domainIntelligence) return tradeoff
+      return formatFounderOSvsStudyResponse(morning?.decisionOutput)
+    },
+  },
+  {
+    keywords: ['should i train or recover', 'train or recover', 'workout or recover'],
+    handler: ({ morning }) => {
+      const health = findDomainEvaluation(morning?.domainIntelligence?.evaluations, 'health')
+      if (health && (health.status === 'at_risk' || health.risks.some(r => r.toLowerCase().includes('sleep')))) {
+        return formatSingleDomainResponse(health, 'Health')
+      }
+      return formatTrainVsRecoverResponse(morning?.decisionOutput)
+    },
+  },
+  {
+    keywords: ['domain intelligence', 'domain snapshot', 'life domains'],
+    handler: ({ morning }) => {
+      const coord = morning?.domainIntelligence?.coordinator
+      if (!coord) return 'Domain intelligence not generated yet. Visit **/morning** or **/domains**.'
+      return formatDomainSnapshotSummary(coord)
+    },
+  },
+  {
     keywords: ['did yesterday', 'yesterday recommendation', 'yesterday decision work', 'did the recommendation work'],
     handler: ({ morning }) => {
       const y = morning?.yesterdayOutcome
@@ -420,14 +522,6 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
   {
     keywords: ['what is the tradeoff', 'what is the trade off', 'what tradeoff', 'the tradeoff'],
     handler: ({ morning }) => formatDecisionResponse(morning?.decisionOutput, 'tradeoff'),
-  },
-  {
-    keywords: ['should i work on founderos or study', 'founderos or study', 'study or founderos', 'work on founderos or study'],
-    handler: ({ morning }) => formatFounderOSvsStudyResponse(morning?.decisionOutput),
-  },
-  {
-    keywords: ['should i train or recover', 'train or recover', 'workout or recover'],
-    handler: ({ morning }) => formatTrainVsRecoverResponse(morning?.decisionOutput),
   },
   {
     keywords: ['sync my calendar', 'sync calendar'],

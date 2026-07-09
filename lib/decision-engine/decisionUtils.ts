@@ -90,6 +90,7 @@ export function normalizeDecisionInput(input: DecisionInput): DecisionInput {
     },
     reasoningOutput: input.reasoningOutput ?? null,
     unresolvedCaptureCount: input.unresolvedCaptureCount ?? 0,
+    domainCoordinator: input.domainCoordinator ?? null,
     currentTime: input.currentTime ?? nowISO(),
   }
 }

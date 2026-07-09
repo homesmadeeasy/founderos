@@ -441,6 +441,7 @@ export function buildDecisionInputFromMorningState(params: {
   executiveState?: DecisionInput['executiveState']
   reasoningOutput?: DecisionInput['reasoningOutput']
   unresolvedCaptureCount?: number
+  domainCoordinator?: DecisionInput['domainCoordinator']
 }): DecisionInput {
   return normalizeDecisionInput({
     objects: params.objects ?? [],
@@ -452,6 +453,7 @@ export function buildDecisionInputFromMorningState(params: {
     executiveState: params.executiveState ?? { recommendations: [], warnings: [], tradeoffs: [] },
     reasoningOutput: params.reasoningOutput ?? null,
     unresolvedCaptureCount: params.unresolvedCaptureCount ?? 0,
+    domainCoordinator: params.domainCoordinator ?? null,
     currentTime: nowISO(),
   })
 }

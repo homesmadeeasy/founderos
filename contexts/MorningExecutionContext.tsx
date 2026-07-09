@@ -30,6 +30,9 @@ import { buildDecisionInputFromMorningState, decide } from '@/lib/decision-engin
 import { createPredictionFromDecision, getSuccessRateForDecision } from '@/lib/outcome-engine/outcomeEngine'
 import type { OutcomePrediction } from '@/lib/outcome-engine/outcomeTypes'
 import type { DecisionOutput } from '@/lib/decision-engine/decisionTypes'
+import { buildDomainIntelligence } from '@/lib/domain-intelligence/domainEvaluator'
+import type { DomainIntelligenceOutput } from '@/lib/domain-intelligence/domainTypes'
+import { getOutcomeHistory } from '@/lib/outcome-engine/outcomeEngine'
 
 interface MorningExecutionContextValue {
   ready: boolean
@@ -39,6 +42,7 @@ interface MorningExecutionContextValue {
   decisionOutput: DecisionOutput | null
   todayPrediction: OutcomePrediction | null
   outcomeSuccessLabel: string
+  domainIntelligence: DomainIntelligenceOutput | null
   regenerateMorningPlan: (writeMemory?: boolean) => void
   markPlanCompleted: () => void
   updatePrimaryMission: (mission: string) => void
@@ -203,6 +207,26 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
     setTick(t => t + 1)
   }, [])
 
+  const domainIntelligence = useMemo<DomainIntelligenceOutput | null>(() => {
+    if (!ready || !dailyContext || !morningPlan) return null
+    const commandCenterState = loadCommandCenterState()
+    return buildDomainIntelligence({
+      objects,
+      memories,
+      knowledge,
+      signals: dailyContext.recentSignals ?? [],
+      morningPlan,
+      eveningReview: getEveningReview(todayISO()),
+      decisionOutput: null,
+      unresolvedCaptureCount: (commandCenterState.captureItems ?? []).filter(c => c.status === 'inbox').length,
+      healthSignals: executive.executiveContext?.healthSignals ?? dailyContext.healthSignals,
+      outcomes: getOutcomeHistory(20),
+    })
+  }, [
+    ready, dailyContext, morningPlan,
+    objects, memories, knowledge, executive,
+  ])
+
   const decisionOutput = useMemo<DecisionOutput | null>(() => {
     if (!ready || !dailyContext || !morningPlan) return null
     const commandCenterState = loadCommandCenterState()
@@ -221,9 +245,10 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
         healthSignals: executive.executiveContext?.healthSignals ?? dailyContext.healthSignals,
       },
       unresolvedCaptureCount: (commandCenterState.captureItems ?? []).filter(c => c.status === 'inbox').length,
+      domainCoordinator: domainIntelligence?.coordinator ?? null,
     }))
   }, [
-    ready, dailyContext, morningPlan, reasoningOutput,
+    ready, dailyContext, morningPlan, reasoningOutput, domainIntelligence,
     objects, memories, knowledge, executive,
   ])
 
@@ -251,6 +276,7 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
     decisionOutput,
     todayPrediction,
     outcomeSuccessLabel,
+    domainIntelligence,
     regenerateMorningPlan,
     markPlanCompleted,
     updatePrimaryMission,
@@ -258,7 +284,7 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
     getFirstAction: () => morningPlan?.topPriorities.find(p => !p.completed) ?? null,
     refresh,
   }), [
-    ready, dailyContext, reasoningOutput, morningPlan, decisionOutput, todayPrediction, outcomeSuccessLabel,
+    ready, dailyContext, reasoningOutput, morningPlan, decisionOutput, todayPrediction, outcomeSuccessLabel, domainIntelligence,
     regenerateMorningPlan, markPlanCompleted, updatePrimaryMission,
     updatePlanItem, refresh,
   ])

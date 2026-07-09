@@ -10,6 +10,7 @@ import type {
 import { clamp, importanceToScore, textIncludesAny, todayISO, tomorrowISO, urgencyToScore } from './decisionUtils'
 import { applyOutcomeFeedbackToCandidate } from '@/lib/outcome-engine/outcomeScoring'
 import { getSimilarPastOutcomes } from '@/lib/outcome-engine/outcomeEngine'
+import { candidateToDomainId } from '@/lib/domain-intelligence/domainUtils'
 
 export interface ScoredCandidate {
   candidate: CandidateAction
@@ -127,6 +128,7 @@ export function scoreCandidate(candidate: CandidateAction, input: DecisionInput)
 
   const similar = getSimilarPastOutcomes(candidate.title, candidate.area, 6)
   const feedback = applyOutcomeFeedbackToCandidate(candidate, similar)
+  const domainBoost = applyDomainScoringBoost(candidate, input)
 
   const total = clamp(
     importance * 0.15
@@ -141,7 +143,9 @@ export function scoreCandidate(candidate: CandidateAction, input: DecisionInput)
     - conflictPenalty
     - lowConfidencePenalty
     - feedback.urgencyPenalty
-    + feedback.scoreBonus,
+    + feedback.scoreBonus
+    + domainBoost.bonus
+    - domainBoost.penalty,
   )
 
   return {
@@ -164,4 +168,48 @@ export function rankCandidates(candidates: CandidateAction[], input: DecisionInp
   return candidates
     .map(candidate => ({ candidate, breakdown: scoreCandidate(candidate, input) }))
     .sort((a, b) => b.breakdown.total - a.breakdown.total)
+}
+
+function applyDomainScoringBoost(
+  candidate: CandidateAction,
+  input: DecisionInput,
+): { bonus: number; penalty: number } {
+  const coord = input.domainCoordinator
+  if (!coord) return { bonus: 0, penalty: 0 }
+
+  const candidateDomain = candidateToDomainId(candidate)
+  let bonus = 0
+  let penalty = 0
+
+  if (coord.topDomain === candidateDomain) bonus += 15
+
+  const eval_ = coord.evaluations.find(e => e.domainId === candidateDomain)
+  if (eval_) {
+    if (eval_.priority === 'critical') bonus += 12
+    else if (eval_.priority === 'high') bonus += 8
+    if (eval_.status === 'at_risk') bonus += 6
+    if (eval_.status === 'excellent' || eval_.status === 'good') bonus += 4
+  }
+
+  if (coord.neglectedDomains.includes(candidateDomain)) bonus += 6
+
+  const conflictSet = new Set(coord.conflictedDomains)
+  if (conflictSet.size >= 2 && conflictSet.has(candidateDomain)) {
+    const topIsDifferent = coord.topDomain !== candidateDomain
+    if (topIsDifferent && coord.evaluations.find(e => e.domainId === coord.topDomain)?.priority === 'critical') {
+      penalty += 12
+    }
+  }
+
+  if (candidateDomain === 'founder' && coord.evaluations.find(e => e.domainId === 'school')?.priority === 'critical') {
+    penalty += 10
+  }
+  if (candidate.tags.includes('workout') && coord.evaluations.find(e => e.domainId === 'health')?.status === 'at_risk') {
+    penalty += 8
+  }
+  if (candidateDomain === 'founder' && coord.evaluations.find(e => e.domainId === 'health')?.status === 'at_risk') {
+    penalty += 10
+  }
+
+  return { bonus, penalty }
 }

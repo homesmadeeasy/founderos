@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import {
-  Sun, RefreshCw, Target, AlertTriangle, BookOpen, History, Brain, Ban, Scale,
+  Sun, RefreshCw, Target, AlertTriangle, BookOpen, History, Brain, Ban, Scale, Layers,
 } from 'lucide-react'
 import UniversalCaptureInput from '@/components/capture/UniversalCaptureInput'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { KNOWLEDGE_TYPE_LABEL } from '@/lib/knowledge-engine/knowledgeTypes'
 import { MEMORY_TYPE_LABEL } from '@/lib/memory-engine/memoryTypes'
+import { getDecisionInfluenceLabel, statusColorClass } from '@/lib/domain-intelligence/domainSummaries'
 
 const inputClass =
   'w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10'
@@ -20,6 +21,7 @@ export default function MorningPage() {
     morningPlan,
     decisionOutput,
     outcomeSuccessLabel,
+    domainIntelligence,
     regenerateMorningPlan,
     updatePrimaryMission,
     markPlanCompleted,
@@ -116,6 +118,47 @@ export default function MorningPage() {
           )}
         </section>
 
+        {domainIntelligence && (
+          <section className="rounded-2xl border border-violet-200 bg-white p-5 sm:p-6 shadow-sm">
+            <h2 className="text-sm font-semibold text-violet-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <Layers size={16} /> Domain Snapshot
+            </h2>
+            <div className="rounded-xl bg-violet-50 border border-violet-100 px-4 py-3 mb-4">
+              <p className="text-[11px] font-semibold text-violet-500 uppercase">Top domain</p>
+              <p className="text-sm font-bold text-violet-900">{domainIntelligence.coordinator.topDomainName}</p>
+              <p className="text-xs text-violet-800 mt-1">{domainIntelligence.coordinator.globalRecommendation}</p>
+            </div>
+
+            <div className="space-y-2">
+              {domainIntelligence.evaluations.map(e => (
+                <div key={e.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 py-2 border-b border-zinc-100 last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusColorClass(e.status)}`}>
+                      {e.status.replace('_', ' ')}
+                    </span>
+                    <span className="text-sm font-semibold text-zinc-800">{e.domainName}</span>
+                    <span className="text-xs text-zinc-400">{e.score}</span>
+                  </div>
+                  <p className="text-xs text-zinc-600 sm:text-right sm:max-w-[55%]">{e.recommendation}</p>
+                </div>
+              ))}
+            </div>
+
+            {domainIntelligence.coordinator.neglectedDomains.length > 0 && (
+              <p className="text-xs text-amber-700 mt-3">
+                Neglected: {domainIntelligence.coordinator.neglectedDomains.map(id =>
+                  domainIntelligence.evaluations.find(e => e.domainId === id)?.domainName ?? id,
+                ).join(', ')}
+              </p>
+            )}
+            {domainIntelligence.coordinator.tradeoffs.length > 0 && (
+              <p className="text-xs text-amber-800 mt-2">
+                Conflicts: {domainIntelligence.coordinator.tradeoffs.join(' ')}
+              </p>
+            )}
+          </section>
+        )}
+
         {decisionOutput && (
           <section className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-white p-5 sm:p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-indigo-900 uppercase tracking-wider mb-3 flex items-center gap-2">
@@ -137,6 +180,11 @@ export default function MorningPage() {
             </div>
 
             <p className="text-xs text-indigo-700 mt-2">{outcomeSuccessLabel}</p>
+            {domainIntelligence && (
+              <p className="text-xs text-indigo-600 mt-1 italic">
+                {getDecisionInfluenceLabel(domainIntelligence.coordinator)}
+              </p>
+            )}
 
             <p className="text-sm text-zinc-700 mt-4 leading-relaxed">{decisionOutput.explanation}</p>
 

@@ -6,6 +6,7 @@ import type { MorningExecutionPlan } from '@/lib/morning-execution/morningTypes'
 import type { FounderObject, LifeArea } from '@/lib/object-engine/objectTypes'
 import type { DailyReasoningOutput } from '@/lib/reasoning-engine/reasoningTypes'
 import type { Signal } from '@/lib/signal-engine/signalTypes'
+import type { DomainCoordinatorOutput } from '@/lib/domain-intelligence/domainTypes'
 
 export type DecisionArea = LifeArea | 'inbox' | 'recovery' | 'planning'
 export type DecisionUrgency = 'critical' | 'high' | 'medium' | 'low'
@@ -87,6 +88,7 @@ export interface DecisionInput {
   currentTime: string
   reasoningOutput?: DailyReasoningOutput | null
   unresolvedCaptureCount?: number
+  domainCoordinator?: DomainCoordinatorOutput | null
 }
 
 export interface DecisionOutput {
