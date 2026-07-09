@@ -14,6 +14,7 @@ import { useObjectEngine } from '@/contexts/ObjectEngineContext'
 import { generateDailyReasoning } from '@/lib/reasoning-engine/dailyReasoning'
 import { saveDailyReasoning, getDailyReasoning } from '@/lib/reasoning-engine/reasoningStorage'
 import type { DailyReasoningOutput } from '@/lib/reasoning-engine/reasoningTypes'
+import { getTomorrowContextData } from '@/lib/daily-learning-loop/tomorrowContext'
 import { generateMorningExecutionPlan } from '@/lib/morning-execution/morningExecution'
 import {
   getMorningPlan,
@@ -47,6 +48,7 @@ function runPipeline(
   executive: ReturnType<typeof useExecutiveEngine>,
 ) {
   const commandCenterState = loadCommandCenterState()
+  const tomorrowContext = getTomorrowContextData(todayISO())
   const dailyContext = buildDailyContext({
     objects,
     memories,
@@ -59,8 +61,8 @@ function runPipeline(
     commandCenterState,
     healthSignals: executive.executiveContext?.healthSignals ?? null,
   })
-  const reasoningOutput = generateDailyReasoning(dailyContext)
-  const morningPlan = generateMorningExecutionPlan({ dailyContext, reasoningOutput })
+  const reasoningOutput = generateDailyReasoning(dailyContext, tomorrowContext)
+  const morningPlan = generateMorningExecutionPlan({ dailyContext, reasoningOutput, tomorrowContext })
   return { dailyContext, reasoningOutput, morningPlan }
 }
 

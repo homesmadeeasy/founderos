@@ -23,12 +23,20 @@ import { SEED_KNOWLEDGE_IDS } from '@/lib/knowledge-engine/knowledgeSeedData'
 import type { MorningExecutionPlan } from '@/lib/morning-execution/morningTypes'
 import type { DailyReasoningOutput } from '@/lib/reasoning-engine/reasoningTypes'
 import type { RecommendedPlanItem } from '@/lib/reasoning-engine/reasoningTypes'
+import type { EveningReview } from '@/lib/evening-review/eveningTypes'
+import type { DailyLearningLoopOutput, TomorrowContextData } from '@/lib/daily-learning-loop/dailyLoopTypes'
 
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
   reasoningOutput: DailyReasoningOutput | null
   firstAction: RecommendedPlanItem | null
   regenerate?: () => void
+}
+
+export interface EveningAssistantSnapshot {
+  eveningReview: EveningReview | null
+  dailyLearningLoop: DailyLearningLoopOutput | null
+  tomorrowContext: TomorrowContextData | null
 }
 
 export interface ExecutiveAssistantSnapshot {
@@ -45,6 +53,7 @@ export interface AssistantContext {
   knowledge: KnowledgeRecord[]
   executive?: ExecutiveAssistantSnapshot | null
   morning?: MorningAssistantSnapshot | null
+  evening?: EveningAssistantSnapshot | null
 }
 
 function formatMorningPlanResponse(morning: MorningAssistantSnapshot): string {
@@ -84,6 +93,69 @@ function formatMorningPlanResponse(morning: MorningAssistantSnapshot): string {
   return lines.join('\n\n')
 }
 
+function formatEveningReviewResponse(evening: EveningAssistantSnapshot): string {
+  const review = evening.eveningReview
+  const loop = evening.dailyLearningLoop
+
+  if (!review) {
+    return 'No evening review yet. Open **/evening** to close the loop for today.'
+  }
+
+  if (!review.completed) {
+    return [
+      'Your evening review is in progress but not completed.',
+      `Completed priorities: ${review.completedPriorities.length}`,
+      `Incomplete: ${review.incompletePriorities.length}`,
+      review.wins.length > 0 ? `Wins so far: ${review.wins.join(', ')}` : null,
+      'Finish at **/evening** and tap **Complete review** so FounderOS can learn from today.',
+    ].filter(Boolean).join('\n\n')
+  }
+
+  const lines: string[] = ['**Evening Review**', loop?.summary ?? `Review completed for ${review.date}.`]
+
+  if (review.wins.length > 0) {
+    lines.push(`**Wins:**\n${review.wins.map(w => `• ${w}`).join('\n')}`)
+  }
+  if (review.blockers.length > 0) {
+    lines.push(`**Blockers:**\n${review.blockers.map(b => `• ${b}`).join('\n')}`)
+  }
+  if (loop?.lessons.length) {
+    lines.push(`**Lessons:**\n${loop.lessons.map(l => `• ${l}`).join('\n')}`)
+  }
+  if (review.reflection) {
+    lines.push(`**Reflection:** ${review.reflection}`)
+  }
+
+  lines.push('Full review: /evening')
+  return lines.join('\n\n')
+}
+
+function formatTomorrowCarryResponse(evening: EveningAssistantSnapshot): string {
+  const ctx = evening.dailyLearningLoop?.tomorrowContext ?? evening.tomorrowContext
+  const review = evening.eveningReview
+
+  if (!review?.completed) {
+    return 'Complete your evening review first at **/evening** — tomorrow context is generated when you close the loop.'
+  }
+
+  if (!ctx) {
+    return 'No tomorrow context saved yet. Complete tonight\'s review at /evening.'
+  }
+
+  const lines: string[] = ['**Carry into tomorrow**']
+  if (ctx.recommendedMission) lines.push(`Mission: ${ctx.recommendedMission}`)
+  if (ctx.suggestedFocus) lines.push(`Focus: ${ctx.suggestedFocus}`)
+  if (ctx.carryOverPriorities.length > 0) {
+    lines.push(`Priorities:\n${ctx.carryOverPriorities.map(p => `• ${p}`).join('\n')}`)
+  }
+  if (ctx.warnings.length > 0) {
+    lines.push(`Warnings:\n${ctx.warnings.map(w => `• ${w}`).join('\n')}`)
+  }
+  if (ctx.notes) lines.push(`Notes: ${ctx.notes}`)
+  lines.push('Tomorrow\'s Morning Execution will use this context automatically.')
+  return lines.join('\n\n')
+}
+
 function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): string {
   const lines: string[] = ['**Executive Engine**']
 
@@ -114,6 +186,46 @@ function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): st
 }
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['close the loop', 'close loop', 'evening review'],
+    handler: ({ evening }) => {
+      if (!evening?.eveningReview) return 'Open **/evening** to close the loop for today.'
+      if (!evening.eveningReview.completed) {
+        return 'Your evening review is not complete yet. Go to **/evening**, add wins, blockers, and lessons, then tap **Complete review**.'
+      }
+      return formatEveningReviewResponse(evening)
+    },
+  },
+  {
+    keywords: ['review my day', 'review the day', 'how was my day'],
+    handler: ({ evening }) => formatEveningReviewResponse(evening ?? { eveningReview: null, dailyLearningLoop: null, tomorrowContext: null }),
+  },
+  {
+    keywords: ['what did i learn today', 'learn today', 'today lesson', 'lessons today'],
+    handler: ({ evening }) => {
+      if (!evening?.eveningReview) return 'No evening review yet. Open **/evening** to capture what you learned today.'
+      if (!evening.eveningReview.completed) {
+        const lessons = evening.dailyLearningLoop?.lessons ?? evening.eveningReview.lessons
+        if (lessons.length === 0) return 'Add lessons in **/evening**, then complete the review.'
+        return `**Lessons so far:**\n${lessons.map(l => `• ${l}`).join('\n')}\n\nComplete the review at /evening to lock them in.`
+      }
+      const lessons = evening.dailyLearningLoop?.lessons ?? evening.eveningReview.lessons
+      if (lessons.length === 0) return 'No lessons captured in today\'s review.'
+      return `**Today\'s lessons:**\n${lessons.map(l => `• ${l}`).join('\n')}`
+    },
+  },
+  {
+    keywords: ['carry into tomorrow', 'carry to tomorrow', 'tomorrow context', 'what should i carry'],
+    handler: ({ evening }) => formatTomorrowCarryResponse(evening ?? { eveningReview: null, dailyLearningLoop: null, tomorrowContext: null }),
+  },
+  {
+    keywords: ['blockers today', 'blockers did i', 'what blockers', 'my blockers today'],
+    handler: ({ evening }) => {
+      if (!evening?.eveningReview) return 'No evening review yet. Open **/evening** to log blockers from today.'
+      if (evening.eveningReview.blockers.length === 0) return 'No blockers logged in today\'s review.'
+      return `**Today\'s blockers:**\n${evening.eveningReview.blockers.map(b => `• ${b}`).join('\n')}`
+    },
+  },
   {
     keywords: ['do first', 'first today', 'start with', 'start today'],
     handler: ({ morning }) => {
@@ -421,11 +533,12 @@ export function generateAssistantResponse(
   executive?: ExecutiveAssistantSnapshot | null,
   knowledge: KnowledgeRecord[] = [],
   morning?: MorningAssistantSnapshot | null,
+  evening?: EveningAssistantSnapshot | null,
 ): string {
   const normalized = prompt.trim().toLowerCase()
-  if (!normalized) return 'Ask me about your focus, plan, projects, objects, memories, knowledge, or health today.'
+  if (!normalized) return 'Ask me about your focus, plan, evening review, projects, objects, memories, knowledge, or health today.'
 
-  const ctx: AssistantContext = { commandCenter, objects, memories, knowledge, executive, morning }
+  const ctx: AssistantContext = { commandCenter, objects, memories, knowledge, executive, morning, evening }
 
   for (const { keywords, handler } of PROMPT_MATCHERS) {
     if (keywords.some(k => normalized.includes(k))) {
@@ -436,6 +549,9 @@ export function generateAssistantResponse(
   return [
     'I can help with:',
     '• "What should I focus on today?"',
+    '• "Review my day."',
+    '• "What did I learn today?"',
+    '• "Close the loop."',
     '• "What do you remember?"',
     '• "What decisions have I made?"',
     '• "What happened recently?"',
@@ -460,8 +576,9 @@ export async function fetchAssistantResponse(
   executive?: ExecutiveAssistantSnapshot | null,
   knowledge: KnowledgeRecord[] = [],
   morning?: MorningAssistantSnapshot | null,
+  evening?: EveningAssistantSnapshot | null,
 ): Promise<string> {
-  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive, knowledge, morning)
+  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive, knowledge, morning, evening)
 }
 
 export const SUGGESTED_PROMPTS = [

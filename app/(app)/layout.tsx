@@ -4,6 +4,7 @@ import { AppProvider } from '@/contexts/AppContext'
 import { ExecutiveEngineProvider } from '@/contexts/ExecutiveEngineContext'
 import { KnowledgeEngineProvider } from '@/contexts/KnowledgeEngineContext'
 import { MemoryEngineProvider } from '@/contexts/MemoryEngineContext'
+import { EveningReviewProvider } from '@/contexts/EveningReviewContext'
 import { MorningExecutionProvider } from '@/contexts/MorningExecutionContext'
 import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
 import CommandBarProvider from '@/components/command/CommandBarProvider'
@@ -23,6 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <KnowledgeEngineProvider>
             <ExecutiveEngineProvider>
               <MorningExecutionProvider>
+                <EveningReviewProvider>
                 <CommandBarProvider>
                   <div className="flex h-screen overflow-hidden bg-zinc-50">
                     <Sidebar userEmail={user.email} />
@@ -34,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     </div>
                   </div>
                 </CommandBarProvider>
+                </EveningReviewProvider>
               </MorningExecutionProvider>
             </ExecutiveEngineProvider>
           </KnowledgeEngineProvider>

@@ -1,5 +1,6 @@
 import type { DailyContext } from '@/lib/context-builder/contextTypes'
 import type { DailyReasoningOutput } from '@/lib/reasoning-engine/reasoningTypes'
+import type { TomorrowContextData } from '@/lib/daily-learning-loop/dailyLoopTypes'
 import { newReasoningId } from '@/lib/reasoning-engine/reasoningUtils'
 import type { MorningExecutionPlan, ScheduleBlock } from './morningTypes'
 import { newMorningId, nowISO } from './morningStorage'
@@ -73,14 +74,20 @@ function buildScheduleBlocks(
 export function generateMorningExecutionPlan(input: {
   dailyContext: DailyContext
   reasoningOutput: DailyReasoningOutput
+  tomorrowContext?: TomorrowContextData | null
 }): MorningExecutionPlan {
-  const { dailyContext, reasoningOutput } = input
+  const { dailyContext, reasoningOutput, tomorrowContext } = input
   const now = nowISO()
 
   const warnings = [
+    ...(tomorrowContext?.warnings ?? []),
     ...reasoningOutput.risks,
     ...reasoningOutput.blockers.slice(0, 2),
   ]
+
+  const mission = tomorrowContext?.recommendedMission
+    || dailyContext.mission
+    || reasoningOutput.primaryFocus
 
   return {
     id: newMorningId('plan'),
@@ -89,7 +96,7 @@ export function generateMorningExecutionPlan(input: {
     reasoningId: reasoningOutput.id,
     title: `Morning Execution — ${dailyContext.date}`,
     summary: reasoningOutput.summary,
-    primaryMission: dailyContext.mission || reasoningOutput.primaryFocus,
+    primaryMission: mission,
     topPriorities: reasoningOutput.recommendedPlan.slice(0, 3),
     scheduleBlocks: buildScheduleBlocks(reasoningOutput),
     warnings,

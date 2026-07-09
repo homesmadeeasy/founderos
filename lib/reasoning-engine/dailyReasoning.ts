@@ -1,15 +1,30 @@
 import type { DailyContext } from '@/lib/context-builder/contextTypes'
+import type { TomorrowContextData } from '@/lib/daily-learning-loop/dailyLoopTypes'
 import { isFounderOSObject, isOpenTaskObject } from '@/lib/executive-engine/executiveUtils'
 import type { DailyReasoningOutput, RecommendedPlanItem } from './reasoningTypes'
 import { newReasoningId, nowISO } from './reasoningUtils'
 
-function pickPrimaryFocus(context: DailyContext): {
+function pickPrimaryFocus(
+  context: DailyContext,
+  tomorrowContext?: TomorrowContextData | null,
+): {
   title: string
   objectId?: string
   knowledgeIds: string[]
   memoryIds: string[]
   reason: string
 } {
+  if (tomorrowContext?.suggestedFocus) {
+    return {
+      title: tomorrowContext.suggestedFocus,
+      knowledgeIds: context.relevantKnowledge.map(k => k.id),
+      memoryIds: context.recentMemories.slice(0, 2).map(m => m.id),
+      reason: tomorrowContext.notes
+        ? `Carried from yesterday: ${tomorrowContext.notes}`
+        : 'Suggested focus from yesterday evening review.',
+    }
+  }
+
   const execPrimary = context.executiveRecommendations.find(r => r.priority === 'high')
   if (execPrimary) {
     return {
@@ -54,8 +69,26 @@ function pickPrimaryFocus(context: DailyContext): {
   }
 }
 
-function buildPlanItems(context: DailyContext, primary: ReturnType<typeof pickPrimaryFocus>): RecommendedPlanItem[] {
+function buildPlanItems(
+  context: DailyContext,
+  primary: ReturnType<typeof pickPrimaryFocus>,
+  tomorrowContext?: TomorrowContextData | null,
+): RecommendedPlanItem[] {
   const items: RecommendedPlanItem[] = []
+
+  for (const carryTitle of tomorrowContext?.carryOverPriorities ?? []) {
+    if (carryTitle === primary.title) continue
+    items.push({
+      id: newReasoningId('plan'),
+      title: carryTitle,
+      reason: 'Carried over from yesterday evening review.',
+      priority: 'high',
+      estimatedMinutes: 60,
+      relatedObjectIds: [],
+      relatedMemoryIds: [],
+      relatedKnowledgeIds: [],
+    })
+  }
 
   items.push({
     id: newReasoningId('plan'),
@@ -121,12 +154,15 @@ function buildPlanItems(context: DailyContext, primary: ReturnType<typeof pickPr
     })
   }
 
-  return items.slice(0, 5)
+  return items.slice(0, 6)
 }
 
-export function generateDailyReasoning(context: DailyContext): DailyReasoningOutput {
-  const primary = pickPrimaryFocus(context)
-  const recommendedPlan = buildPlanItems(context, primary)
+export function generateDailyReasoning(
+  context: DailyContext,
+  tomorrowContext?: TomorrowContextData | null,
+): DailyReasoningOutput {
+  const primary = pickPrimaryFocus(context, tomorrowContext)
+  const recommendedPlan = buildPlanItems(context, primary, tomorrowContext)
 
   const deferList: string[] = []
   const lowTasks = context.openTasks.filter(t => t.priority === 'low').slice(0, 3)
@@ -142,6 +178,9 @@ export function generateDailyReasoning(context: DailyContext): DailyReasoningOut
   if (deferRec) deferList.push(deferRec.summary)
 
   const risks: string[] = []
+  if (tomorrowContext?.warnings?.length) {
+    risks.push(...tomorrowContext.warnings.slice(0, 2))
+  }
   if (context.healthSignals && context.healthSignals.score < 55) {
     risks.push('Weak health signals may reduce afternoon output.')
   }
@@ -160,15 +199,22 @@ export function generateDailyReasoning(context: DailyContext): DailyReasoningOut
     ? ` ${context.recentMemories.length} recent memories inform this plan.`
     : ''
 
+  const tomorrowNote = tomorrowContext
+    ? ` Yesterday's review suggests: ${tomorrowContext.suggestedFocus}.`
+    : ''
+
   return {
     id: newReasoningId('daily'),
     date: context.date,
     summary: [
-      context.mission ? `Mission: ${context.mission}.` : 'No mission set.',
+      tomorrowContext?.recommendedMission
+        ? `Mission: ${tomorrowContext.recommendedMission}.`
+        : context.mission ? `Mission: ${context.mission}.` : 'No mission set.',
       `Primary focus: ${primary.title}.`,
       `${context.activeProjects.length} active projects, ${context.openTasks.length} open tasks.`,
       memoryNote.trim(),
       knowledgeNote.trim(),
+      tomorrowNote.trim(),
     ].filter(Boolean).join(' '),
     primaryFocus: primary.title,
     secondaryFocuses: recommendedPlan.slice(1, 3).map(p => p.title),

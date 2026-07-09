@@ -6,6 +6,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard,
   Sun,
+  Moon,
   FolderKanban,
   Target,
   Lightbulb,
@@ -27,6 +28,7 @@ import { useCommandBar, commandShortcutLabel } from '@/components/command/Comman
 const nav = [
   { label: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Morning Execution', href: '/morning', icon: Sun },
+  { label: 'Evening Review', href: '/evening', icon: Moon },
   { label: 'Object Engine', href: '/objects', icon: Boxes },
   { label: 'Memory Engine', href: '/memory', icon: History },
   { label: 'Knowledge Engine', href: '/knowledge', icon: BookOpen },
