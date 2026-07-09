@@ -181,6 +181,9 @@ export function generateDailyReasoning(
   if (tomorrowContext?.warnings?.length) {
     risks.push(...tomorrowContext.warnings.slice(0, 2))
   }
+  if (context.signalNotes.some(n => n.toLowerCase().includes('workout not logged'))) {
+    risks.push('Workout not logged — health signal suggests training is overdue.')
+  }
   if (context.healthSignals && context.healthSignals.score < 55) {
     risks.push('Weak health signals may reduce afternoon output.')
   }
@@ -203,6 +206,10 @@ export function generateDailyReasoning(
     ? ` Yesterday's review suggests: ${tomorrowContext.suggestedFocus}.`
     : ''
 
+  const signalNote = context.signalNotes.length > 0
+    ? ` Signals: ${context.signalNotes.join(' ')}`
+    : ''
+
   return {
     id: newReasoningId('daily'),
     date: context.date,
@@ -215,6 +222,7 @@ export function generateDailyReasoning(
       memoryNote.trim(),
       knowledgeNote.trim(),
       tomorrowNote.trim(),
+      signalNote.trim(),
     ].filter(Boolean).join(' '),
     primaryFocus: primary.title,
     secondaryFocuses: recommendedPlan.slice(1, 3).map(p => p.title),

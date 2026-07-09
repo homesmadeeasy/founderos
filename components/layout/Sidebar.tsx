@@ -6,6 +6,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard,
   Inbox,
+  Radio,
   Sun,
   Moon,
   Zap,
@@ -31,6 +32,7 @@ import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 const nav = [
   { label: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Inbox', href: '/inbox', icon: Inbox },
+  { label: 'Signals', href: '/signals', icon: Radio },
   { label: 'Morning Execution', href: '/morning', icon: Sun },
   { label: 'Evening Review', href: '/evening', icon: Moon },
   { label: 'Object Engine', href: '/objects', icon: Boxes },

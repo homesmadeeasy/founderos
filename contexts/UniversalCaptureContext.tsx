@@ -6,20 +6,20 @@ import {
 import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import { useObjectEngine } from '@/contexts/ObjectEngineContext'
+import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import { runCapturePipeline } from '@/lib/capture-engine/capturePipeline'
-import {
-  getTodaySignals,
-  getUnprocessedCount,
-  reloadCaptureStore,
-  updateSignal,
-} from '@/lib/capture-engine/captureStorage'
 import {
   getCaptureStatsForDate,
   searchUnified,
   type UnifiedSearchResult,
 } from '@/lib/capture-engine/captureSearch'
 import type { CaptureResult, CaptureSignal, CaptureSource } from '@/lib/capture-engine/captureTypes'
+import { todayISO } from '@/lib/capture-engine/captureUtils'
 import type { KnowledgeSuggestion } from '@/lib/knowledge-engine/knowledgeTypes'
+import {
+  reloadCaptureStore,
+  updateSignal,
+} from '@/lib/capture-engine/captureStorage'
 import { createObject as storageCreateObject, getObjectById as storageGetObject, updateObject as storageUpdateObject } from '@/lib/object-engine/objectStorage'
 import type { CCCaptureItem } from '@/lib/command-center/types'
 
@@ -48,23 +48,22 @@ export function UniversalCaptureProvider({ children }: { children: React.ReactNo
   const { memories, recordMemory, ready: memoriesReady } = useMemoryEngine()
   const { syncCaptureFromCommandCenter, refresh: refreshObjects, ready: objectsReady } = useObjectEngine()
   const { createKnowledge, ready: knowledgeReady } = useKnowledgeEngine()
+  const { ingestFromCapture, ready: signalsReady } = useSignalEngine()
 
   const [signals, setSignals] = useState<CaptureSignal[]>([])
   const [lastResult, setLastResult] = useState<CaptureResult | null>(null)
   const [captureOpen, setCaptureOpen] = useState(false)
-  const [tick, setTick] = useState(0)
 
-  const ready = memoriesReady && objectsReady && knowledgeReady
+  const ready = memoriesReady && objectsReady && knowledgeReady && signalsReady
 
-  const refresh = useCallback(() => {
+  const reloadFromStore = useCallback(() => {
     setSignals(reloadCaptureStore().signals)
-    setTick(t => t + 1)
   }, [])
 
   useEffect(() => {
     if (!ready) return
-    refresh()
-  }, [ready, tick, refresh])
+    reloadFromStore()
+  }, [ready, reloadFromStore])
 
   const capture = useCallback((rawInput: string, source: CaptureSource = 'manual'): CaptureResult => {
     const result = runCapturePipeline(
@@ -85,26 +84,35 @@ export function UniversalCaptureProvider({ children }: { children: React.ReactNo
         },
       },
     )
+    ingestFromCapture({
+      id: result.signal.id,
+      rawInput: result.signal.rawInput,
+      parsedTitle: result.signal.parsedTitle,
+      parsedContent: result.signal.parsedContent,
+      classification: result.signal.classification,
+      createdObjectId: result.objectId,
+      createdMemoryId: result.memoryId,
+    })
     setLastResult(result)
     refreshObjects()
-    refresh()
+    reloadFromStore()
     return result
-  }, [recordMemory, memories, syncCaptureFromCommandCenter, refreshObjects, refresh])
+  }, [recordMemory, memories, syncCaptureFromCommandCenter, refreshObjects, reloadFromStore, ingestFromCapture])
 
   const markProcessed = useCallback((id: string) => {
     updateSignal(id, { status: 'processed', processed: true })
-    refresh()
-  }, [refresh])
+    reloadFromStore()
+  }, [reloadFromStore])
 
   const markNeedsReview = useCallback((id: string) => {
     updateSignal(id, { status: 'needs_review' })
-    refresh()
-  }, [refresh])
+    reloadFromStore()
+  }, [reloadFromStore])
 
   const archiveSignal = useCallback((id: string) => {
     updateSignal(id, { status: 'archived' })
-    refresh()
-  }, [refresh])
+    reloadFromStore()
+  }, [reloadFromStore])
 
   const saveKnowledgeSuggestion = useCallback((suggestion: KnowledgeSuggestion): string | null => {
     const created = createKnowledge({
@@ -126,10 +134,10 @@ export function UniversalCaptureProvider({ children }: { children: React.ReactNo
         knowledgeSuggestionPending: false,
         status: 'processed',
       })
-      refresh()
+      reloadFromStore()
     }
     return created.id
-  }, [createKnowledge, signals, refresh])
+  }, [createKnowledge, signals, reloadFromStore])
 
   const getYesterdayCaptureSummary = useCallback((): string | null => {
     const yesterday = new Date()
@@ -147,8 +155,15 @@ export function UniversalCaptureProvider({ children }: { children: React.ReactNo
     return parts.join(' ')
   }, [])
 
-  const todaySignals = useMemo(() => getTodaySignals(), [signals, tick])
-  const unprocessedCount = useMemo(() => getUnprocessedCount(), [signals, tick])
+  const todaySignals = useMemo(() => {
+    const today = todayISO()
+    return signals.filter(s => s.timestamp.slice(0, 10) === today)
+  }, [signals])
+
+  const unprocessedCount = useMemo(
+    () => signals.filter(s => s.status === 'new' || s.status === 'needs_review').length,
+    [signals],
+  )
 
   const value = useMemo<UniversalCaptureContextValue>(() => ({
     ready,
@@ -165,12 +180,12 @@ export function UniversalCaptureProvider({ children }: { children: React.ReactNo
     archiveSignal,
     search: searchUnified,
     saveKnowledgeSuggestion,
-    refresh,
+    refresh: reloadFromStore,
     getYesterdayCaptureSummary,
   }), [
     ready, signals, todaySignals, unprocessedCount, lastResult, captureOpen,
     capture, markProcessed, markNeedsReview, archiveSignal,
-    saveKnowledgeSuggestion, refresh, getYesterdayCaptureSummary,
+    saveKnowledgeSuggestion, reloadFromStore, getYesterdayCaptureSummary,
   ])
 
   return (

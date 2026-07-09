@@ -26,6 +26,8 @@ import type { RecommendedPlanItem } from '@/lib/reasoning-engine/reasoningTypes'
 import type { EveningReview } from '@/lib/evening-review/eveningTypes'
 import type { DailyLearningLoopOutput, TomorrowContextData } from '@/lib/daily-learning-loop/dailyLoopTypes'
 import type { CaptureSignal } from '@/lib/capture-engine/captureTypes'
+import type { Signal } from '@/lib/signal-engine/signalTypes'
+import type { SignalSummary } from '@/lib/signal-engine/signalSearch'
 
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
@@ -45,6 +47,13 @@ export interface CaptureAssistantSnapshot {
   unprocessedCount: number
 }
 
+export interface SignalAssistantSnapshot {
+  signals: Signal[]
+  todaySignals: Signal[]
+  morningNotes: string[]
+  summary: SignalSummary
+}
+
 export interface ExecutiveAssistantSnapshot {
   topFocus: { title: string; summary: string; score?: number }
   briefing: ExecutiveBriefing | null
@@ -61,6 +70,7 @@ export interface AssistantContext {
   morning?: MorningAssistantSnapshot | null
   evening?: EveningAssistantSnapshot | null
   capture?: CaptureAssistantSnapshot | null
+  signals?: SignalAssistantSnapshot | null
 }
 
 function formatMorningPlanResponse(morning: MorningAssistantSnapshot): string {
@@ -193,6 +203,116 @@ function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): st
 }
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['what happened today', 'happened today'],
+    handler: ({ signals, memories, capture }) => {
+      const parts: string[] = ['**Today so far**']
+      const todaySigs = signals?.todaySignals ?? []
+      if (todaySigs.length > 0) {
+        parts.push(`**Signals (${todaySigs.length}):**\n${todaySigs.slice(0, 8).map(s =>
+          `• [${s.source}] ${s.title}`,
+        ).join('\n')}`)
+      }
+      const caps = capture?.todaySignals ?? []
+      if (caps.length > 0) {
+        parts.push(`**Captures (${caps.length}):**\n${caps.slice(0, 6).map(s =>
+          `• ${s.parsedContent}`,
+        ).join('\n')}`)
+      }
+      const today = todayISO()
+      const memToday = memories.filter(m => m.occurredAt.slice(0, 10) === today).slice(0, 5)
+      if (memToday.length > 0) {
+        parts.push(`**Memories:**\n${memToday.map(m => `• ${m.title}`).join('\n')}`)
+      }
+      if (parts.length === 1) {
+        return 'Nothing recorded yet today. Capture something or open **/signals** for Connected Reality data.'
+      }
+      return parts.join('\n\n')
+    },
+  },
+  {
+    keywords: ['what signals', 'signals came in', 'signals today', 'signal count'],
+    handler: ({ signals }) => {
+      if (!signals?.signals?.length) {
+        return 'No signals in the Signal Engine yet. Open **/signals** — mock seeds load on first visit.'
+      }
+      const lines = [
+        `**Signal Engine:** ${signals.summary.total} total, ${signals.summary.today} today.`,
+      ]
+      if (signals.summary.highlights.length > 0) {
+        lines.push(`**Highlights:**\n${signals.summary.highlights.map(h => `• ${h}`).join('\n')}`)
+      }
+      if (signals.todaySignals.length > 0) {
+        lines.push(`**Today:**\n${signals.todaySignals.slice(0, 8).map(s =>
+          `• [${s.source}] ${s.title}`,
+        ).join('\n')}`)
+      }
+      lines.push('Full feed: /signals')
+      return lines.join('\n\n')
+    },
+  },
+  {
+    keywords: ['did i code', 'code today', 'coding today', 'coding session', 'work on founder'],
+    handler: ({ signals }) => {
+      const today = todayISO()
+      const coding = signals?.todaySignals?.find(s => s.type === 'coding_session')
+        ?? signals?.signals?.find(s =>
+          s.type === 'coding_session' && s.timestamp.slice(0, 10) === today,
+        )
+      if (coding) {
+        return `**Yes — coding signal detected.**\n${coding.title}\n${coding.content}\n\nFounderOS progress is on the board today.`
+      }
+      return 'No coding session signal today. If you worked in Cursor, a future integration will log it automatically.'
+    },
+  },
+  {
+    keywords: ['did i train', 'workout today', 'did i workout', 'train today', 'did i work out'],
+    handler: ({ signals, commandCenter: s }) => {
+      const today = todayISO()
+      const log = s.dailyLogs.find(l => l.date === today)
+      if (log?.workoutCompleted) return '**Yes** — workout marked complete in today\'s health log.'
+      const gap = signals?.todaySignals?.find(s =>
+        s.content.toLowerCase().includes('workout not logged') || s.metadata?.workoutLogged === false,
+      )
+      if (gap) return `**Not yet** — ${gap.content}\nHealth is flagged as a priority in your morning plan.`
+      const workout = signals?.todaySignals?.find(s => s.type === 'workout')
+      if (workout) return `**Workout signal:** ${workout.title} — ${workout.content}`
+      return 'No workout signal or health log entry today. Log training in Health Snapshot or wait for Apple Health integration.'
+    },
+  },
+  {
+    keywords: ['calendar suggest', 'what does my calendar', 'calendar today', 'calendar tomorrow', 'study block'],
+    handler: ({ signals }) => {
+      const calendar = signals?.signals?.filter(s => s.source === 'calendar' || s.type === 'event') ?? []
+      if (calendar.length === 0) {
+        return 'No calendar signals yet. Mock calendar data appears on **/signals** until Google Calendar connects.'
+      }
+      return `**Calendar signals:**\n${calendar.slice(0, 5).map(s =>
+        `• ${s.title} — ${s.content}`,
+      ).join('\n')}`
+    },
+  },
+  {
+    keywords: ['health signals', 'health signal matter', 'what health signals', 'sleep signal'],
+    handler: ({ signals, morning }) => {
+      const health = signals?.signals?.filter(s =>
+        s.type === 'health' || s.type === 'workout' || s.source === 'health',
+      ) ?? []
+      const lines: string[] = ['**Health signals**']
+      if (health.length === 0) {
+        lines.push('No health signals in the engine yet.')
+      } else {
+        lines.push(health.slice(0, 6).map(s => `• ${s.title}: ${s.content}`).join('\n'))
+      }
+      if (morning?.reasoningOutput?.risks?.some(r => r.toLowerCase().includes('workout'))) {
+        lines.push('Morning plan flagged workout as a health priority.')
+      }
+      if (signals?.morningNotes?.length) {
+        lines.push(`**Morning notes:** ${signals.morningNotes.join(' ')}`)
+      }
+      return lines.join('\n\n')
+    },
+  },
   {
     keywords: ['what did i capture today', 'captured today', 'capture today'],
     handler: ({ capture }) => {
@@ -580,11 +700,16 @@ export function generateAssistantResponse(
   morning?: MorningAssistantSnapshot | null,
   evening?: EveningAssistantSnapshot | null,
   capture?: CaptureAssistantSnapshot | null,
+  signals?: SignalAssistantSnapshot | null,
 ): string {
   const normalized = prompt.trim().toLowerCase()
-  if (!normalized) return 'Ask me about your focus, plan, captures, evening review, projects, objects, memories, knowledge, or health today.'
+  if (!normalized) {
+    return 'Ask me about your focus, plan, captures, signals, evening review, projects, objects, memories, knowledge, or health today.'
+  }
 
-  const ctx: AssistantContext = { commandCenter, objects, memories, knowledge, executive, morning, evening, capture }
+  const ctx: AssistantContext = {
+    commandCenter, objects, memories, knowledge, executive, morning, evening, capture, signals,
+  }
 
   for (const { keywords, handler } of PROMPT_MATCHERS) {
     if (keywords.some(k => normalized.includes(k))) {
@@ -600,7 +725,10 @@ export function generateAssistantResponse(
     '• "Close the loop."',
     '• "What do you remember?"',
     '• "What decisions have I made?"',
-    '• "What happened recently?"',
+    '• "What happened today?"',
+    '• "What signals came in?"',
+    '• "Did I code today?"',
+    '• "What health signals matter?"',
     '• "Why did we choose object-first?"',
     '• "What is related to FounderOS?"',
     '• "What is blocking me?"',
@@ -624,8 +752,11 @@ export async function fetchAssistantResponse(
   morning?: MorningAssistantSnapshot | null,
   evening?: EveningAssistantSnapshot | null,
   capture?: CaptureAssistantSnapshot | null,
+  signals?: SignalAssistantSnapshot | null,
 ): Promise<string> {
-  return generateAssistantResponse(commandCenter, prompt, objects, memories, executive, knowledge, morning, evening, capture)
+  return generateAssistantResponse(
+    commandCenter, prompt, objects, memories, executive, knowledge, morning, evening, capture, signals,
+  )
 }
 
 export const SUGGESTED_PROMPTS = [

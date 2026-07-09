@@ -9,7 +9,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that require a logged-in user.
-const PROTECTED_PREFIXES = ['/dashboard', '/inbox', '/morning', '/evening', '/objects', '/memory', '/knowledge', '/executive', '/projects', '/goals', '/ideas', '/review', '/weekly-review', '/patterns', '/settings', '/onboarding', '/memory-search']
+const PROTECTED_PREFIXES = ['/dashboard', '/inbox', '/signals', '/morning', '/evening', '/objects', '/memory', '/knowledge', '/executive', '/projects', '/goals', '/ideas', '/review', '/weekly-review', '/patterns', '/settings', '/onboarding', '/memory-search']
 
 // Auth routes a logged-in user shouldn't see.
 const AUTH_ROUTES = ['/login', '/signup']

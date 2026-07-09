@@ -28,6 +28,8 @@ import {
 import type { EnergyLevel, EveningReview } from '@/lib/evening-review/eveningTypes'
 import { todayISO } from '@/lib/evening-review/eveningUtils'
 import type { KnowledgeSuggestion } from '@/lib/knowledge-engine/knowledgeTypes'
+import { processSignal } from '@/lib/signal-engine/signalPipeline'
+import { getSignalById } from '@/lib/signal-engine/signalStorage'
 
 interface EveningReviewContextValue {
   ready: boolean
@@ -38,6 +40,7 @@ interface EveningReviewContextValue {
   togglePriority: (title: string, completed: boolean) => void
   addItem: (field: 'wins' | 'blockers' | 'lessons', value: string) => void
   removeItem: (field: 'wins' | 'blockers' | 'lessons', index: number) => void
+  toggleMatteredSignal: (signalId: string) => void
   completeEveningReview: () => void
   regenerateLearningLoop: () => void
   saveKnowledgeSuggestion: (suggestion: KnowledgeSuggestion) => string | null
@@ -139,6 +142,14 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
     persistReview(updated, loop)
   }, [eveningReview, morningPlan, objects, memories, knowledge, executive, persistReview])
 
+  const toggleMatteredSignal = useCallback((signalId: string) => {
+    if (!eveningReview) return
+    const next = eveningReview.matteredSignalIds.includes(signalId)
+      ? eveningReview.matteredSignalIds.filter(id => id !== signalId)
+      : [...eveningReview.matteredSignalIds, signalId]
+    updateEveningReview({ matteredSignalIds: next })
+  }, [eveningReview, updateEveningReview])
+
   const completeEveningReview = useCallback(() => {
     if (!eveningReview || eveningReview.completed) return
 
@@ -149,6 +160,15 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
       for (const memInput of loop.generatedMemoryInputs) {
         const created = recordMemory(memInput)
         if (created) memoryIds.push(created.id)
+      }
+
+      for (const signalId of eveningReview.matteredSignalIds) {
+        const signal = getSignalById(signalId)
+        if (!signal || signal.processed) continue
+        const processed = processSignal(signalId, { recordMemory })
+        if (processed?.relatedMemoryIds.length) {
+          memoryIds.push(...processed.relatedMemoryIds.filter(id => !memoryIds.includes(id)))
+        }
       }
     }
 
@@ -219,6 +239,7 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
     togglePriority,
     addItem,
     removeItem,
+    toggleMatteredSignal,
     completeEveningReview,
     regenerateLearningLoop,
     saveKnowledgeSuggestion,
@@ -227,7 +248,7 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
   }), [
     ready, eveningReview, dailyLearningLoop, tomorrowContext,
     updateEveningReview, togglePriority, addItem, removeItem,
-    completeEveningReview, regenerateLearningLoop,
+    toggleMatteredSignal, completeEveningReview, regenerateLearningLoop,
     saveKnowledgeSuggestion, isSuggestionSaved, refresh,
   ])
 

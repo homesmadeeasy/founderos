@@ -3,6 +3,7 @@
 import { RefreshCw, Sun, AlertTriangle, Target, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
+import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 import CardShell from './CardShell'
 
@@ -16,6 +17,7 @@ export default function MorningExecutionBriefingCard() {
     getFirstAction,
   } = useMorningExecution()
   const { getYesterdayCaptureSummary } = useUniversalCapture()
+  const { morningNotes } = useSignalEngine()
   const yesterdayCaptures = getYesterdayCaptureSummary()
 
   if (!ready || !morningPlan) {
@@ -60,6 +62,19 @@ export default function MorningExecutionBriefingCard() {
         </div>
 
         <p className="text-sm text-zinc-600 leading-relaxed">{morningPlan.summary}</p>
+
+        {morningNotes.length > 0 && (
+          <div className="rounded-xl bg-sky-50 border border-sky-100 px-4 py-3">
+            <p className="text-[11px] font-semibold text-sky-700 uppercase tracking-wider mb-1">
+              Connected Reality
+            </p>
+            <ul className="text-sm text-sky-900 space-y-1">
+              {morningNotes.map((note, i) => (
+                <li key={i}>• {note}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {yesterdayCaptures && (
           <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3">

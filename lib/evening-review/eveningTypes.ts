@@ -19,6 +19,7 @@ export interface EveningReview {
   tomorrowNotes: string
   generatedMemories: string[]
   suggestedKnowledgeIds: string[]
+  matteredSignalIds: string[]
   memoriesWritten: boolean
   completed: boolean
   createdAt: string
@@ -27,11 +28,12 @@ export interface EveningReview {
 
 export type CreateEveningReviewInput = Omit<
   EveningReview,
-  'id' | 'generatedMemories' | 'suggestedKnowledgeIds' | 'memoriesWritten' | 'completed' | 'createdAt' | 'updatedAt'
+  'id' | 'generatedMemories' | 'suggestedKnowledgeIds' | 'matteredSignalIds' | 'memoriesWritten' | 'completed' | 'createdAt' | 'updatedAt'
 > & {
   id?: string
   generatedMemories?: string[]
   suggestedKnowledgeIds?: string[]
+  matteredSignalIds?: string[]
   memoriesWritten?: boolean
   completed?: boolean
 }

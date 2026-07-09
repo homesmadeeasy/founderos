@@ -16,6 +16,8 @@ import {
   isFounderOSObject,
   isOpenTaskObject,
 } from '@/lib/executive-engine/executiveUtils'
+import { buildMorningSignalNotes } from '@/lib/signal-engine/signalSearch'
+import { getSignals, getRecentSignals } from '@/lib/signal-engine/signalStorage'
 
 function buildHealthFromCommandCenter(
   input: BuildDailyContextInput,
@@ -148,6 +150,9 @@ export function buildDailyContext(input: BuildDailyContextInput): DailyContext {
     c => c.status === 'inbox',
   )
 
+  const recentSignals = getRecentSignals(20)
+  const signalNotes = buildMorningSignalNotes(getSignals())
+
   const context: DailyContext = {
     id: newContextId('daily'),
     date: today,
@@ -162,6 +167,8 @@ export function buildDailyContext(input: BuildDailyContextInput): DailyContext {
     blockers: buildBlockers({ ...input, healthSignals }),
     opportunities: buildOpportunities({ ...input, healthSignals }),
     unresolvedCaptures,
+    recentSignals,
+    signalNotes,
     contextScore: 0,
     generatedAt: nowISO(),
   }

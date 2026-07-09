@@ -6,10 +6,12 @@ import {
   Sparkles, CheckCircle2, RefreshCw,
 } from 'lucide-react'
 import { useEveningReview } from '@/contexts/EveningReviewContext'
+import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 import UniversalCaptureInput from '@/components/capture/UniversalCaptureInput'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { CAPTURE_CLASSIFICATION_LABEL } from '@/lib/capture-engine/captureTypes'
+import { SIGNAL_SOURCE_LABEL, SIGNAL_TYPE_LABEL } from '@/lib/signal-engine/signalTypes'
 import type { EnergyLevel } from '@/lib/evening-review/eveningTypes'
 
 const inputClass =
@@ -93,7 +95,8 @@ function ListSection({
 
 export default function EveningPage() {
   const { morningPlan } = useMorningExecution()
-  const { todaySignals } = useUniversalCapture()
+  const { todaySignals: todayCaptures } = useUniversalCapture()
+  const { todaySignals: todayRealitySignals } = useSignalEngine()
   const {
     ready,
     eveningReview,
@@ -103,6 +106,7 @@ export default function EveningPage() {
     togglePriority,
     addItem,
     removeItem,
+    toggleMatteredSignal,
     completeEveningReview,
     regenerateLearningLoop,
     saveKnowledgeSuggestion,
@@ -172,14 +176,53 @@ export default function EveningPage() {
           </div>
         )}
 
+        {/* Today's Reality Signals */}
+        {todayRealitySignals.length > 0 && (
+          <section className="rounded-2xl border border-sky-200 bg-sky-50/30 p-5">
+            <h2 className="text-sm font-semibold text-sky-800 uppercase tracking-wider mb-1">
+              Today&apos;s Signals ({todayRealitySignals.length})
+            </h2>
+            <p className="text-xs text-sky-700 mb-3">
+              Which signals mattered today? Selected signals become memories when you complete the review.
+            </p>
+            <ul className="space-y-2 text-sm">
+              {todayRealitySignals.map(s => {
+                const mattered = eveningReview.matteredSignalIds.includes(s.id)
+                return (
+                  <li key={s.id} className="flex items-start gap-3 rounded-xl bg-white border border-sky-100 p-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleMatteredSignal(s.id)}
+                      className={`mt-0.5 w-5 h-5 rounded border shrink-0 ${
+                        mattered ? 'bg-sky-600 border-sky-600' : 'border-zinc-300'
+                      }`}
+                      aria-label={mattered ? 'Unmark signal' : 'Mark signal as mattered'}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase">
+                        {SIGNAL_SOURCE_LABEL[s.source]} · {SIGNAL_TYPE_LABEL[s.type]}
+                      </p>
+                      <p className="font-medium text-zinc-900">{s.title}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{s.content}</p>
+                      {s.type === 'idea' && mattered && (
+                        <p className="text-[10px] text-indigo-600 mt-1">Idea signal — consider saving as knowledge below.</p>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+
         {/* Today's Captures */}
-        {todaySignals.length > 0 && (
+        {todayCaptures.length > 0 && (
           <section className="rounded-2xl border border-zinc-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-3">
-              Today&apos;s Captures ({todaySignals.length})
+              Today&apos;s Captures ({todayCaptures.length})
             </h2>
             <ul className="space-y-2 text-sm">
-              {todaySignals.slice(0, 8).map(s => (
+              {todayCaptures.slice(0, 8).map(s => (
                 <li key={s.id} className="flex items-start gap-2">
                   <span className="text-[10px] font-semibold text-zinc-400 uppercase w-20 shrink-0">
                     {CAPTURE_CLASSIFICATION_LABEL[s.classification]}

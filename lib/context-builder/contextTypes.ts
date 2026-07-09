@@ -9,6 +9,7 @@ import type { KnowledgeRecord } from '@/lib/knowledge-engine/knowledgeTypes'
 import type { MemoryRecord } from '@/lib/memory-engine/memoryTypes'
 import type { FounderObject } from '@/lib/object-engine/objectTypes'
 import type { CCCaptureItem } from '@/lib/command-center/types'
+import type { Signal } from '@/lib/signal-engine/signalTypes'
 
 export interface ContextBlocker {
   id: string
@@ -46,6 +47,8 @@ export interface DailyContext {
   blockers: ContextBlocker[]
   opportunities: ContextOpportunity[]
   unresolvedCaptures: CCCaptureItem[]
+  recentSignals: Signal[]
+  signalNotes: string[]
   contextScore: number
   generatedAt: string
 }

@@ -42,6 +42,7 @@ export function createEveningReview(input: CreateEveningReviewInput): EveningRev
     id: input.id ?? newEveningId('review'),
     generatedMemories: input.generatedMemories ?? [],
     suggestedKnowledgeIds: input.suggestedKnowledgeIds ?? [],
+    matteredSignalIds: input.matteredSignalIds ?? [],
     memoriesWritten: input.memoriesWritten ?? false,
     completed: input.completed ?? false,
     completedPriorities: input.completedPriorities ?? [],
