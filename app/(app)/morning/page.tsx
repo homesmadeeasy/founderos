@@ -19,6 +19,7 @@ export default function MorningPage() {
     reasoningOutput,
     morningPlan,
     decisionOutput,
+    outcomeSuccessLabel,
     regenerateMorningPlan,
     updatePrimaryMission,
     markPlanCompleted,
@@ -134,6 +135,8 @@ export default function MorningPage() {
                 {decisionOutput.confidenceLabel} confidence · {decisionOutput.confidence}%
               </span>
             </div>
+
+            <p className="text-xs text-indigo-700 mt-2">{outcomeSuccessLabel}</p>
 
             <p className="text-sm text-zinc-700 mt-4 leading-relaxed">{decisionOutput.explanation}</p>
 

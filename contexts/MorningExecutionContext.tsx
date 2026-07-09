@@ -27,6 +27,8 @@ import type { MorningExecutionPlan } from '@/lib/morning-execution/morningTypes'
 import type { RecommendedPlanItem } from '@/lib/reasoning-engine/reasoningTypes'
 import { getEveningReview } from '@/lib/evening-review/eveningStorage'
 import { buildDecisionInputFromMorningState, decide } from '@/lib/decision-engine/decisionEngine'
+import { createPredictionFromDecision, getSuccessRateForDecision } from '@/lib/outcome-engine/outcomeEngine'
+import type { OutcomePrediction } from '@/lib/outcome-engine/outcomeTypes'
 import type { DecisionOutput } from '@/lib/decision-engine/decisionTypes'
 
 interface MorningExecutionContextValue {
@@ -35,6 +37,8 @@ interface MorningExecutionContextValue {
   reasoningOutput: DailyReasoningOutput | null
   morningPlan: MorningExecutionPlan | null
   decisionOutput: DecisionOutput | null
+  todayPrediction: OutcomePrediction | null
+  outcomeSuccessLabel: string
   regenerateMorningPlan: (writeMemory?: boolean) => void
   markPlanCompleted: () => void
   updatePrimaryMission: (mission: string) => void
@@ -79,6 +83,7 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
   const [dailyContext, setDailyContext] = useState<DailyContext | null>(null)
   const [reasoningOutput, setReasoningOutput] = useState<DailyReasoningOutput | null>(null)
   const [morningPlan, setMorningPlan] = useState<MorningExecutionPlan | null>(null)
+  const [todayPrediction, setTodayPrediction] = useState<OutcomePrediction | null>(null)
   const [tick, setTick] = useState(0)
 
   const ready = objectsReady && memoriesReady && knowledgeReady && executive.ready
@@ -222,12 +227,30 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
     objects, memories, knowledge, executive,
   ])
 
+  useEffect(() => {
+    if (!decisionOutput?.id) return
+    const prediction = createPredictionFromDecision(decisionOutput)
+    setTodayPrediction(prediction)
+  }, [decisionOutput?.id])
+
+  const outcomeSuccessLabel = useMemo(() => {
+    if (!decisionOutput) return ''
+    const { wins, total } = getSuccessRateForDecision(
+      decisionOutput.primaryDecision.title,
+      decisionOutput.primaryDecision.area,
+    )
+    if (total === 0) return 'No outcome history yet.'
+    return `This recommendation has worked ${wins}/${total} times before.`
+  }, [decisionOutput?.primaryDecision.title, decisionOutput?.primaryDecision.area])
+
   const value = useMemo<MorningExecutionContextValue>(() => ({
     ready,
     dailyContext,
     reasoningOutput,
     morningPlan,
     decisionOutput,
+    todayPrediction,
+    outcomeSuccessLabel,
     regenerateMorningPlan,
     markPlanCompleted,
     updatePrimaryMission,
@@ -235,7 +258,7 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
     getFirstAction: () => morningPlan?.topPriorities.find(p => !p.completed) ?? null,
     refresh,
   }), [
-    ready, dailyContext, reasoningOutput, morningPlan, decisionOutput,
+    ready, dailyContext, reasoningOutput, morningPlan, decisionOutput, todayPrediction, outcomeSuccessLabel,
     regenerateMorningPlan, markPlanCompleted, updatePrimaryMission,
     updatePlanItem, refresh,
   ])

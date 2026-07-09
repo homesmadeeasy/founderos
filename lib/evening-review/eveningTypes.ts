@@ -2,6 +2,8 @@
  * Evening Review — core types.
  */
 
+import type { OutcomeCompleted, OutcomeQuality } from '@/lib/outcome-engine/outcomeTypes'
+
 export type EnergyLevel = 'low' | 'medium' | 'high'
 
 export interface EveningReview {
@@ -23,6 +25,14 @@ export interface EveningReview {
   ignoredSignalIds: string[]
   memoriesWritten: boolean
   completed: boolean
+  outcomePredictionId?: string
+  outcomeCompleted?: OutcomeCompleted | null
+  outcomeQuality?: OutcomeQuality | null
+  outcomeActualResult?: string
+  outcomeReflection?: string
+  outcomeEnergyAfter?: EnergyLevel
+  outcomeMoodAfter?: string
+  outcomeLesson?: string
   createdAt: string
   updatedAt: string
 }

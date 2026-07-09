@@ -16,6 +16,7 @@ import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import { useSyncEngine } from '@/contexts/SyncEngineContext'
 import type { CaptureAssistantSnapshot, ExecutiveAssistantSnapshot, EveningAssistantSnapshot, MorningAssistantSnapshot, SignalAssistantSnapshot, SyncAssistantSnapshot } from '@/lib/command-center/assistantLogic'
+import { getOutcomeStats, getYesterdayOutcome } from '@/lib/outcome-engine/outcomeEngine'
 import { isSyncableStatus } from '@/lib/source-adapters/adapterRegistry'
 import {
   memoryForCapture, memoryForHealthLog, memoryForMissionSet,
@@ -233,6 +234,8 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
         reasoningOutput: morningExecution.reasoningOutput,
         firstAction: morningExecution.getFirstAction(),
         decisionOutput: morningExecution.decisionOutput,
+        outcomeStats: getOutcomeStats(),
+        yesterdayOutcome: getYesterdayOutcome(),
         regenerate: () => morningExecution.regenerateMorningPlan(true),
       }
       const eveningSnapshot: EveningAssistantSnapshot = {

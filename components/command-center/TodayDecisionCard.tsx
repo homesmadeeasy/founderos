@@ -1,12 +1,13 @@
 'use client'
 
-import { Brain, ArrowRight, Ban } from 'lucide-react'
+import { Brain, ArrowRight, Ban, Target } from 'lucide-react'
 import Link from 'next/link'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
+import { getSuccessRateForDecision } from '@/lib/outcome-engine/outcomeEngine'
 import CardShell from './CardShell'
 
 export default function TodayDecisionCard() {
-  const { ready, decisionOutput, morningPlan } = useMorningExecution()
+  const { ready, decisionOutput, morningPlan, todayPrediction } = useMorningExecution()
 
   if (!ready || !decisionOutput) {
     return (
@@ -18,6 +19,7 @@ export default function TodayDecisionCard() {
 
   const { primaryDecision, confidence, confidenceLabel, explanation, ignoreToday, evidence } = decisionOutput
   const firstAction = morningPlan?.topPriorities.find(p => !p.completed)
+  const history = getSuccessRateForDecision(primaryDecision.title, primaryDecision.area)
 
   return (
     <CardShell
@@ -52,6 +54,20 @@ export default function TodayDecisionCard() {
             <span className="text-[10px] text-zinc-400">~{primaryDecision.estimatedMinutes} min</span>
           )}
         </div>
+
+        {todayPrediction && (
+          <div className="rounded-xl bg-violet-50 border border-violet-100 px-4 py-3 text-xs text-violet-900">
+            <p className="font-semibold flex items-center gap-1">
+              <Target size={12} /> Outcome tracking active
+            </p>
+            <p className="mt-1 text-violet-800">
+              {history.total > 0
+                ? `Historical success rate: ${history.wins}/${history.total} similar decisions.`
+                : 'No outcome history for this type of decision yet.'}
+            </p>
+            <p className="mt-1 text-violet-700">FounderOS will ask tonight whether this worked.</p>
+          </div>
+        )}
 
         {firstAction && (
           <div className="rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3">

@@ -14,6 +14,7 @@ import { CAPTURE_CLASSIFICATION_LABEL } from '@/lib/capture-engine/captureTypes'
 import { SIGNAL_TYPE_LABEL } from '@/lib/signal-engine/signalTypes'
 import { formatCalendarEventTime, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
 import type { EnergyLevel } from '@/lib/evening-review/eveningTypes'
+import type { OutcomeCompleted, OutcomeQuality } from '@/lib/outcome-engine/outcomeTypes'
 
 const inputClass =
   'w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-900/10'
@@ -95,7 +96,7 @@ function ListSection({
 }
 
 export default function EveningPage() {
-  const { morningPlan } = useMorningExecution()
+  const { morningPlan, decisionOutput, todayPrediction } = useMorningExecution()
   const { todaySignals: todayCaptures } = useUniversalCapture()
   const { todaySignals: todayRealitySignals } = useSignalEngine()
   const {
@@ -174,6 +175,113 @@ export default function EveningPage() {
         <section className="rounded-2xl border border-violet-100 bg-white p-4">
           <UniversalCaptureInput variant="compact" placeholder="Capture a reflection before closing the loop…" />
         </section>
+
+        {(decisionOutput || todayPrediction) && (
+          <section className="rounded-2xl border border-indigo-200 bg-indigo-50/30 p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-indigo-900 uppercase tracking-wider flex items-center gap-2">
+              <Target size={16} /> Decision Outcome
+            </h2>
+            <div className="rounded-xl bg-white border border-indigo-100 p-4">
+              <p className="text-[11px] font-semibold text-zinc-400 uppercase">Today&apos;s predicted decision</p>
+              <p className="text-sm font-semibold text-zinc-900 mt-1">
+                {decisionOutput?.primaryDecision.action ?? todayPrediction?.predictedAction}
+              </p>
+              <p className="text-xs text-zinc-500 mt-1">
+                {decisionOutput?.primaryDecision.reason ?? todayPrediction?.predictedBenefit}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-zinc-600 mb-2">Did you follow it?</p>
+              <div className="flex flex-wrap gap-2">
+                {(['yes', 'partial', 'no'] as OutcomeCompleted[]).map(value => (
+                  <button
+                    key={value}
+                    type="button"
+                    disabled={eveningReview.completed}
+                    onClick={() => updateEveningReview({ outcomeCompleted: value })}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+                      eveningReview.outcomeCompleted === value
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-zinc-600 border-zinc-200'
+                    }`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-zinc-600 mb-2">Outcome quality</p>
+              <select
+                className={inputClass}
+                disabled={eveningReview.completed}
+                value={eveningReview.outcomeQuality ?? ''}
+                onChange={e => updateEveningReview({
+                  outcomeQuality: (e.target.value || null) as OutcomeQuality | null,
+                })}
+              >
+                <option value="">Select quality…</option>
+                <option value="excellent">Excellent</option>
+                <option value="good">Good</option>
+                <option value="neutral">Neutral</option>
+                <option value="poor">Poor</option>
+              </select>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-zinc-600 mb-2">What actually happened?</p>
+              <textarea
+                className={`${inputClass} min-h-[72px]`}
+                disabled={eveningReview.completed}
+                value={eveningReview.outcomeActualResult ?? ''}
+                onChange={e => updateEveningReview({ outcomeActualResult: e.target.value })}
+                placeholder="Describe what you did and what resulted…"
+              />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-zinc-600 mb-2">What did we learn?</p>
+              <textarea
+                className={`${inputClass} min-h-[56px]`}
+                disabled={eveningReview.completed}
+                value={eveningReview.outcomeLesson ?? ''}
+                onChange={e => updateEveningReview({ outcomeLesson: e.target.value })}
+                placeholder="Lesson for future decisions…"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs font-semibold text-zinc-600 mb-2">Energy after</p>
+                <select
+                  className={inputClass}
+                  disabled={eveningReview.completed}
+                  value={eveningReview.outcomeEnergyAfter ?? ''}
+                  onChange={e => updateEveningReview({
+                    outcomeEnergyAfter: (e.target.value || undefined) as EnergyLevel | undefined,
+                  })}
+                >
+                  <option value="">Not set</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-zinc-600 mb-2">Mood after</p>
+                <input
+                  className={inputClass}
+                  disabled={eveningReview.completed}
+                  value={eveningReview.outcomeMoodAfter ?? ''}
+                  onChange={e => updateEveningReview({ outcomeMoodAfter: e.target.value })}
+                  placeholder="How you felt after"
+                />
+              </div>
+            </div>
+          </section>
+        )}
 
         {eveningReview.completed && (
           <div className="rounded-2xl border border-violet-200 bg-violet-50/80 px-5 py-4 text-sm text-violet-900">

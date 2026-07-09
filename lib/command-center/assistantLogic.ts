@@ -30,6 +30,9 @@ import type { Signal } from '@/lib/signal-engine/signalTypes'
 import type { SignalSummary } from '@/lib/signal-engine/signalSearch'
 import type { AdapterConnectionState } from '@/lib/source-adapters/adapterTypes'
 import type { DecisionOutput } from '@/lib/decision-engine/decisionTypes'
+import type { OutcomeStats } from '@/lib/outcome-engine/outcomeTypes'
+import type { OutcomeHistoryEntry } from '@/lib/outcome-engine/outcomeTypes'
+import { getOutcomeHistory } from '@/lib/outcome-engine/outcomeEngine'
 import { formatSignalTimestamp, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
 import { tomorrowISO } from '@/lib/signal-engine/signalUtils'
 export interface MorningAssistantSnapshot {
@@ -37,6 +40,8 @@ export interface MorningAssistantSnapshot {
   reasoningOutput: DailyReasoningOutput | null
   firstAction: RecommendedPlanItem | null
   decisionOutput?: DecisionOutput | null
+  outcomeStats?: OutcomeStats | null
+  yesterdayOutcome?: OutcomeHistoryEntry | null
   regenerate?: () => void
 }
 
@@ -322,6 +327,84 @@ function googleCalendarStatusMessage(sync?: SyncAssistantSnapshot | null): strin
 }
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['did yesterday', 'yesterday recommendation', 'yesterday decision work', 'did the recommendation work'],
+    handler: ({ morning }) => {
+      const y = morning?.yesterdayOutcome
+      if (!y?.prediction) {
+        return 'No outcome recorded for yesterday yet. Complete **/evening** and log whether you followed the decision.'
+      }
+      if (!y.record) {
+        return `Yesterday's decision was **${y.prediction.predictedAction}**, but no outcome was logged. Complete evening review to close the loop.`
+      }
+      const lines = [
+        `**Yesterday:** ${y.prediction.predictedAction}`,
+        `Followed: **${y.record.completed}** · Quality: **${y.record.outcomeQuality}**`,
+        y.record.actualResult ? `Result: ${y.record.actualResult}` : null,
+        y.evaluation ? `Accuracy: ${y.evaluation.accuracyScore}% — ${y.evaluation.whatWorked || y.evaluation.whatDidNotWork}` : null,
+      ].filter(Boolean)
+      return lines.join('\n\n')
+    },
+  },
+  {
+    keywords: ['decisions work best', 'what decisions work', 'best decisions for me'],
+    handler: ({ morning }) => {
+      const history = getOutcomeHistory(12)
+      const good = history.filter(h =>
+        h.record && (h.record.outcomeQuality === 'good' || h.record.outcomeQuality === 'excellent'),
+      )
+      if (good.length === 0) {
+        return 'Not enough outcome history yet. FounderOS learns after you complete evening reviews with decision outcomes.'
+      }
+      return `**Decisions that worked best:**\n${good.slice(0, 5).map(h =>
+        `• ${h.prediction.decisionTitle} (${h.record!.outcomeQuality}, followed: ${h.record!.completed})`,
+      ).join('\n')}`
+    },
+  },
+  {
+    keywords: ['learned from outcomes', 'founderos learned', 'what has founderos learned'],
+    handler: ({ morning }) => {
+      const stats = morning?.outcomeStats
+      const history = getOutcomeHistory(8)
+      const lessons = history
+        .filter(h => h.record?.lessons)
+        .map(h => `• ${h.record!.lessons}`)
+      const lines = ['**Outcome learning**']
+      if (stats) {
+        lines.push(`Tracked: ${stats.totalPredictions} predictions, ${stats.evaluatedCount} evaluated.`)
+        lines.push(`Success rate: ${stats.successRate}% · Follow rate: ${stats.followRate}% · Avg accuracy: ${stats.averageAccuracy}%`)
+      }
+      if (lessons.length > 0) {
+        lines.push(`**Lessons:**\n${lessons.slice(0, 4).join('\n')}`)
+      } else {
+        lines.push('Log lessons in evening Decision Outcome to build personalised knowledge.')
+      }
+      return lines.join('\n\n')
+    },
+  },
+  {
+    keywords: ['how accurate', 'accuracy of recommendations', 'recommendation accuracy'],
+    handler: ({ morning }) => {
+      const stats = morning?.outcomeStats
+      if (!stats || stats.evaluatedCount === 0) {
+        return 'No accuracy data yet. Complete evening reviews with decision outcomes to calibrate recommendations.'
+      }
+      return `**Recommendation accuracy:** ${stats.averageAccuracy}% across ${stats.evaluatedCount} evaluated decisions. Success rate (good/excellent when followed): ${stats.successRate}%.`
+    },
+  },
+  {
+    keywords: ['why are you confident', 'why confident', 'why is founderos confident'],
+    handler: ({ morning }) => {
+      const decision = morning?.decisionOutput
+      if (!decision) return formatDecisionResponse(null, 'why')
+      const stats = morning?.outcomeStats
+      const lines = [formatDecisionResponse(decision, 'why')]
+      if (stats && stats.evaluatedCount > 0) {
+        lines.push(`Outcome history supports tuning: ${stats.successRate}% success on similar past decisions.`)
+      }
+      return lines.join('\n\n')
+    },
+  },
   {
     keywords: ['what should i do next', 'should i do next', 'do next'],
     handler: ({ morning }) => formatDecisionResponse(morning?.decisionOutput),

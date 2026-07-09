@@ -29,6 +29,7 @@ import {
 import type { EnergyLevel, EveningReview } from '@/lib/evening-review/eveningTypes'
 import { todayISO } from '@/lib/evening-review/eveningUtils'
 import type { KnowledgeSuggestion } from '@/lib/knowledge-engine/knowledgeTypes'
+import { buildOutcomeCompletionPayload, getPredictionForDate } from '@/lib/outcome-engine/outcomeEngine'
 import { processSignal } from '@/lib/signal-engine/signalPipeline'
 import { getSignalById } from '@/lib/signal-engine/signalStorage'
 
@@ -104,6 +105,10 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
 
     let review = getOrCreateEveningReview(morningPlan)
     review = syncPrioritiesFromMorning(review, morningPlan)
+    const todayPrediction = getPredictionForDate(todayISO())
+    if (todayPrediction && !review.outcomePredictionId) {
+      review = { ...review, outcomePredictionId: todayPrediction.id }
+    }
     saveEveningReview(review)
     setEveningReview(review)
 
@@ -184,44 +189,6 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
     }
   }, [eveningReview, recordMemory, updateEveningReview, refreshSignals])
 
-  const completeEveningReview = useCallback(() => {
-    if (!eveningReview || eveningReview.completed) return
-
-    const loop = buildLoop(eveningReview, morningPlan, objects, memories, knowledge, executive)
-    const memoryIds: string[] = [...eveningReview.generatedMemories]
-
-    if (!eveningReview.memoriesWritten) {
-      for (const memInput of loop.generatedMemoryInputs) {
-        const created = recordMemory(memInput)
-        if (created) memoryIds.push(created.id)
-      }
-
-      for (const signalId of eveningReview.matteredSignalIds) {
-        const signal = getSignalById(signalId)
-        if (!signal || signal.processed) continue
-        const processed = processSignal(signalId, { recordMemory })
-        if (processed?.relatedMemoryIds.length) {
-          memoryIds.push(...processed.relatedMemoryIds.filter(id => !memoryIds.includes(id)))
-        }
-      }
-    }
-
-    saveTomorrowContext(eveningReview.date, loop.tomorrowContext)
-
-    const completed: EveningReview = {
-      ...eveningReview,
-      completed: true,
-      memoriesWritten: true,
-      generatedMemories: memoryIds,
-      updatedAt: new Date().toISOString(),
-    }
-    persistReview(completed, loop)
-    setTick(t => t + 1)
-  }, [
-    eveningReview, morningPlan, objects, memories, knowledge, executive,
-    recordMemory, persistReview,
-  ])
-
   const saveKnowledgeSuggestion = useCallback((suggestion: KnowledgeSuggestion): string | null => {
     if (!eveningReview) return null
 
@@ -251,6 +218,72 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
 
     return created.id
   }, [eveningReview, knowledge, createKnowledge])
+
+  const completeEveningReview = useCallback(() => {
+    if (!eveningReview || eveningReview.completed) return
+
+    const loop = buildLoop(eveningReview, morningPlan, objects, memories, knowledge, executive)
+    const memoryIds: string[] = [...eveningReview.generatedMemories]
+    let suggestedKnowledgeIds = [...eveningReview.suggestedKnowledgeIds]
+
+    if (!eveningReview.memoriesWritten) {
+      for (const memInput of loop.generatedMemoryInputs) {
+        const created = recordMemory(memInput)
+        if (created) memoryIds.push(created.id)
+      }
+
+      if (
+        eveningReview.outcomePredictionId
+        && eveningReview.outcomeCompleted
+        && eveningReview.outcomeQuality
+      ) {
+        const payload = buildOutcomeCompletionPayload(eveningReview.outcomePredictionId, {
+          completed: eveningReview.outcomeCompleted,
+          outcomeQuality: eveningReview.outcomeQuality,
+          actualResult: eveningReview.outcomeActualResult ?? '',
+          reflection: eveningReview.outcomeReflection,
+          energyAfter: eveningReview.outcomeEnergyAfter,
+          moodAfter: eveningReview.outcomeMoodAfter,
+          lessons: eveningReview.outcomeLesson,
+        })
+        if (payload) {
+          const mem = recordMemory(payload.memory)
+          if (mem) memoryIds.push(mem.id)
+          if (payload.knowledgeSuggestion) {
+            const kid = saveKnowledgeSuggestion(payload.knowledgeSuggestion)
+            if (kid && !suggestedKnowledgeIds.includes(kid)) {
+              suggestedKnowledgeIds = [...suggestedKnowledgeIds, kid]
+            }
+          }
+        }
+      }
+
+      for (const signalId of eveningReview.matteredSignalIds) {
+        const signal = getSignalById(signalId)
+        if (!signal || signal.processed) continue
+        const processed = processSignal(signalId, { recordMemory })
+        if (processed?.relatedMemoryIds.length) {
+          memoryIds.push(...processed.relatedMemoryIds.filter(id => !memoryIds.includes(id)))
+        }
+      }
+    }
+
+    saveTomorrowContext(eveningReview.date, loop.tomorrowContext)
+
+    const completed: EveningReview = {
+      ...eveningReview,
+      completed: true,
+      memoriesWritten: true,
+      generatedMemories: memoryIds,
+      suggestedKnowledgeIds,
+      updatedAt: new Date().toISOString(),
+    }
+    persistReview(completed, loop)
+    setTick(t => t + 1)
+  }, [
+    eveningReview, morningPlan, objects, memories, knowledge, executive,
+    recordMemory, persistReview, saveKnowledgeSuggestion,
+  ])
 
   const isSuggestionSaved = useCallback((suggestion: KnowledgeSuggestion): boolean => {
     if (!eveningReview) return false

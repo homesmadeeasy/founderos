@@ -8,6 +8,8 @@ import type {
   ScoreBreakdown,
 } from './decisionTypes'
 import { clamp, importanceToScore, textIncludesAny, todayISO, tomorrowISO, urgencyToScore } from './decisionUtils'
+import { applyOutcomeFeedbackToCandidate } from '@/lib/outcome-engine/outcomeScoring'
+import { getSimilarPastOutcomes } from '@/lib/outcome-engine/outcomeEngine'
 
 export interface ScoredCandidate {
   candidate: CandidateAction
@@ -123,6 +125,9 @@ export function scoreCandidate(candidate: CandidateAction, input: DecisionInput)
     lowConfidencePenalty = 10
   }
 
+  const similar = getSimilarPastOutcomes(candidate.title, candidate.area, 6)
+  const feedback = applyOutcomeFeedbackToCandidate(candidate, similar)
+
   const total = clamp(
     importance * 0.15
     + urgency * 0.2
@@ -134,7 +139,9 @@ export function scoreCandidate(candidate: CandidateAction, input: DecisionInput)
     + deadlinePressure * 0.12
     - overloadPenalty
     - conflictPenalty
-    - lowConfidencePenalty,
+    - lowConfidencePenalty
+    - feedback.urgencyPenalty
+    + feedback.scoreBonus,
   )
 
   return {
