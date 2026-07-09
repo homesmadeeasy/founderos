@@ -6,6 +6,7 @@ import {
   User, Bot, Bell, Shield, AlertTriangle, ChevronRight, Mail, Brain, Loader2, RefreshCw,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import ConnectedSourcesSection from '@/components/settings/ConnectedSourcesSection'
 import LoadingScreen from '@/components/ui/LoadingScreen'
 import type { MemoryIndexStatus } from '@/lib/types'
 
@@ -158,7 +159,7 @@ export default function SettingsPage() {
 
       <div className="flex items-center gap-3 px-4 py-3 bg-zinc-50 border border-zinc-100 rounded-xl text-xs text-zinc-500">
         <span className="font-medium text-zinc-600">Preview</span>
-        <span>Most sections below are placeholders — Memory Search is live.</span>
+        <span>Most sections below are placeholders — Memory Search and Connected Sources are live.</span>
       </div>
 
       <section className="bg-white rounded-xl border border-zinc-100 overflow-hidden">
@@ -208,6 +209,8 @@ export default function SettingsPage() {
           )}
         </div>
       </section>
+
+      <ConnectedSourcesSection />
 
       <div className="space-y-4">
         {sections.map(section => {

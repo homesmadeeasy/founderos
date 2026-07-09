@@ -7,6 +7,7 @@ import { useExecutiveEngine } from '@/contexts/ExecutiveEngineContext'
 import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
+import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import { useObjectEngine } from '@/contexts/ObjectEngineContext'
 import { generateDailyLearningLoop } from '@/lib/daily-learning-loop/dailyLoop'
 import type { DailyLearningLoopOutput, TomorrowContextData } from '@/lib/daily-learning-loop/dailyLoopTypes'
@@ -41,6 +42,8 @@ interface EveningReviewContextValue {
   addItem: (field: 'wins' | 'blockers' | 'lessons', value: string) => void
   removeItem: (field: 'wins' | 'blockers' | 'lessons', index: number) => void
   toggleMatteredSignal: (signalId: string) => void
+  toggleIgnoredSignal: (signalId: string) => void
+  convertSignalToMemory: (signalId: string) => void
   completeEveningReview: () => void
   regenerateLearningLoop: () => void
   saveKnowledgeSuggestion: (suggestion: KnowledgeSuggestion) => string | null
@@ -77,6 +80,7 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
   const { memories, ready: memoriesReady, recordMemory } = useMemoryEngine()
   const { knowledge, ready: knowledgeReady, createKnowledge } = useKnowledgeEngine()
   const executive = useExecutiveEngine()
+  const { refresh: refreshSignals } = useSignalEngine()
 
   const [eveningReview, setEveningReview] = useState<EveningReview | null>(null)
   const [dailyLearningLoop, setDailyLearningLoop] = useState<DailyLearningLoopOutput | null>(null)
@@ -144,11 +148,41 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
 
   const toggleMatteredSignal = useCallback((signalId: string) => {
     if (!eveningReview) return
-    const next = eveningReview.matteredSignalIds.includes(signalId)
+    const mattered = eveningReview.matteredSignalIds.includes(signalId)
+    const nextMattered = mattered
       ? eveningReview.matteredSignalIds.filter(id => id !== signalId)
       : [...eveningReview.matteredSignalIds, signalId]
-    updateEveningReview({ matteredSignalIds: next })
+    const nextIgnored = mattered
+      ? eveningReview.ignoredSignalIds
+      : eveningReview.ignoredSignalIds.filter(id => id !== signalId)
+    updateEveningReview({ matteredSignalIds: nextMattered, ignoredSignalIds: nextIgnored })
   }, [eveningReview, updateEveningReview])
+
+  const toggleIgnoredSignal = useCallback((signalId: string) => {
+    if (!eveningReview) return
+    const ignored = eveningReview.ignoredSignalIds.includes(signalId)
+    const nextIgnored = ignored
+      ? eveningReview.ignoredSignalIds.filter(id => id !== signalId)
+      : [...eveningReview.ignoredSignalIds, signalId]
+    const nextMattered = ignored
+      ? eveningReview.matteredSignalIds
+      : eveningReview.matteredSignalIds.filter(id => id !== signalId)
+    updateEveningReview({ ignoredSignalIds: nextIgnored, matteredSignalIds: nextMattered })
+  }, [eveningReview, updateEveningReview])
+
+  const convertSignalToMemory = useCallback((signalId: string) => {
+    const signal = getSignalById(signalId)
+    if (!signal || signal.processed) return
+    processSignal(signalId, { recordMemory })
+    refreshSignals()
+    if (!eveningReview) return
+    if (!eveningReview.matteredSignalIds.includes(signalId)) {
+      updateEveningReview({
+        matteredSignalIds: [...eveningReview.matteredSignalIds, signalId],
+        ignoredSignalIds: eveningReview.ignoredSignalIds.filter(id => id !== signalId),
+      })
+    }
+  }, [eveningReview, recordMemory, updateEveningReview, refreshSignals])
 
   const completeEveningReview = useCallback(() => {
     if (!eveningReview || eveningReview.completed) return
@@ -240,6 +274,8 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
     addItem,
     removeItem,
     toggleMatteredSignal,
+    toggleIgnoredSignal,
+    convertSignalToMemory,
     completeEveningReview,
     regenerateLearningLoop,
     saveKnowledgeSuggestion,
@@ -248,7 +284,7 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
   }), [
     ready, eveningReview, dailyLearningLoop, tomorrowContext,
     updateEveningReview, togglePriority, addItem, removeItem,
-    toggleMatteredSignal, completeEveningReview, regenerateLearningLoop,
+    toggleMatteredSignal, toggleIgnoredSignal, convertSignalToMemory, completeEveningReview, regenerateLearningLoop,
     saveKnowledgeSuggestion, isSuggestionSaved, refresh,
   ])
 

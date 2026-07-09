@@ -1,8 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Radio, Plus, Search, Filter } from 'lucide-react'
+import { Radio, Plus, Search, Filter, RefreshCw, Loader2, Link2 } from 'lucide-react'
 import { useSignalEngine } from '@/contexts/SignalEngineContext'
+import { useSyncEngine } from '@/contexts/SyncEngineContext'
+import { isSyncableStatus } from '@/lib/source-adapters/adapterRegistry'
 import {
   SIGNAL_SOURCE_LABEL,
   SIGNAL_TYPE_LABEL,
@@ -10,6 +12,7 @@ import {
   type SignalSource,
   type SignalType,
 } from '@/lib/signal-engine/signalTypes'
+import { formatSignalTimestamp } from '@/lib/signal-engine/signalFormat'
 
 const inputClass =
   'w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10'
@@ -19,10 +22,19 @@ const TYPES = Object.keys(SIGNAL_TYPE_LABEL) as SignalType[]
 
 export default function SignalsPage() {
   const { signals, summary, searchSignals, addMockSignal, processSignalById } = useSignalEngine()
+  const {
+    adapters,
+    syncHistory,
+    lastGlobalSyncLabel,
+    syncing,
+    syncAll,
+  } = useSyncEngine()
   const [query, setQuery] = useState('')
   const [sourceFilter, setSourceFilter] = useState<SignalSource | ''>('')
   const [typeFilter, setTypeFilter] = useState<SignalType | ''>('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const connectedCount = adapters.filter(a => isSyncableStatus(a.status)).length
 
   const filtered = useMemo(
     () => searchSignals(query, {
@@ -45,18 +57,58 @@ export default function SignalsPage() {
               Signals
             </h1>
             <p className="text-sm text-zinc-500 mt-1">
-              {summary.total} signals · {summary.today} today
+              {summary.total} signals · {summary.today} today · {connectedCount} source{connectedCount === 1 ? '' : 's'} connected
+            </p>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Last sync: {lastGlobalSyncLabel}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={addMockSignal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800"
-          >
-            <Plus size={16} />
-            Add mock signal
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={syncing || connectedCount === 0}
+              onClick={() => void syncAll()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 disabled:opacity-50"
+            >
+              {syncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              Sync all sources
+            </button>
+            <button
+              type="button"
+              onClick={addMockSignal}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 text-white text-sm font-semibold hover:bg-zinc-800"
+            >
+              <Plus size={16} />
+              Add mock signal
+            </button>
+          </div>
         </header>
+
+        <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+          <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Link2 size={14} /> Source connections
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {adapters.map(a => (
+              <span
+                key={a.adapterId}
+                className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+                  isSyncableStatus(a.status)
+                    ? 'bg-sky-50 text-sky-700 border-sky-200'
+                    : 'bg-zinc-50 text-zinc-500 border-zinc-200'
+                }`}
+              >
+                {a.adapterId}: {a.status}
+                {a.lastSyncedAt ? ` · ${formatSignalTimestamp(a.lastSyncedAt)}` : ''}
+              </span>
+            ))}
+          </div>
+          {connectedCount === 0 && (
+            <p className="text-xs text-zinc-400 mt-2">
+              No sources connected. Open Settings → Connected Sources to connect mock adapters.
+            </p>
+          )}
+        </section>
 
         {summary.highlights.length > 0 && (
           <section className="rounded-2xl border border-sky-200 bg-sky-50/50 p-5">
@@ -113,6 +165,30 @@ export default function SignalsPage() {
                 ))}
               </ul>
             </section>
+
+            <section className="rounded-2xl border border-zinc-200 bg-white p-5">
+              <h2 className="text-sm font-semibold text-zinc-900 uppercase tracking-wider mb-3">Sync history</h2>
+              {syncHistory.length === 0 ? (
+                <p className="text-sm text-zinc-400">No syncs yet. Connect sources in Settings and sync.</p>
+              ) : (
+                <ul className="space-y-2 text-sm max-h-48 overflow-y-auto">
+                  {syncHistory.slice(0, 12).map(job => (
+                    <li key={job.id} className="flex items-start justify-between gap-2 border-b border-zinc-50 pb-2">
+                      <div>
+                        <p className="font-medium text-zinc-800">{job.adapterId}</p>
+                        <p className="text-xs text-zinc-500">
+                          {job.status} · {job.signalsCreated} signal{job.signalsCreated === 1 ? '' : 's'}
+                          {job.error ? ` · ${job.error}` : ''}
+                        </p>
+                      </div>
+                      <span className="text-xs text-zinc-400 shrink-0">
+                        {formatSignalTimestamp(job.completedAt ?? job.startedAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
 
           <section className="rounded-2xl border border-zinc-200 bg-white p-5 h-fit sticky top-4">
@@ -139,6 +215,7 @@ function SignalRow({
   selected: boolean
   onSelect: () => void
 }) {
+  const synced = signal.metadata?.synced === true
   return (
     <li>
       <button
@@ -154,6 +231,9 @@ function SignalRow({
             <p className="text-sm font-medium text-zinc-900 truncate">{signal.title}</p>
             <p className="text-xs text-zinc-500 truncate">{signal.content}</p>
           </div>
+          {synced && (
+            <span className="text-[10px] text-sky-600 font-medium shrink-0">Synced</span>
+          )}
           {signal.processed && (
             <span className="text-[10px] text-emerald-600 font-medium shrink-0">Processed</span>
           )}
@@ -181,7 +261,7 @@ function SignalDetail({ signal, onProcess }: { signal: Signal; onProcess: () => 
         <div><dt className="text-zinc-400">Processed</dt><dd className="font-medium">{signal.processed ? 'Yes' : 'No'}</dd></div>
       </dl>
       <p className="text-xs text-zinc-400">
-        {new Date(signal.timestamp).toLocaleString()}
+        {formatSignalTimestamp(signal.timestamp)}
       </p>
       {!signal.processed && (
         <button

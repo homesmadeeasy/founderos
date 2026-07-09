@@ -107,6 +107,8 @@ export default function EveningPage() {
     addItem,
     removeItem,
     toggleMatteredSignal,
+    toggleIgnoredSignal,
+    convertSignalToMemory,
     completeEveningReview,
     regenerateLearningLoop,
     saveKnowledgeSuggestion,
@@ -129,6 +131,8 @@ export default function EveningPage() {
   ]
 
   const suggestions = dailyLearningLoop?.knowledgeSuggestions ?? []
+  const syncedTodaySignals = todayRealitySignals.filter(s => s.metadata?.synced === true)
+  const displaySignals = syncedTodaySignals.length > 0 ? syncedTodaySignals : todayRealitySignals
 
   return (
     <div className="min-h-full bg-gradient-to-b from-violet-50/40 to-zinc-50/80">
@@ -176,31 +180,46 @@ export default function EveningPage() {
           </div>
         )}
 
-        {/* Today's Reality Signals */}
-        {todayRealitySignals.length > 0 && (
+        {/* Today's Synced Signals */}
+        {displaySignals.length > 0 && (
           <section className="rounded-2xl border border-sky-200 bg-sky-50/30 p-5">
             <h2 className="text-sm font-semibold text-sky-800 uppercase tracking-wider mb-1">
-              Today&apos;s Signals ({todayRealitySignals.length})
+              Today&apos;s Synced Signals ({displaySignals.length})
             </h2>
             <p className="text-xs text-sky-700 mb-3">
-              Which signals mattered today? Selected signals become memories when you complete the review.
+              Mark signals that mattered, ignore noise, or convert important ones to memory now.
             </p>
             <ul className="space-y-2 text-sm">
-              {todayRealitySignals.map(s => {
+              {displaySignals.map(s => {
                 const mattered = eveningReview.matteredSignalIds.includes(s.id)
+                const ignored = eveningReview.ignoredSignalIds.includes(s.id)
                 return (
-                  <li key={s.id} className="flex items-start gap-3 rounded-xl bg-white border border-sky-100 p-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleMatteredSignal(s.id)}
-                      className={`mt-0.5 w-5 h-5 rounded border shrink-0 ${
-                        mattered ? 'bg-sky-600 border-sky-600' : 'border-zinc-300'
-                      }`}
-                      aria-label={mattered ? 'Unmark signal' : 'Mark signal as mattered'}
-                    />
+                  <li key={s.id} className={`flex items-start gap-3 rounded-xl bg-white border p-3 ${ignored ? 'border-zinc-200 opacity-60' : 'border-sky-100'}`}>
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleMatteredSignal(s.id)}
+                        className={`w-5 h-5 rounded border ${
+                          mattered ? 'bg-sky-600 border-sky-600' : 'border-zinc-300'
+                        }`}
+                        aria-label={mattered ? 'Unmark mattered' : 'Mark as mattered'}
+                        title="Mattered"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleIgnoredSignal(s.id)}
+                        className={`text-[9px] px-1 py-0.5 rounded border ${
+                          ignored ? 'bg-zinc-200 border-zinc-300' : 'border-zinc-200 text-zinc-400'
+                        }`}
+                        title="Ignore"
+                      >
+                        skip
+                      </button>
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-semibold text-zinc-400 uppercase">
                         {SIGNAL_SOURCE_LABEL[s.source]} · {SIGNAL_TYPE_LABEL[s.type]}
+                        {s.metadata?.synced ? ' · synced' : ''}
                       </p>
                       <p className="font-medium text-zinc-900">{s.title}</p>
                       <p className="text-xs text-zinc-500 mt-0.5">{s.content}</p>
@@ -208,6 +227,15 @@ export default function EveningPage() {
                         <p className="text-[10px] text-indigo-600 mt-1">Idea signal — consider saving as knowledge below.</p>
                       )}
                     </div>
+                    {!s.processed && mattered && (
+                      <button
+                        type="button"
+                        onClick={() => convertSignalToMemory(s.id)}
+                        className="text-[10px] font-semibold text-emerald-700 shrink-0 hover:underline"
+                      >
+                        → memory
+                      </button>
+                    )}
                   </li>
                 )
               })}

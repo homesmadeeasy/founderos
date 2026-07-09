@@ -72,19 +72,43 @@ export function buildMorningSignalNotes(signals: Signal[]): string[] {
     s.type === 'health' && (s.content.toLowerCase().includes('sleep') || s.metadata?.sleepHours),
   )
   if (sleep) {
-    const hrs = sleep.metadata?.sleepHours ?? sleep.content.match(/([\d.]+)\s*hours?/)?.[1]
-    notes.push(hrs ? `Sleep signal: ${hrs}h logged.` : `Sleep signal: ${sleep.title}.`)
+    const hrs = Number(sleep.metadata?.sleepHours ?? sleep.content.match(/([\d.]+)\s*hours?/)?.[1])
+    if (hrs && hrs < 7) {
+      notes.push(`Low sleep (${hrs}h) — reduce morning intensity.`)
+    } else if (hrs) {
+      notes.push(`Sleep signal: ${hrs}h logged.`)
+    } else {
+      notes.push(`Sleep signal: ${sleep.title}.`)
+    }
+    if (sleep.metadata?.lowRecovery) {
+      notes.push('Recovery signal low — protect energy for priority work only.')
+    }
   }
 
-  const calendar = recent.find(s => s.source === 'calendar' || s.type === 'event')
-  if (calendar) notes.push(`Calendar: ${calendar.title} — ${calendar.content}`)
+  const calendarToday = todaySignals.find(s => s.source === 'calendar' || s.type === 'event')
+    ?? recent.find(s => (s.source === 'calendar' || s.type === 'event') && s.content.toLowerCase().includes('today'))
+  if (calendarToday) notes.push(`Calendar: ${calendarToday.title} — ${calendarToday.content}`)
 
   const coding = todaySignals.find(s => s.type === 'coding_session')
     ?? recent.find(s => s.type === 'coding_session')
-  if (coding) notes.push(`Coding signal: ${coding.content}`)
+  if (coding) {
+    const synced = coding.metadata?.synced ? ' (synced)' : ''
+    notes.push(`Coding signal${synced}: ${coding.content}`)
+  }
+
+  const yesterdayCoding = signals.find(s => {
+    if (s.type !== 'coding_session') return false
+    const age = Date.now() - new Date(s.timestamp).getTime()
+    return age > 12 * 60 * 60 * 1000 && age < 36 * 60 * 60 * 1000
+  })
+  if (yesterdayCoding && !coding) {
+    notes.push(`FounderOS momentum: coding session yesterday — ${yesterdayCoding.title}.`)
+  }
 
   const workoutGap = todaySignals.find(s =>
-    s.content.toLowerCase().includes('workout not logged') || s.metadata?.workoutLogged === false,
+    s.content.toLowerCase().includes('workout not logged')
+    || s.content.toLowerCase().includes('workout not completed')
+    || s.metadata?.workoutLogged === false,
   )
   if (workoutGap) notes.push('Health priority: workout not logged today.')
 

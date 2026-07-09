@@ -28,6 +28,8 @@ import type { DailyLearningLoopOutput, TomorrowContextData } from '@/lib/daily-l
 import type { CaptureSignal } from '@/lib/capture-engine/captureTypes'
 import type { Signal } from '@/lib/signal-engine/signalTypes'
 import type { SignalSummary } from '@/lib/signal-engine/signalSearch'
+import type { AdapterConnectionState } from '@/lib/source-adapters/adapterTypes'
+import { formatSignalTimestamp } from '@/lib/signal-engine/signalFormat'
 
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
@@ -54,6 +56,12 @@ export interface SignalAssistantSnapshot {
   summary: SignalSummary
 }
 
+export interface SyncAssistantSnapshot {
+  adapters: AdapterConnectionState[]
+  lastGlobalSyncLabel: string
+  connectedCount: number
+}
+
 export interface ExecutiveAssistantSnapshot {
   topFocus: { title: string; summary: string; score?: number }
   briefing: ExecutiveBriefing | null
@@ -71,6 +79,7 @@ export interface AssistantContext {
   evening?: EveningAssistantSnapshot | null
   capture?: CaptureAssistantSnapshot | null
   signals?: SignalAssistantSnapshot | null
+  sync?: SyncAssistantSnapshot | null
 }
 
 function formatMorningPlanResponse(morning: MorningAssistantSnapshot): string {
@@ -203,6 +212,44 @@ function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): st
 }
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['sync my signal', 'sync signals', 'sync sources', 'run sync'],
+    handler: () => {
+      return 'Running mock sync for all connected sources… Check **/signals** for new entries and sync history.'
+    },
+  },
+  {
+    keywords: ['what sources are connected', 'sources connected', 'connected sources', 'which sources'],
+    handler: ({ sync }) => {
+      if (!sync?.adapters?.length) {
+        return 'No source adapters configured. Open **/settings** → Connected Sources.'
+      }
+      const connected = sync.adapters.filter(a => a.status === 'mock' || a.status === 'connected')
+      if (connected.length === 0) {
+        return 'No sources connected yet. Open **/settings**, tap **Connect mock** on Calendar, Health, or Cursor, then sync.'
+      }
+      return `**Connected sources (${connected.length}):**\n${connected.map(a =>
+        `• ${a.adapterId} (${a.status})${a.lastSyncedAt ? ` — last sync ${formatSignalTimestamp(a.lastSyncedAt)}` : ''}`,
+      ).join('\n')}`
+    },
+  },
+  {
+    keywords: ['when did signals last sync', 'last sync', 'when last sync'],
+    handler: ({ sync }) => {
+      if (!sync) return 'Sync engine not loaded.'
+      return `Last global sync: **${sync.lastGlobalSyncLabel}**. ${sync.connectedCount} source${sync.connectedCount === 1 ? '' : 's'} connected. Open **/signals** for history.`
+    },
+  },
+  {
+    keywords: ['what is on my calendar', 'on my calendar', 'my calendar today'],
+    handler: ({ signals }) => {
+      const calendar = signals?.signals?.filter(s => s.source === 'calendar' || s.type === 'event') ?? []
+      if (calendar.length === 0) {
+        return 'No calendar signals. Connect Calendar in Settings, sync, then ask again.'
+      }
+      return `**Calendar:**\n${calendar.slice(0, 6).map(s => `• ${s.title} — ${s.content}`).join('\n')}`
+    },
+  },
   {
     keywords: ['what happened today', 'happened today'],
     handler: ({ signals, memories, capture }) => {
@@ -701,14 +748,15 @@ export function generateAssistantResponse(
   evening?: EveningAssistantSnapshot | null,
   capture?: CaptureAssistantSnapshot | null,
   signals?: SignalAssistantSnapshot | null,
+  sync?: SyncAssistantSnapshot | null,
 ): string {
   const normalized = prompt.trim().toLowerCase()
   if (!normalized) {
-    return 'Ask me about your focus, plan, captures, signals, evening review, projects, objects, memories, knowledge, or health today.'
+    return 'Ask me about your focus, plan, captures, signals, sources, evening review, projects, objects, memories, knowledge, or health today.'
   }
 
   const ctx: AssistantContext = {
-    commandCenter, objects, memories, knowledge, executive, morning, evening, capture, signals,
+    commandCenter, objects, memories, knowledge, executive, morning, evening, capture, signals, sync,
   }
 
   for (const { keywords, handler } of PROMPT_MATCHERS) {
@@ -753,9 +801,10 @@ export async function fetchAssistantResponse(
   evening?: EveningAssistantSnapshot | null,
   capture?: CaptureAssistantSnapshot | null,
   signals?: SignalAssistantSnapshot | null,
+  sync?: SyncAssistantSnapshot | null,
 ): Promise<string> {
   return generateAssistantResponse(
-    commandCenter, prompt, objects, memories, executive, knowledge, morning, evening, capture, signals,
+    commandCenter, prompt, objects, memories, executive, knowledge, morning, evening, capture, signals, sync,
   )
 }
 

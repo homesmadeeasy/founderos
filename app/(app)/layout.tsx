@@ -8,6 +8,7 @@ import { EveningReviewProvider } from '@/contexts/EveningReviewContext'
 import { MorningExecutionProvider } from '@/contexts/MorningExecutionContext'
 import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
 import { SignalEngineProvider } from '@/contexts/SignalEngineContext'
+import { SyncEngineProvider } from '@/contexts/SyncEngineContext'
 import { UniversalCaptureProvider } from '@/contexts/UniversalCaptureContext'
 import CommandBarProvider from '@/components/command/CommandBarProvider'
 import Sidebar from '@/components/layout/Sidebar'
@@ -26,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <KnowledgeEngineProvider>
             <ExecutiveEngineProvider>
               <SignalEngineProvider>
+              <SyncEngineProvider>
               <MorningExecutionProvider>
                 <EveningReviewProvider>
                   <UniversalCaptureProvider>
@@ -43,6 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   </UniversalCaptureProvider>
                 </EveningReviewProvider>
               </MorningExecutionProvider>
+              </SyncEngineProvider>
               </SignalEngineProvider>
             </ExecutiveEngineProvider>
           </KnowledgeEngineProvider>

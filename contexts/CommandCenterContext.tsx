@@ -14,7 +14,9 @@ import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { useEveningReview } from '@/contexts/EveningReviewContext'
 import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 import { useSignalEngine } from '@/contexts/SignalEngineContext'
-import type { CaptureAssistantSnapshot, ExecutiveAssistantSnapshot, EveningAssistantSnapshot, MorningAssistantSnapshot, SignalAssistantSnapshot } from '@/lib/command-center/assistantLogic'
+import { useSyncEngine } from '@/contexts/SyncEngineContext'
+import type { CaptureAssistantSnapshot, ExecutiveAssistantSnapshot, EveningAssistantSnapshot, MorningAssistantSnapshot, SignalAssistantSnapshot, SyncAssistantSnapshot } from '@/lib/command-center/assistantLogic'
+import { isSyncableStatus } from '@/lib/source-adapters/adapterRegistry'
 import {
   memoryForCapture, memoryForHealthLog, memoryForMissionSet,
   memoryForProjectAdded, memoryForTaskAdded, memoryForTaskUpdated,
@@ -62,6 +64,7 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
   const eveningReview = useEveningReview()
   const universalCapture = useUniversalCapture()
   const signalEngine = useSignalEngine()
+  const syncEngine = useSyncEngine()
 
   useEffect(() => {
     setState(loadCommandCenterState())
@@ -196,6 +199,13 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
     const trimmed = prompt.trim()
     if (!trimmed) return
 
+    const normalized = trimmed.toLowerCase()
+    const shouldSync = ['sync my signal', 'sync signals', 'sync sources', 'run sync']
+      .some(k => normalized.includes(k))
+    if (shouldSync) {
+      await syncEngine.syncAll()
+    }
+
     setState(prev => {
       if (!prev) return prev
       const userMsg: CCAIMessage = { id: newId(), role: 'user', content: trimmed, createdAt: nowISO() }
@@ -229,6 +239,11 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
         morningNotes: signalEngine.morningNotes,
         summary: signalEngine.summary,
       }
+      const syncSnapshot: SyncAssistantSnapshot = {
+        adapters: syncEngine.adapters,
+        lastGlobalSyncLabel: syncEngine.lastGlobalSyncLabel,
+        connectedCount: syncEngine.adapters.filter(a => isSyncableStatus(a.status)).length,
+      }
       if (!morningSnapshot.morningPlan && morningExecution.ready) {
         morningExecution.regenerateMorningPlan(true)
       }
@@ -243,11 +258,12 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
         eveningSnapshot,
         captureSnapshot,
         signalSnapshot,
+        syncSnapshot,
       )
       const assistantMsg: CCAIMessage = { id: newId(), role: 'assistant', content: reply, createdAt: nowISO() }
       return persist({ ...withUser, aiMessages: [...withUser.aiMessages, assistantMsg] })
     })
-  }, [objectEngine.objects, memoryEngine.memories, executiveEngine, knowledgeEngine.knowledge, morningExecution, eveningReview, universalCapture, signalEngine])
+  }, [objectEngine.objects, memoryEngine.memories, executiveEngine, knowledgeEngine.knowledge, morningExecution, eveningReview, universalCapture, signalEngine, syncEngine])
 
   const clearAssistant = useCallback(() => {
     update(s => ({ ...s, aiMessages: [] }))
