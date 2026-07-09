@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
 } from 'react'
 import { loadCommandCenterState } from '@/lib/command-center/storage'
 import { buildDailyContext } from '@/lib/context-builder/contextBuilder'
@@ -28,6 +28,7 @@ import type { RecommendedPlanItem } from '@/lib/reasoning-engine/reasoningTypes'
 import { getEveningReview } from '@/lib/evening-review/eveningStorage'
 import { buildDecisionInputFromMorningState, decide } from '@/lib/decision-engine/decisionEngine'
 import { createPredictionFromDecision, getSuccessRateForDecision } from '@/lib/outcome-engine/outcomeEngine'
+import { publishEvent } from '@/lib/founder-kernel/publishEvent'
 import type { OutcomePrediction } from '@/lib/outcome-engine/outcomeTypes'
 import type { DecisionOutput } from '@/lib/decision-engine/decisionTypes'
 import { buildDomainIntelligence } from '@/lib/domain-intelligence/domainEvaluator'
@@ -89,6 +90,7 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
   const [morningPlan, setMorningPlan] = useState<MorningExecutionPlan | null>(null)
   const [todayPrediction, setTodayPrediction] = useState<OutcomePrediction | null>(null)
   const [tick, setTick] = useState(0)
+  const morningStartedRef = useRef<string | null>(null)
 
   const ready = objectsReady && memoriesReady && knowledgeReady && executive.ready
 
@@ -253,7 +255,27 @@ export function MorningExecutionProvider({ children }: { children: React.ReactNo
   ])
 
   useEffect(() => {
+    if (!morningPlan?.date) return
+    if (morningStartedRef.current === morningPlan.date) return
+    morningStartedRef.current = morningPlan.date
+    void publishEvent({
+      type: 'MorningStarted',
+      source: 'morning-execution',
+      payload: { date: morningPlan.date, planTitle: morningPlan.title },
+    })
+  }, [morningPlan?.date, morningPlan?.title])
+
+  useEffect(() => {
     if (!decisionOutput?.id) return
+    void publishEvent({
+      type: 'DecisionGenerated',
+      source: 'decision-engine',
+      payload: {
+        decisionId: decisionOutput.id,
+        decisionTitle: decisionOutput.primaryDecision.title,
+        decision: decisionOutput,
+      },
+    })
     const prediction = createPredictionFromDecision(decisionOutput)
     setTodayPrediction(prediction)
   }, [decisionOutput?.id])

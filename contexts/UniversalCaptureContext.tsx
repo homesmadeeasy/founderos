@@ -6,8 +6,8 @@ import {
 import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import { useObjectEngine } from '@/contexts/ObjectEngineContext'
-import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import { runCapturePipeline } from '@/lib/capture-engine/capturePipeline'
+import type { CCCaptureItem } from '@/lib/command-center/types'
 import {
   getCaptureStatsForDate,
   searchUnified,
@@ -21,7 +21,8 @@ import {
   updateSignal,
 } from '@/lib/capture-engine/captureStorage'
 import { createObject as storageCreateObject, getObjectById as storageGetObject, updateObject as storageUpdateObject } from '@/lib/object-engine/objectStorage'
-import type { CCCaptureItem } from '@/lib/command-center/types'
+import { buildCaptureCreatedPayload } from '@/lib/founder-kernel/kernelPayloads'
+import { publishEvent } from '@/lib/founder-kernel/publishEvent'
 
 interface UniversalCaptureContextValue {
   ready: boolean
@@ -46,15 +47,14 @@ const UniversalCaptureContext = createContext<UniversalCaptureContextValue | nul
 
 export function UniversalCaptureProvider({ children }: { children: React.ReactNode }) {
   const { memories, recordMemory, ready: memoriesReady } = useMemoryEngine()
-  const { syncCaptureFromCommandCenter, refresh: refreshObjects, ready: objectsReady } = useObjectEngine()
+  const { syncCaptureFromCommandCenter, ready: objectsReady } = useObjectEngine()
   const { createKnowledge, ready: knowledgeReady } = useKnowledgeEngine()
-  const { ingestFromCapture, ready: signalsReady } = useSignalEngine()
 
   const [signals, setSignals] = useState<CaptureSignal[]>([])
   const [lastResult, setLastResult] = useState<CaptureResult | null>(null)
   const [captureOpen, setCaptureOpen] = useState(false)
 
-  const ready = memoriesReady && objectsReady && knowledgeReady && signalsReady
+  const ready = memoriesReady && objectsReady && knowledgeReady
 
   const reloadFromStore = useCallback(() => {
     setSignals(reloadCaptureStore().signals)
@@ -84,20 +84,15 @@ export function UniversalCaptureProvider({ children }: { children: React.ReactNo
         },
       },
     )
-    ingestFromCapture({
-      id: result.signal.id,
-      rawInput: result.signal.rawInput,
-      parsedTitle: result.signal.parsedTitle,
-      parsedContent: result.signal.parsedContent,
-      classification: result.signal.classification,
-      createdObjectId: result.objectId,
-      createdMemoryId: result.memoryId,
+    void publishEvent({
+      type: 'CaptureCreated',
+      source: 'universal-capture',
+      payload: buildCaptureCreatedPayload(result),
     })
     setLastResult(result)
-    refreshObjects()
     reloadFromStore()
     return result
-  }, [recordMemory, memories, syncCaptureFromCommandCenter, refreshObjects, reloadFromStore, ingestFromCapture])
+  }, [recordMemory, memories, syncCaptureFromCommandCenter, reloadFromStore])
 
   const markProcessed = useCallback((id: string) => {
     updateSignal(id, { status: 'processed', processed: true })

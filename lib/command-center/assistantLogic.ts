@@ -40,6 +40,12 @@ import {
   formatDomainTradeoffResponse,
   formatSingleDomainResponse,
 } from '@/lib/domain-intelligence/domainSummaries'
+import {
+  formatDecisionTriggerFromKernel,
+  formatKernelWhatChanged,
+  formatLastImportantKernelEvent,
+  formatTodayKernelEvents,
+} from '@/lib/founder-kernel/kernelSummaries'
 import { formatSignalTimestamp, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
 import { tomorrowISO } from '@/lib/signal-engine/signalUtils'
 export interface MorningAssistantSnapshot {
@@ -335,6 +341,22 @@ function googleCalendarStatusMessage(sync?: SyncAssistantSnapshot | null): strin
 }
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['what happened today', 'happened today', 'kernel activity today'],
+    handler: () => formatTodayKernelEvents(),
+  },
+  {
+    keywords: ['what changed', 'what has changed', 'recent changes'],
+    handler: () => formatKernelWhatChanged(),
+  },
+  {
+    keywords: ['what triggered this recommendation', 'triggered this recommendation', 'what triggered the decision'],
+    handler: ({ morning }) => formatDecisionTriggerFromKernel(morning?.decisionOutput?.primaryDecision.title),
+  },
+  {
+    keywords: ['last important event', 'what was the last important event', 'latest important event'],
+    handler: () => formatLastImportantKernelEvent(),
+  },
   {
     keywords: ['which area needs attention', 'area of my life needs attention', 'what needs attention', 'domain needs attention'],
     handler: ({ morning }) => {

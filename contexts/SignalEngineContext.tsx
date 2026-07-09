@@ -19,6 +19,7 @@ import {
   ensureSignalSeed,
   reloadSignalStore,
 } from '@/lib/signal-engine/signalStorage'
+import { publishEvent } from '@/lib/founder-kernel/publishEvent'
 import type { CreateSignalInput, Signal, SignalSource, SignalType } from '@/lib/signal-engine/signalTypes'
 
 interface SignalEngineContextValue {
@@ -56,6 +57,11 @@ export function SignalEngineProvider({ children }: { children: React.ReactNode }
   const createSignalFn = useCallback((input: CreateSignalInput) => {
     const created = ingestSignal(input, memoryDeps)
     reloadFromStore()
+    void publishEvent({
+      type: 'SignalCreated',
+      source: 'signal-engine',
+      payload: { signalId: created.id, title: created.title, type: created.type },
+    })
     return created
   }, [memoryDeps, reloadFromStore])
 
@@ -73,12 +79,24 @@ export function SignalEngineProvider({ children }: { children: React.ReactNode }
   const processSignalById = useCallback((id: string) => {
     const result = processSignal(id, memoryDeps)
     reloadFromStore()
+    if (result) {
+      void publishEvent({
+        type: 'SignalProcessed',
+        source: 'signal-engine',
+        payload: { signalId: result.id, title: result.title },
+      })
+    }
     return result
   }, [memoryDeps, reloadFromStore])
 
   const ingestFromCapture = useCallback((capture: Parameters<typeof createSignalFromCapture>[0]) => {
     const created = createSignalFromCapture(capture, memoryDeps)
     reloadFromStore()
+    void publishEvent({
+      type: 'SignalCreated',
+      source: 'signal-engine',
+      payload: { signalId: created.id, title: created.title, fromCapture: true },
+    })
     return created
   }, [memoryDeps, reloadFromStore])
 

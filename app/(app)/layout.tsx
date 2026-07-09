@@ -9,7 +9,9 @@ import { MorningExecutionProvider } from '@/contexts/MorningExecutionContext'
 import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
 import { SignalEngineProvider } from '@/contexts/SignalEngineContext'
 import { SyncEngineProvider } from '@/contexts/SyncEngineContext'
+import { FounderKernelProvider } from '@/contexts/FounderKernelContext'
 import { UniversalCaptureProvider } from '@/contexts/UniversalCaptureContext'
+import KernelSubscriberBootstrap from '@/components/kernel/KernelSubscriberBootstrap'
 import CommandBarProvider from '@/components/command/CommandBarProvider'
 import Sidebar from '@/components/layout/Sidebar'
 import TopBar from '@/components/layout/TopBar'
@@ -27,10 +29,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <KnowledgeEngineProvider>
             <ExecutiveEngineProvider>
               <SignalEngineProvider>
+              <FounderKernelProvider>
               <SyncEngineProvider>
               <MorningExecutionProvider>
                 <EveningReviewProvider>
                   <UniversalCaptureProvider>
+                    <KernelSubscriberBootstrap />
                     <CommandBarProvider>
                       <div className="flex h-screen overflow-hidden bg-zinc-50">
                         <Sidebar userEmail={user.email} />
@@ -46,6 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </EveningReviewProvider>
               </MorningExecutionProvider>
               </SyncEngineProvider>
+              </FounderKernelProvider>
               </SignalEngineProvider>
             </ExecutiveEngineProvider>
           </KnowledgeEngineProvider>

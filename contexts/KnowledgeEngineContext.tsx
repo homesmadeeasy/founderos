@@ -4,6 +4,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
+import { publishEvent } from '@/lib/founder-kernel/publishEvent'
 import type {
   CreateKnowledgeInput,
   KnowledgeDomain,
@@ -77,6 +78,11 @@ export function KnowledgeEngineProvider({ children }: { children: React.ReactNod
   const createKnowledge = useCallback((input: CreateKnowledgeInput) => {
     const created = storageCreate(input)
     refresh()
+    void publishEvent({
+      type: 'KnowledgeCreated',
+      source: 'knowledge-engine',
+      payload: { knowledgeId: created.id, title: created.title, domain: created.domain },
+    })
     return created
   }, [refresh])
 

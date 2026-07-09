@@ -3,6 +3,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react'
+import { publishEvent } from '@/lib/founder-kernel/publishEvent'
 import type { CreateMemoryInput, LifeArea, MemoryImportance, MemoryRecord, MemoryType, UpdateMemoryInput } from '@/lib/memory-engine/memoryTypes'
 import {
   createMemory as storageCreate,
@@ -72,12 +73,22 @@ export function MemoryEngineProvider({ children }: { children: React.ReactNode }
     if (dedupeKey && hasRecentMemory(dedupeKey, 8000)) return null
     const created = storageCreate(input)
     refresh()
+    void publishEvent({
+      type: 'MemoryCreated',
+      source: 'memory-engine',
+      payload: { memoryId: created.id, title: created.title, type: created.type },
+    })
     return created
   }, [refresh])
 
   const createMemory = useCallback((input: CreateMemoryInput): MemoryRecord => {
     const created = storageCreate(input)
     refresh()
+    void publishEvent({
+      type: 'MemoryCreated',
+      source: 'memory-engine',
+      payload: { memoryId: created.id, title: created.title, type: created.type },
+    })
     return created
   }, [refresh])
 

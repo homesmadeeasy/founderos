@@ -30,6 +30,7 @@ import type { EnergyLevel, EveningReview } from '@/lib/evening-review/eveningTyp
 import { todayISO } from '@/lib/evening-review/eveningUtils'
 import type { KnowledgeSuggestion } from '@/lib/knowledge-engine/knowledgeTypes'
 import { buildOutcomeCompletionPayload, getPredictionForDate } from '@/lib/outcome-engine/outcomeEngine'
+import { publishEvent } from '@/lib/founder-kernel/publishEvent'
 import { processSignal } from '@/lib/signal-engine/signalPipeline'
 import { getSignalById } from '@/lib/signal-engine/signalStorage'
 
@@ -280,6 +281,34 @@ export function EveningReviewProvider({ children }: { children: React.ReactNode 
     }
     persistReview(completed, loop)
     setTick(t => t + 1)
+
+    if (
+      eveningReview.outcomePredictionId
+      && eveningReview.outcomeCompleted
+      && eveningReview.outcomeQuality
+    ) {
+      void publishEvent({
+        type: 'OutcomeRecorded',
+        source: 'evening-review',
+        payload: {
+          predictionId: eveningReview.outcomePredictionId,
+          completed: eveningReview.outcomeCompleted,
+          quality: eveningReview.outcomeQuality,
+          date: completed.date,
+        },
+      })
+    }
+
+    void publishEvent({
+      type: 'EveningCompleted',
+      source: 'evening-review',
+      payload: {
+        reviewId: completed.id,
+        date: completed.date,
+        memoryIds: completed.generatedMemories,
+        knowledgeIds: completed.suggestedKnowledgeIds,
+      },
+    })
   }, [
     eveningReview, morningPlan, objects, memories, knowledge, executive,
     recordMemory, persistReview, saveKnowledgeSuggestion,

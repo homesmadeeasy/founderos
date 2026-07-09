@@ -15,6 +15,7 @@ import { useEveningReview } from '@/contexts/EveningReviewContext'
 import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import { useSyncEngine } from '@/contexts/SyncEngineContext'
+import { publishEvent } from '@/lib/founder-kernel/publishEvent'
 import type { CaptureAssistantSnapshot, ExecutiveAssistantSnapshot, EveningAssistantSnapshot, MorningAssistantSnapshot, SignalAssistantSnapshot, SyncAssistantSnapshot } from '@/lib/command-center/assistantLogic'
 import { getOutcomeStats, getYesterdayOutcome } from '@/lib/outcome-engine/outcomeEngine'
 import { isSyncableStatus } from '@/lib/source-adapters/adapterRegistry'
@@ -199,6 +200,12 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
   const askAssistant = useCallback(async (prompt: string) => {
     const trimmed = prompt.trim()
     if (!trimmed) return
+
+    void publishEvent({
+      type: 'UserAskedQuestion',
+      source: 'assistant',
+      payload: { question: trimmed.slice(0, 200) },
+    })
 
     const normalized = trimmed.toLowerCase()
     const shouldSyncAll = ['sync my signal', 'sync signals', 'sync sources', 'run sync']
