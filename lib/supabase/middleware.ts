@@ -9,7 +9,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that require a logged-in user.
-const PROTECTED_PREFIXES = ['/dashboard', '/inbox', '/signals', '/morning', '/evening', '/objects', '/memory', '/knowledge', '/executive', '/projects', '/goals', '/ideas', '/review', '/weekly-review', '/patterns', '/settings', '/onboarding', '/memory-search']
+const PROTECTED_PREFIXES = ['/home', '/dashboard', '/domains', '/inbox', '/signals', '/morning', '/evening', '/objects', '/memory', '/knowledge', '/executive', '/projects', '/goals', '/ideas', '/review', '/weekly-review', '/patterns', '/settings', '/onboarding', '/memory-search']
 
 // Auth routes a logged-in user shouldn't see.
 const AUTH_ROUTES = ['/login', '/signup']
@@ -53,10 +53,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Logged in + visiting login/signup → send to /dashboard
+  // Logged in + visiting login/signup → send to /home
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = '/home'
     url.search = ''
     return NextResponse.redirect(url)
   }
@@ -78,7 +78,7 @@ export async function updateSession(request: NextRequest) {
       }
       if (profile.onboarding_completed && pathname === '/onboarding') {
         const url = request.nextUrl.clone()
-        url.pathname = '/dashboard'
+        url.pathname = '/home'
         url.search = ''
         return NextResponse.redirect(url)
       }

@@ -3,6 +3,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react'
+import { useRouter } from 'next/navigation'
 import { generateDailyBriefing } from '@/lib/command-center/briefingLogic'
 import { generateAssistantResponse } from '@/lib/command-center/assistantLogic'
 import { loadCommandCenterState, saveCommandCenterState } from '@/lib/command-center/storage'
@@ -57,6 +58,7 @@ function persist(state: CommandCenterState): CommandCenterState {
 }
 
 export function CommandCenterProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
   const [state, setState] = useState<CommandCenterState | null>(null)
   const objectEngine = useObjectEngine()
   const memoryEngine = useMemoryEngine()
@@ -208,6 +210,10 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
     })
 
     const normalized = trimmed.toLowerCase()
+    const shouldGoHome = ['go home', 'open home', 'take me home'].some(k => normalized.includes(k))
+    if (shouldGoHome) {
+      router.push('/home')
+    }
     const shouldSyncAll = ['sync my signal', 'sync signals', 'sync sources', 'run sync']
       .some(k => normalized.includes(k))
     const shouldSyncCalendar = ['sync my calendar', 'sync calendar']
@@ -285,7 +291,7 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
       const assistantMsg: CCAIMessage = { id: newId(), role: 'assistant', content: reply, createdAt: nowISO() }
       return persist({ ...withUser, aiMessages: [...withUser.aiMessages, assistantMsg] })
     })
-  }, [objectEngine.objects, memoryEngine.memories, executiveEngine, knowledgeEngine.knowledge, morningExecution, eveningReview, universalCapture, signalEngine, syncEngine])
+  }, [objectEngine.objects, memoryEngine.memories, executiveEngine, knowledgeEngine.knowledge, morningExecution, eveningReview, universalCapture, signalEngine, syncEngine, router])
 
   const clearAssistant = useCallback(() => {
     update(s => ({ ...s, aiMessages: [] }))

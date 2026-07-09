@@ -12,7 +12,7 @@ export default function KernelDebugPage() {
     <div className="min-h-full bg-zinc-50/80">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
         <header>
-          <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 mb-3">
+          <Link href="/home" className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800 mb-3">
             <ArrowLeft size={12} /> Dashboard
           </Link>
           <h1 className="text-2xl font-bold text-zinc-900 flex items-center gap-2">

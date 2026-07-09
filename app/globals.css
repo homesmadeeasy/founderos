@@ -24,3 +24,79 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out both;
+}
+
+@keyframes subtle-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.animate-subtle-float {
+  animation: subtle-float 4s ease-in-out infinite;
+}
+
+/* ─── Home page surface ───────────────────────────────────────────────────── */
+
+.home-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100%;
+  background: linear-gradient(
+    165deg,
+    #eef4ff 0%,
+    #f8faff 28%,
+    #ffffff 55%,
+    #f5f3ff 100%
+  );
+}
+
+.home-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% -5%, rgba(99, 102, 241, 0.12), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 85% 8%, rgba(139, 92, 246, 0.08), transparent 50%),
+    radial-gradient(ellipse 40% 30% at 50% 100%, rgba(59, 130, 246, 0.06), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-canvas {
+  position: relative;
+  z-index: 1;
+}
+
+.home-grid {
+  display: grid;
+  gap: 0.875rem;
+}
+
+@media (min-width: 1024px) {
+  .home-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

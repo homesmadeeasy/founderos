@@ -4,18 +4,11 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
-  LayoutDashboard,
-  Inbox,
-  Radio,
+  Home,
   Sun,
   Moon,
   Zap,
-  FolderKanban,
-  Target,
-  Lightbulb,
-  CalendarCheck2,
-  GitBranch,
-  Brain,
+  LayoutGrid,
   Boxes,
   History,
   BookOpen,
@@ -30,22 +23,15 @@ import { useCommandBar, commandShortcutLabel } from '@/components/command/Comman
 import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 
 const nav = [
-  { label: 'Command Center', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Inbox', href: '/inbox', icon: Inbox },
-  { label: 'Signals', href: '/signals', icon: Radio },
-  { label: 'Morning Execution', href: '/morning', icon: Sun },
-  { label: 'Evening Review', href: '/evening', icon: Moon },
-  { label: 'Object Engine', href: '/objects', icon: Boxes },
-  { label: 'Memory Engine', href: '/memory', icon: History },
-  { label: 'Knowledge Engine', href: '/knowledge', icon: BookOpen },
-  { label: 'Executive Engine', href: '/executive', icon: Crown },
-  { label: 'Goals', href: '/goals', icon: Target },
-  { label: 'Worlds',  href: '/projects',  icon: FolderKanban },
-  { label: 'Idea Vault', href: '/ideas',    icon: Lightbulb },
-  { label: 'Weekly Review', href: '/weekly-review', icon: CalendarCheck2 },
-  { label: 'Patterns', href: '/patterns', icon: GitBranch },
-  { label: 'Memory Search', href: '/memory-search', icon: Brain },
-  { label: 'Settings', href: '/settings',   icon: Settings },
+  { label: 'Home', href: '/home', icon: Home },
+  { label: 'Morning', href: '/morning', icon: Sun },
+  { label: 'Evening', href: '/evening', icon: Moon },
+  { label: 'Domains', href: '/domains', icon: LayoutGrid },
+  { label: 'Objects', href: '/objects', icon: Boxes },
+  { label: 'Memory', href: '/memory', icon: History },
+  { label: 'Knowledge', href: '/knowledge', icon: BookOpen },
+  { label: 'Executive', href: '/executive', icon: Crown },
+  { label: 'Settings', href: '/settings', icon: Settings },
 ]
 
 export default function Sidebar({ userEmail }: { userEmail?: string }) {
@@ -54,6 +40,7 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
   const { openCommandBar } = useCommandBar()
   const { openCapture, unprocessedCount } = useUniversalCapture()
   const [loggingOut, setLoggingOut] = useState(false)
+  const isHome = pathname === '/home' || pathname.startsWith('/home/')
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -66,49 +53,51 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
   const initial = (userEmail?.[0] ?? 'Y').toUpperCase()
 
   return (
-    <aside className="w-56 shrink-0 flex flex-col h-screen sticky top-0 bg-white border-r border-zinc-200">
+    <aside className={[
+      'w-[168px] shrink-0 flex flex-col h-screen sticky top-0 border-r transition-colors',
+      isHome
+        ? 'bg-white/70 backdrop-blur-xl border-indigo-100/60'
+        : 'bg-white border-zinc-200',
+    ].join(' ')}>
       {/* Logo */}
-      <div className="h-14 px-5 flex items-center border-b border-zinc-100">
-        <span className="text-sm font-bold tracking-tight text-zinc-900">FounderOS</span>
+      <div className="h-11 px-3.5 flex items-center border-b border-zinc-100/80">
+        <span className="text-xs font-bold tracking-tight text-zinc-900">FounderOS</span>
       </div>
 
       {/* Command */}
-      <div className="px-2 pt-3 pb-1">
+      <div className="px-1.5 pt-2 pb-0.5">
         <button
           type="button"
           onClick={openCommandBar}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50 border border-zinc-200 transition-colors"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-800 hover:bg-white/80 border border-zinc-200/60 transition-colors"
         >
-          <Command size={15} strokeWidth={1.8} />
+          <Command size={13} strokeWidth={1.8} />
           <span className="flex-1 text-left">Command</span>
-          <kbd className="text-[10px] font-medium text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
+          <kbd className="text-[9px] font-medium text-zinc-400 bg-zinc-100/80 rounded px-1 py-0.5">
             {commandShortcutLabel()}
           </kbd>
         </button>
       </div>
 
       {/* Capture */}
-      <div className="px-2 pb-1">
+      <div className="px-1.5 pb-0.5">
         <button
           type="button"
           onClick={openCapture}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-amber-700 hover:text-amber-900 hover:bg-amber-50 border border-amber-200/80 transition-colors"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-700 hover:text-amber-900 hover:bg-amber-50/70 border border-amber-200/50 transition-colors"
         >
-          <Zap size={15} strokeWidth={1.8} />
+          <Zap size={13} strokeWidth={1.8} />
           <span className="flex-1 text-left">Capture</span>
           {unprocessedCount > 0 && (
-            <span className="text-[10px] font-semibold bg-amber-100 text-amber-800 rounded-full px-1.5">
+            <span className="text-[9px] font-semibold bg-amber-100 text-amber-800 rounded-full px-1">
               {unprocessedCount}
             </span>
           )}
-          <kbd className="text-[10px] font-medium text-zinc-400 bg-zinc-100 rounded px-1.5 py-0.5">
-            {commandShortcutLabel()}
-          </kbd>
         </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto py-2 px-1.5 space-y-0.5">
         {nav.map(({ label, href, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
           return (
@@ -116,13 +105,15 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
               key={href}
               href={href}
               className={[
-                'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                'flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
                 active
-                  ? 'bg-zinc-100 text-zinc-900'
-                  : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50',
+                  ? isHome
+                    ? 'bg-indigo-50/90 text-indigo-900 shadow-[0_1px_4px_rgba(99,102,241,0.08)]'
+                    : 'bg-zinc-100 text-zinc-900'
+                  : 'text-zinc-500 hover:text-zinc-800 hover:bg-white/60',
               ].join(' ')}
             >
-              <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
+              <Icon size={14} strokeWidth={active ? 2.2 : 1.8} />
               {label}
             </Link>
           )
@@ -130,30 +121,30 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
         <Link
           href="/how-it-works"
           target="_blank"
-          className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50 transition-colors"
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-800 hover:bg-white/60 transition-colors"
         >
-          <HelpCircle size={15} strokeWidth={1.8} />
+          <HelpCircle size={14} strokeWidth={1.8} />
           How it works
         </Link>
       </nav>
 
       {/* User */}
-      <div className="px-3 py-3 border-t border-zinc-100">
-        <div className="flex items-center gap-2.5 px-1 mb-2">
-          <div className="w-7 h-7 rounded-full bg-zinc-900 flex items-center justify-center text-xs font-semibold text-white select-none shrink-0">
+      <div className="px-2 py-2 border-t border-zinc-100/80">
+        <div className="flex items-center gap-2 px-0.5 mb-1.5">
+          <div className="w-6 h-6 rounded-full bg-zinc-900 flex items-center justify-center text-[10px] font-semibold text-white select-none shrink-0">
             {initial}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-800 truncate">{userEmail ?? 'You'}</p>
-            <p className="text-xs text-zinc-400 truncate">Free plan</p>
+            <p className="text-[10px] font-medium text-zinc-800 truncate">{userEmail ?? 'You'}</p>
+            <p className="text-[9px] text-zinc-400 truncate">Free plan</p>
           </div>
         </div>
         <button
           onClick={handleLogout}
           disabled={loggingOut}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50 transition-colors disabled:opacity-50"
+          className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-800 hover:bg-white/60 transition-colors disabled:opacity-50"
         >
-          <LogOut size={15} strokeWidth={1.8} />
+          <LogOut size={13} strokeWidth={1.8} />
           {loggingOut ? 'Signing out…' : 'Log out'}
         </button>
       </div>

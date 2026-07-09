@@ -30,7 +30,7 @@ export default function OnboardingFlow() {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || 'Could not complete onboarding.')
       }
-      router.push('/dashboard')
+      router.push('/home')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -165,7 +165,7 @@ export default function OnboardingFlow() {
                   className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-700 disabled:opacity-50"
                 >
                   {completing ? <Loader2 size={14} className="animate-spin" /> : null}
-                  Go to dashboard
+                  Go to Home
                   {!completing && <ArrowRight size={14} />}
                 </button>
               ) : (

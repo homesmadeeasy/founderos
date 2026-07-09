@@ -1,12 +1,18 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
 import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 import { Bell, Command, Zap } from 'lucide-react'
 import { useCommandBar, commandShortcutLabel } from '@/components/command/CommandBarProvider'
 
 export default function TopBar() {
+  const pathname = usePathname()
   const { openCommandBar } = useCommandBar()
   const { openCapture, unprocessedCount } = useUniversalCapture()
+
+  if (pathname === '/home' || pathname.startsWith('/home/')) {
+    return null
+  }
 
   return (
     <header className="h-14 shrink-0 bg-white border-b border-zinc-200 px-6 flex items-center justify-between gap-3">

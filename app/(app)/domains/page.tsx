@@ -87,7 +87,7 @@ export default function DomainsPage() {
         <p className="text-xs text-zinc-400">
           <Link href="/morning" className="text-violet-700 hover:underline">Back to Morning</Link>
           {' · '}
-          <Link href="/dashboard" className="text-violet-700 hover:underline">Dashboard</Link>
+          <Link href="/home" className="text-violet-700 hover:underline">Home</Link>
         </p>
       </div>
     </div>

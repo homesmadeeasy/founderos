@@ -13,7 +13,7 @@ const inputCls = 'w-full px-3 py-2.5 text-sm border border-zinc-200 rounded-lg o
 export default function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter()
   const search = useSearchParams()
-  const redirectTo = search.get('redirect') || '/dashboard'
+  const redirectTo = search.get('redirect') || '/home'
 
   const [fullName, setFullName] = useState('')
   const [email, setEmail]       = useState('')

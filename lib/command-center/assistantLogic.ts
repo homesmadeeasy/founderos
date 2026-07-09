@@ -48,6 +48,12 @@ import {
 } from '@/lib/founder-kernel/kernelSummaries'
 import { formatSignalTimestamp, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
 import { tomorrowISO } from '@/lib/signal-engine/signalUtils'
+import {
+  generateHomeNarrative,
+  computeDailySuccessProbability,
+  computeRecoveryScore,
+} from '@/lib/home/homeUtils'
+import { buildTodayTimeline } from '@/lib/home/homeTimeline'
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
   reasoningOutput: DailyReasoningOutput | null
@@ -142,7 +148,7 @@ function formatMorningPlanResponse(morning: MorningAssistantSnapshot): string {
 
 function formatDecisionResponse(decision?: DecisionOutput | null, mode: 'full' | 'ignore' | 'why' | 'tradeoff' = 'full'): string {
   if (!decision) {
-    return 'Decision Engine needs more context. Open **/morning** or **/dashboard** after your morning plan compiles, then ask again.'
+    return 'Decision Engine needs more context. Open **/morning** or **/home** after your morning plan compiles, then ask again.'
   }
 
   if (mode === 'ignore') {
@@ -340,7 +346,95 @@ function googleCalendarStatusMessage(sync?: SyncAssistantSnapshot | null): strin
   return '**Google Calendar** live sync is prepared but not connected. Connect mock calendar or add a manual token in **/settings**.'
 }
 
+function formatWhatMattersResponse(ctx: AssistantContext): string {
+  const { commandCenter: s, morning, signals } = ctx
+  const today = todayISO()
+  const log = s.dailyLogs.find(l => l.date === today)
+  const health = {
+    sleepHours: log?.sleepHours,
+    workoutCompleted: log?.workoutCompleted,
+  }
+
+  const narrative = generateHomeNarrative({
+    health,
+    coordinator: morning?.domainIntelligence?.coordinator,
+    decision: morning?.decisionOutput,
+    morningPlan: morning?.morningPlan,
+  })
+
+  const lines = [narrative]
+  const mission = s.missionDate === today ? s.mission.trim() : morning?.morningPlan?.primaryMission
+  if (mission) lines.unshift(`**Mission:** ${mission}`)
+
+  if (morning?.decisionOutput) {
+    const d = morning.decisionOutput
+    lines.push(`**Today's decision:** ${d.primaryDecision.action} (${d.confidence}% confidence)`)
+  }
+
+  const recovery = computeRecoveryScore(health)
+  const success = computeDailySuccessProbability(morning?.decisionOutput, morning?.outcomeStats)
+  lines.push(`Recovery ${recovery} · Success probability ${success}%`)
+
+  const topSignals = (signals?.todaySignals ?? []).slice(0, 3)
+  if (topSignals.length > 0) {
+    lines.push(`**Signals:**\n${topSignals.map(sig => `• ${sig.title}`).join('\n')}`)
+  }
+
+  lines.push('Full view: **/home**')
+  return lines.join('\n\n')
+}
+
+function formatSummariseTodayResponse(ctx: AssistantContext): string {
+  const { commandCenter: s, morning, signals, memories } = ctx
+  const today = todayISO()
+  const log = s.dailyLogs.find(l => l.date === today)
+  const lines: string[] = ['**Today at a glance**']
+
+  const mission = s.missionDate === today ? s.mission.trim() : morning?.morningPlan?.primaryMission
+  if (mission) lines.push(`Mission: ${mission}`)
+
+  const narrative = generateHomeNarrative({
+    health: {
+      sleepHours: log?.sleepHours,
+      workoutCompleted: log?.workoutCompleted,
+    },
+    coordinator: morning?.domainIntelligence?.coordinator,
+    decision: morning?.decisionOutput,
+    morningPlan: morning?.morningPlan,
+  })
+  lines.push(narrative)
+
+  const timeline = buildTodayTimeline({
+    signals: signals?.todaySignals ?? [],
+    morningPlan: morning?.morningPlan,
+    decision: morning?.decisionOutput,
+  })
+  if (timeline.length > 0) {
+    lines.push(`**Timeline:**\n${timeline.slice(0, 5).map(t => `• ${t.time} — ${t.title}`).join('\n')}`)
+  }
+
+  const todayMemories = memories.filter(m => m.occurredAt.slice(0, 10) === today).slice(0, 3)
+  if (todayMemories.length > 0) {
+    lines.push(`**Learning:**\n${todayMemories.map(m => `• ${m.title}`).join('\n')}`)
+  }
+
+  lines.push('Open **/home** for the full experience.')
+  return lines.join('\n\n')
+}
+
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['go home', 'open home', 'take me home'],
+    handler: () => 'Taking you to **Home** — your daily command surface.',
+  },
+  {
+    keywords: ['what matters', 'what matters right now', 'what matters today'],
+    handler: formatWhatMattersResponse,
+  },
+  {
+    keywords: ['summarise today', 'summarize today', 'summary of today', 'summarise my day', 'summarize my day'],
+    handler: formatSummariseTodayResponse,
+  },
   {
     keywords: ['what happened today', 'happened today', 'kernel activity today'],
     handler: () => formatTodayKernelEvents(),
@@ -1192,9 +1286,9 @@ export async function fetchAssistantResponse(
 }
 
 export const SUGGESTED_PROMPTS = [
+  'What matters right now?',
+  'Summarise today',
   'What should I focus on today?',
   'What do you remember?',
-  'What decisions have I made?',
-  'What happened recently?',
-  'Why did we choose object-first?',
+  'What changed?',
 ] as const
