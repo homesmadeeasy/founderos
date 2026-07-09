@@ -3,7 +3,7 @@
 import { CommandCenterProvider } from '@/contexts/CommandCenterContext'
 import HomeHero from '@/components/home/HomeHero'
 import MissionCard from '@/components/home/MissionCard'
-import NarrativeCard from '@/components/home/NarrativeCard'
+import FounderConversationPrompt from '@/components/home/FounderConversationPrompt'
 import TimelineCard from '@/components/home/TimelineCard'
 import FocusCard from '@/components/home/FocusCard'
 import DomainSnapshot from '@/components/home/DomainSnapshot'
@@ -23,7 +23,7 @@ function HomeContent() {
         {/* Mission + Briefing */}
         <div className="home-grid home-grid-2 mt-4">
           <MissionCard />
-          <NarrativeCard />
+          <FounderConversationPrompt />
         </div>
 
         {/* Today + Focus with dock floating between rows */}

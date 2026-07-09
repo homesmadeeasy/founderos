@@ -10,6 +10,7 @@ import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
 import { SignalEngineProvider } from '@/contexts/SignalEngineContext'
 import { SyncEngineProvider } from '@/contexts/SyncEngineContext'
 import { FounderKernelProvider } from '@/contexts/FounderKernelContext'
+import { ConversationProvider } from '@/contexts/ConversationContext'
 import { UniversalCaptureProvider } from '@/contexts/UniversalCaptureContext'
 import KernelSubscriberBootstrap from '@/components/kernel/KernelSubscriberBootstrap'
 import CommandBarProvider from '@/components/command/CommandBarProvider'
@@ -29,28 +30,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <KnowledgeEngineProvider>
             <ExecutiveEngineProvider>
               <SignalEngineProvider>
-              <FounderKernelProvider>
-              <SyncEngineProvider>
-              <MorningExecutionProvider>
-                <EveningReviewProvider>
+                <SyncEngineProvider>
                   <UniversalCaptureProvider>
-                    <KernelSubscriberBootstrap />
-                    <CommandBarProvider>
-                      <div className="flex h-screen overflow-hidden bg-zinc-50">
-                        <Sidebar userEmail={user.email} />
-                        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-                          <TopBar />
-                          <main className="flex-1 overflow-y-auto">
-                            {children}
-                          </main>
-                        </div>
-                      </div>
-                    </CommandBarProvider>
+                    <FounderKernelProvider>
+                      <MorningExecutionProvider>
+                        <EveningReviewProvider>
+                          <ConversationProvider>
+                            <CommandBarProvider>
+                              <KernelSubscriberBootstrap />
+                              <div className="flex h-screen overflow-hidden bg-zinc-50">
+                                <Sidebar userEmail={user.email} />
+                                <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+                                  <TopBar />
+                                  <main className="flex-1 overflow-y-auto">
+                                    {children}
+                                  </main>
+                                </div>
+                              </div>
+                            </CommandBarProvider>
+                          </ConversationProvider>
+                        </EveningReviewProvider>
+                      </MorningExecutionProvider>
+                    </FounderKernelProvider>
                   </UniversalCaptureProvider>
-                </EveningReviewProvider>
-              </MorningExecutionProvider>
-              </SyncEngineProvider>
-              </FounderKernelProvider>
+                </SyncEngineProvider>
               </SignalEngineProvider>
             </ExecutiveEngineProvider>
           </KnowledgeEngineProvider>

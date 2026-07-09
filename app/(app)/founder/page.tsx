@@ -1,45 +1,23 @@
 'use client'
 
-import FounderHero from '@/components/founder/FounderHero'
-import FounderNarrative from '@/components/founder/FounderNarrative'
-import FounderHealthCard from '@/components/founder/FounderHealthCard'
-import FounderBottleneckCard from '@/components/founder/FounderBottleneckCard'
-import FounderSprintCard from '@/components/founder/FounderSprintCard'
-import FounderRisksCard from '@/components/founder/FounderRisksCard'
-import FounderEvidenceCard from '@/components/founder/FounderEvidenceCard'
-import FounderQuestionsCard from '@/components/founder/FounderQuestionsCard'
-import FounderRoadmapCard from '@/components/founder/FounderRoadmapCard'
+import ConversationHeader from '@/components/conversation/ConversationHeader'
+import ConversationChat from '@/components/conversation/ConversationChat'
+import ConversationSidebar from '@/components/conversation/ConversationSidebar'
 import { useFounderSnapshot } from '@/components/founder/useFounderSnapshot'
+import { useConversation } from '@/contexts/ConversationContext'
 
 export default function FounderPage() {
   const snapshot = useFounderSnapshot()
+  const { session } = useConversation()
 
   return (
     <div className="home-page">
-      <div className="home-canvas max-w-[860px] mx-auto px-4 sm:px-5 py-4 sm:py-5 pb-16">
-        <FounderHero snapshot={snapshot} />
+      <div className="home-canvas max-w-[1120px] mx-auto px-4 sm:px-5 py-5 sm:py-6 pb-20">
+        <ConversationHeader snapshot={snapshot} />
 
-        <div className="mt-4">
-          <FounderNarrative snapshot={snapshot} />
-        </div>
-
-        <div className="mt-4">
-          <FounderHealthCard snapshot={snapshot} />
-        </div>
-
-        <div className="home-grid home-grid-2 mt-4">
-          <FounderBottleneckCard snapshot={snapshot} />
-          <FounderSprintCard snapshot={snapshot} />
-        </div>
-
-        <div className="home-grid home-grid-2 mt-3.5">
-          <FounderRisksCard snapshot={snapshot} />
-          <FounderEvidenceCard snapshot={snapshot} />
-        </div>
-
-        <div className="home-grid home-grid-2 mt-3.5">
-          <FounderQuestionsCard snapshot={snapshot} />
-          <FounderRoadmapCard snapshot={snapshot} />
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+          <ConversationChat />
+          <ConversationSidebar session={session} />
         </div>
       </div>
     </div>

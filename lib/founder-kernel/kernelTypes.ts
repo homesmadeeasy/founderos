@@ -21,6 +21,14 @@ export type FounderEventType =
   | 'StudyCompleted'
   | 'UserAskedQuestion'
   | 'UserReflectionAdded'
+  | 'ConversationStarted'
+  | 'ConversationAnswered'
+  | 'ConversationFinished'
+  | 'ConversationAbandoned'
+  | 'ConversationSummaryCreated'
+  | 'ConversationMemoryCreated'
+  | 'ConversationKnowledgeSuggested'
+  | 'ConversationDecisionUpdated'
 
 export type FounderEventStatus =
   | 'created'
