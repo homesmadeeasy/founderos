@@ -8,6 +8,7 @@ import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import {
   ADAPTER_CARDS,
   connectMockAdapter,
+  connectGoogleCalendarManual,
   disconnectAdapter,
   getAdapterConnections,
   type AdapterId,
@@ -32,6 +33,7 @@ interface SyncEngineContextValue {
   lastGlobalSyncLabel: string
   syncing: boolean
   connectMock: (adapterId: string) => void
+  connectGoogleCalendar: (token: string) => void
   disconnect: (adapterId: string) => void
   syncNow: (adapterId: string) => Promise<SyncResult>
   syncAll: () => Promise<SyncResult[]>
@@ -68,6 +70,11 @@ export function SyncEngineProvider({ children }: { children: React.ReactNode }) 
 
   const connectMock = useCallback((adapterId: string) => {
     connectMockAdapter(adapterId)
+    reloadFromStore()
+  }, [reloadFromStore])
+
+  const connectGoogleCalendar = useCallback((token: string) => {
+    connectGoogleCalendarManual(token)
     reloadFromStore()
   }, [reloadFromStore])
 
@@ -121,6 +128,7 @@ export function SyncEngineProvider({ children }: { children: React.ReactNode }) 
     lastGlobalSyncLabel: formatSignalTimestamp(lastGlobalSyncAt),
     syncing,
     connectMock,
+    connectGoogleCalendar,
     disconnect,
     syncNow,
     syncAll,
@@ -128,7 +136,7 @@ export function SyncEngineProvider({ children }: { children: React.ReactNode }) 
     refresh: reloadFromStore,
   }), [
     ready, adapters, syncHistory, lastGlobalSyncAt, syncing,
-    connectMock, disconnect, syncNow, syncAll, scheduleMockSyncFn, reloadFromStore,
+    connectMock, connectGoogleCalendar, disconnect, syncNow, syncAll, scheduleMockSyncFn, reloadFromStore,
   ])
 
   return (

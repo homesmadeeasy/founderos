@@ -13,9 +13,12 @@ export interface SourceAdapter {
   testConnection(): Promise<boolean>
 }
 
+export type AdapterConnectionMode = 'mock' | 'manual_token' | 'oauth'
+
 export interface AdapterConnectionState {
   adapterId: string
   status: AdapterStatus
+  connectionMode?: AdapterConnectionMode
   lastSyncedAt?: string
   errorMessage?: string
 }

@@ -12,7 +12,7 @@ import {
   type SignalSource,
   type SignalType,
 } from '@/lib/signal-engine/signalTypes'
-import { formatSignalTimestamp } from '@/lib/signal-engine/signalFormat'
+import { formatSignalTimestamp, formatCalendarEventTime, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
 
 const inputClass =
   'w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10'
@@ -216,6 +216,15 @@ function SignalRow({
   onSelect: () => void
 }) {
   const synced = signal.metadata?.synced === true
+  const isCalendar = signal.source === 'calendar'
+  const providerLabel = isCalendar ? getCalendarProviderLabel(signal.metadata) : null
+  const eventTime = isCalendar
+    ? formatCalendarEventTime(
+        signal.metadata?.start as string | undefined ?? signal.timestamp,
+        signal.metadata?.end as string | undefined,
+      )
+    : null
+
   return (
     <li>
       <button
@@ -225,10 +234,13 @@ function SignalRow({
       >
         <div className="flex items-start gap-2">
           <span className="text-[10px] font-semibold text-zinc-400 uppercase w-16 shrink-0 pt-0.5">
-            {SIGNAL_SOURCE_LABEL[signal.source]}
+            {isCalendar && providerLabel ? providerLabel : SIGNAL_SOURCE_LABEL[signal.source]}
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-zinc-900 truncate">{signal.title}</p>
+            {eventTime && (
+              <p className="text-[10px] text-sky-600 font-medium">{eventTime}</p>
+            )}
             <p className="text-xs text-zinc-500 truncate">{signal.content}</p>
           </div>
           {synced && (
@@ -244,18 +256,33 @@ function SignalRow({
 }
 
 function SignalDetail({ signal, onProcess }: { signal: Signal; onProcess: () => void }) {
+  const isCalendar = signal.source === 'calendar'
+  const providerLabel = isCalendar ? getCalendarProviderLabel(signal.metadata) : SIGNAL_SOURCE_LABEL[signal.source]
+  const eventTime = isCalendar
+    ? formatCalendarEventTime(
+        signal.metadata?.start as string | undefined ?? signal.timestamp,
+        signal.metadata?.end as string | undefined,
+      )
+    : null
+
   return (
     <div className="space-y-3 text-sm">
       <div>
         <p className="text-[10px] font-semibold text-zinc-400 uppercase">Title</p>
         <p className="font-medium text-zinc-900">{signal.title}</p>
       </div>
+      {eventTime && (
+        <div>
+          <p className="text-[10px] font-semibold text-zinc-400 uppercase">Event time</p>
+          <p className="text-sky-700 font-medium">{eventTime}</p>
+        </div>
+      )}
       <div>
         <p className="text-[10px] font-semibold text-zinc-400 uppercase">Content</p>
         <p className="text-zinc-700">{signal.content}</p>
       </div>
       <dl className="grid grid-cols-2 gap-2 text-xs">
-        <div><dt className="text-zinc-400">Source</dt><dd className="font-medium">{SIGNAL_SOURCE_LABEL[signal.source]}</dd></div>
+        <div><dt className="text-zinc-400">Source</dt><dd className="font-medium">{providerLabel}</dd></div>
         <div><dt className="text-zinc-400">Type</dt><dd className="font-medium">{SIGNAL_TYPE_LABEL[signal.type]}</dd></div>
         <div><dt className="text-zinc-400">Confidence</dt><dd className="font-medium">{signal.confidence}</dd></div>
         <div><dt className="text-zinc-400">Processed</dt><dd className="font-medium">{signal.processed ? 'Yes' : 'No'}</dd></div>

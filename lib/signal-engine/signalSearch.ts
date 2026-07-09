@@ -1,6 +1,6 @@
 import type { Signal, SignalSource, SignalType } from './signalTypes'
 import { getSignals, getRecentSignals, searchSignals as storageSearch } from './signalStorage'
-import { todayISO } from './signalUtils'
+import { todayISO, tomorrowISO } from './signalUtils'
 import { SIGNAL_SOURCE_LABEL, SIGNAL_TYPE_LABEL } from './signalTypes'
 
 export interface SignalSummary {
@@ -62,11 +62,16 @@ export function buildSignalSummary(signals: Signal[] = getSignals()): SignalSumm
 export function buildMorningSignalNotes(signals: Signal[]): string[] {
   const notes: string[] = []
   const today = todayISO()
+  const tomorrow = tomorrowISO()
   const todaySignals = signals.filter(s => s.timestamp.slice(0, 10) === today)
   const recent = signals.filter(s => {
     const age = Date.now() - new Date(s.timestamp).getTime()
     return age < 48 * 60 * 60 * 1000
   })
+
+  const calendarSignals = signals.filter(s => s.source === 'calendar' || s.type === 'event' || s.type === 'reminder')
+  const calendarToday = calendarSignals.filter(s => s.timestamp.slice(0, 10) === today)
+  const calendarTomorrow = calendarSignals.filter(s => s.timestamp.slice(0, 10) === tomorrow)
 
   const sleep = recent.find(s =>
     s.type === 'health' && (s.content.toLowerCase().includes('sleep') || s.metadata?.sleepHours),
@@ -85,9 +90,35 @@ export function buildMorningSignalNotes(signals: Signal[]): string[] {
     }
   }
 
-  const calendarToday = todaySignals.find(s => s.source === 'calendar' || s.type === 'event')
-    ?? recent.find(s => (s.source === 'calendar' || s.type === 'event') && s.content.toLowerCase().includes('today'))
-  if (calendarToday) notes.push(`Calendar: ${calendarToday.title} — ${calendarToday.content}`)
+  if (calendarToday.length > 0) {
+    calendarToday.forEach(ev => {
+      notes.push(`Calendar today: ${ev.title} — ${ev.content}`)
+    })
+  }
+
+  if (calendarTomorrow.length > 0) {
+    calendarTomorrow.forEach(ev => {
+      notes.push(`Upcoming tomorrow: ${ev.title} — plan around this block.`)
+    })
+  }
+
+  const studyBlock = calendarSignals.find(s => {
+    const text = `${s.title} ${s.content}`.toLowerCase()
+    return text.includes('study') || text.includes('class') || text.includes('lecture')
+      || s.metadata?.domain === 'school'
+  })
+  if (studyBlock) {
+    notes.push('School/study priority: study block on calendar — protect focus time.')
+  }
+
+  const gymSession = calendarSignals.find(s => {
+    const text = `${s.title} ${s.content}`.toLowerCase()
+    return text.includes('gym') || text.includes('workout') || text.includes('train')
+      || s.metadata?.workout === true
+  })
+  if (gymSession) {
+    notes.push(`Workout priority: ${gymSession.title} scheduled — fit training into the day.`)
+  }
 
   const coding = todaySignals.find(s => s.type === 'coding_session')
     ?? recent.find(s => s.type === 'coding_session')

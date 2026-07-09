@@ -1,5 +1,6 @@
 import type { AdapterCardConfig, AdapterConnectionState, SourceAdapter } from './adapterTypes'
 import { createCalendarAdapter } from './calendarAdapter'
+import { createGoogleCalendarAdapter } from './googleCalendarAdapter'
 import { createCursorAdapter } from './cursorAdapter'
 import { createEmailAdapter } from './emailAdapter'
 import { createFileAdapter } from './fileAdapter'
@@ -11,9 +12,14 @@ import {
   getAllAdapterStates,
   setAdapterState,
 } from '@/lib/sync-engine/syncStorage'
+import {
+  clearGoogleCalendarToken,
+  hasGoogleCalendarToken,
+  setGoogleCalendarToken,
+} from '@/lib/integrations/google-calendar/tokenStorage'
 
 const ADAPTER_IDS = [
-  'calendar', 'health', 'github', 'cursor', 'email', 'file', 'voice', 'watch',
+  'calendar', 'google-calendar', 'health', 'github', 'cursor', 'email', 'file', 'voice', 'watch',
 ] as const
 
 export type AdapterId = typeof ADAPTER_IDS[number]
@@ -38,6 +44,7 @@ function buildAdapter(
 export function getAllAdapters(): SourceAdapter[] {
   return [
     buildAdapter('calendar', createCalendarAdapter),
+    buildAdapter('google-calendar', createGoogleCalendarAdapter),
     buildAdapter('health', createHealthAdapter),
     buildAdapter('github', createGithubAdapter),
     buildAdapter('cursor', createCursorAdapter),
@@ -53,11 +60,42 @@ export function getAdapter(adapterId: string): SourceAdapter | null {
 }
 
 export function connectMockAdapter(adapterId: string): AdapterConnectionState {
-  return setAdapterState(adapterId, { status: 'mock', errorMessage: undefined })
+  return setAdapterState(adapterId, {
+    status: 'mock',
+    connectionMode: 'mock',
+    errorMessage: undefined,
+  })
+}
+
+export function connectGoogleCalendarManual(token: string): AdapterConnectionState {
+  setGoogleCalendarToken(token)
+  return setAdapterState('google-calendar', {
+    status: 'connected',
+    connectionMode: 'manual_token',
+    errorMessage: undefined,
+  })
 }
 
 export function disconnectAdapter(adapterId: string): AdapterConnectionState {
-  return setAdapterState(adapterId, { status: 'disconnected', errorMessage: undefined })
+  if (adapterId === 'google-calendar') {
+    clearGoogleCalendarToken()
+  }
+  return setAdapterState(adapterId, {
+    status: 'disconnected',
+    connectionMode: undefined,
+    errorMessage: undefined,
+  })
+}
+
+export function isGoogleCalendarConnected(): boolean {
+  const state = getAdapterState('google-calendar')
+  return state?.status === 'connected' && hasGoogleCalendarToken()
+}
+
+export function getGoogleCalendarConnectionMode(): AdapterConnectionState['connectionMode'] | 'none' {
+  const state = getAdapterState('google-calendar')
+  if (!state || state.status === 'disconnected') return 'none'
+  return state.connectionMode ?? 'none'
 }
 
 export function getAdapterConnections(): AdapterConnectionState[] {
@@ -75,8 +113,8 @@ export const ADAPTER_CARDS: AdapterCardConfig[] = [
   {
     id: 'calendar',
     name: 'Calendar',
-    description: 'Study blocks, gym sessions, and deadlines',
-    adapterIds: ['calendar'],
+    description: 'Mock calendar and Google Calendar read-only',
+    adapterIds: ['calendar', 'google-calendar'],
     sources: ['calendar'],
   },
   {

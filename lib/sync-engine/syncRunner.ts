@@ -29,6 +29,25 @@ function hasRecentSyncKey(syncKey: string): boolean {
   })
 }
 
+function hasRecentCalendarDuplicate(input: CreateSignalInput): boolean {
+  if (input.source !== 'calendar') return false
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000
+  const existing = getSignals().filter(s => new Date(s.timestamp).getTime() > cutoff)
+
+  const eventId = input.metadata?.calendarEventId as string | undefined
+  if (eventId) {
+    return existing.some(s => s.metadata?.calendarEventId === eventId)
+  }
+
+  const start = String(input.metadata?.start ?? input.timestamp).slice(0, 16)
+  return existing.some(s => {
+    if (s.source !== 'calendar') return false
+    if (s.title !== input.title) return false
+    const sStart = String(s.metadata?.start ?? s.timestamp).slice(0, 16)
+    return sStart === start
+  })
+}
+
 function ingestSyncSignals(inputs: CreateSignalInput[], deps?: SyncRunnerDeps): { created: number; skipped: number } {
   let created = 0
   let skipped = 0
@@ -37,6 +56,10 @@ function ingestSyncSignals(inputs: CreateSignalInput[], deps?: SyncRunnerDeps): 
   for (const input of inputs) {
     const syncKey = input.metadata?.syncKey as string | undefined
     if (syncKey && hasRecentSyncKey(syncKey)) {
+      skipped += 1
+      continue
+    }
+    if (hasRecentCalendarDuplicate(input)) {
       skipped += 1
       continue
     }

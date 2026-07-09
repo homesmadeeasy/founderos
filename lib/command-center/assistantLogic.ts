@@ -29,8 +29,8 @@ import type { CaptureSignal } from '@/lib/capture-engine/captureTypes'
 import type { Signal } from '@/lib/signal-engine/signalTypes'
 import type { SignalSummary } from '@/lib/signal-engine/signalSearch'
 import type { AdapterConnectionState } from '@/lib/source-adapters/adapterTypes'
-import { formatSignalTimestamp } from '@/lib/signal-engine/signalFormat'
-
+import { formatSignalTimestamp, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
+import { tomorrowISO } from '@/lib/signal-engine/signalUtils'
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
   reasoningOutput: DailyReasoningOutput | null
@@ -211,11 +211,47 @@ function formatExecutiveFocusResponse(executive: ExecutiveAssistantSnapshot): st
   return lines.join('\n\n')
 }
 
+function filterCalendarSignals(signals?: Signal[]): Signal[] {
+  return signals?.filter(s => s.source === 'calendar' || s.type === 'event' || s.type === 'reminder') ?? []
+}
+
+function formatCalendarSignalLine(signal: Signal): string {
+  const provider = getCalendarProviderLabel(signal.metadata)
+  const start = (signal.metadata?.start as string | undefined) ?? signal.timestamp
+  return `• ${formatSignalTimestamp(start)} — ${signal.title} (${provider})`
+}
+
+function googleCalendarStatusMessage(sync?: SyncAssistantSnapshot | null): string {
+  const google = sync?.adapters?.find(a => a.adapterId === 'google-calendar')
+  const mock = sync?.adapters?.find(a => a.adapterId === 'calendar')
+  const mockOn = mock?.status === 'mock'
+  const googleOn = google?.status === 'connected'
+
+  if (googleOn) {
+    const mode = google?.connectionMode === 'manual_token' ? 'manual token mode' : 'connected'
+    return `**Google Calendar** is connected (${mode}). Last sync: ${google?.lastSyncedAt ? formatSignalTimestamp(google.lastSyncedAt) : 'never'}.`
+  }
+  if (mockOn) {
+    return '**Google Calendar** live sync is prepared but not connected. You are using **mock calendar** data. Connect in **/settings** → Connected Sources.'
+  }
+  return '**Google Calendar** live sync is prepared but not connected. Connect mock calendar or add a manual token in **/settings**.'
+}
+
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['sync my calendar', 'sync calendar'],
+    handler: () => {
+      return 'Syncing calendar sources… Check **/signals** for new calendar events.'
+    },
+  },
+  {
+    keywords: ['is google calendar connected', 'google calendar connected', 'google calendar status'],
+    handler: ({ sync }) => googleCalendarStatusMessage(sync),
+  },
   {
     keywords: ['sync my signal', 'sync signals', 'sync sources', 'run sync'],
     handler: () => {
-      return 'Running mock sync for all connected sources… Check **/signals** for new entries and sync history.'
+      return 'Running sync for all connected sources… Check **/signals** for new entries and sync history.'
     },
   },
   {
@@ -242,12 +278,26 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
   },
   {
     keywords: ['what is on my calendar', 'on my calendar', 'my calendar today'],
-    handler: ({ signals }) => {
-      const calendar = signals?.signals?.filter(s => s.source === 'calendar' || s.type === 'event') ?? []
+    handler: ({ signals, sync }) => {
+      const calendar = filterCalendarSignals(signals?.signals)
       if (calendar.length === 0) {
-        return 'No calendar signals. Connect Calendar in Settings, sync, then ask again.'
+        return `${googleCalendarStatusMessage(sync)}\n\nNo calendar signals yet. Connect and sync in **/settings**, then ask again.`
       }
-      return `**Calendar:**\n${calendar.slice(0, 6).map(s => `• ${s.title} — ${s.content}`).join('\n')}`
+      return `**Your calendar:**\n${calendar.slice(0, 8).map(formatCalendarSignalLine).join('\n')}`
+    },
+  },
+  {
+    keywords: ['calendar events matter today', 'events matter today', 'what calendar events matter'],
+    handler: ({ signals, sync }) => {
+      const today = todayISO()
+      const calendar = filterCalendarSignals(signals?.signals).filter(s => {
+        const start = (s.metadata?.start as string | undefined) ?? s.timestamp
+        return start.slice(0, 10) === today
+      })
+      if (calendar.length === 0) {
+        return `No calendar events for today in signals. ${googleCalendarStatusMessage(sync)}`
+      }
+      return `**Today's calendar events:**\n${calendar.map(formatCalendarSignalLine).join('\n')}`
     },
   },
   {
@@ -328,15 +378,40 @@ const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) =>
     },
   },
   {
-    keywords: ['calendar suggest', 'what does my calendar', 'calendar today', 'calendar tomorrow', 'study block'],
-    handler: ({ signals }) => {
-      const calendar = signals?.signals?.filter(s => s.source === 'calendar' || s.type === 'event') ?? []
+    keywords: ['calendar suggest', 'what does my calendar', 'calendar today', 'calendar tomorrow', 'study block', 'do i have study blocks', 'study blocks'],
+    handler: ({ signals, sync }) => {
+      const calendar = filterCalendarSignals(signals?.signals)
       if (calendar.length === 0) {
-        return 'No calendar signals yet. Mock calendar data appears on **/signals** until Google Calendar connects.'
+        return `${googleCalendarStatusMessage(sync)}\n\nNo calendar signals yet.`
       }
-      return `**Calendar signals:**\n${calendar.slice(0, 5).map(s =>
-        `• ${s.title} — ${s.content}`,
-      ).join('\n')}`
+      const today = todayISO()
+      const tomorrow = tomorrowISO()
+      const study = calendar.filter(s => {
+        const text = `${s.title} ${s.content}`.toLowerCase()
+        return text.includes('study') || text.includes('class') || text.includes('lecture')
+          || s.metadata?.domain === 'school'
+      })
+      const todayEvents = calendar.filter(s => {
+        const start = (s.metadata?.start as string | undefined) ?? s.timestamp
+        return start.slice(0, 10) === today
+      })
+      const tomorrowEvents = calendar.filter(s => {
+        const start = (s.metadata?.start as string | undefined) ?? s.timestamp
+        return start.slice(0, 10) === tomorrow
+      })
+      const lines: string[] = ['**Calendar signals**']
+      if (study.length > 0) {
+        lines.push(`**Study blocks (${study.length}):**\n${study.slice(0, 4).map(formatCalendarSignalLine).join('\n')}`)
+      } else {
+        lines.push('No study blocks detected in calendar signals.')
+      }
+      if (todayEvents.length > 0) {
+        lines.push(`**Today:**\n${todayEvents.slice(0, 4).map(formatCalendarSignalLine).join('\n')}`)
+      }
+      if (tomorrowEvents.length > 0) {
+        lines.push(`**Tomorrow:**\n${tomorrowEvents.slice(0, 4).map(formatCalendarSignalLine).join('\n')}`)
+      }
+      return lines.join('\n\n')
     },
   },
   {

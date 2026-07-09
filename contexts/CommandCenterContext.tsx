@@ -200,10 +200,20 @@ export function CommandCenterProvider({ children }: { children: React.ReactNode 
     if (!trimmed) return
 
     const normalized = trimmed.toLowerCase()
-    const shouldSync = ['sync my signal', 'sync signals', 'sync sources', 'run sync']
+    const shouldSyncAll = ['sync my signal', 'sync signals', 'sync sources', 'run sync']
       .some(k => normalized.includes(k))
-    if (shouldSync) {
+    const shouldSyncCalendar = ['sync my calendar', 'sync calendar']
+      .some(k => normalized.includes(k))
+    if (shouldSyncAll) {
       await syncEngine.syncAll()
+    } else if (shouldSyncCalendar) {
+      const calendarIds = ['calendar', 'google-calendar'] as const
+      for (const id of calendarIds) {
+        const adapter = syncEngine.adapters.find(a => a.adapterId === id)
+        if (adapter && (adapter.status === 'mock' || adapter.status === 'connected')) {
+          await syncEngine.syncNow(id)
+        }
+      }
     }
 
     setState(prev => {

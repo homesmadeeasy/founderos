@@ -11,7 +11,8 @@ import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 import UniversalCaptureInput from '@/components/capture/UniversalCaptureInput'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { CAPTURE_CLASSIFICATION_LABEL } from '@/lib/capture-engine/captureTypes'
-import { SIGNAL_SOURCE_LABEL, SIGNAL_TYPE_LABEL } from '@/lib/signal-engine/signalTypes'
+import { SIGNAL_TYPE_LABEL } from '@/lib/signal-engine/signalTypes'
+import { formatCalendarEventTime, getCalendarProviderLabel } from '@/lib/signal-engine/signalFormat'
 import type { EnergyLevel } from '@/lib/evening-review/eveningTypes'
 
 const inputClass =
@@ -193,6 +194,14 @@ export default function EveningPage() {
               {displaySignals.map(s => {
                 const mattered = eveningReview.matteredSignalIds.includes(s.id)
                 const ignored = eveningReview.ignoredSignalIds.includes(s.id)
+                const isCalendar = s.source === 'calendar'
+                const providerLabel = isCalendar ? getCalendarProviderLabel(s.metadata) : s.source
+                const eventTime = isCalendar
+                  ? formatCalendarEventTime(
+                      s.metadata?.start as string | undefined ?? s.timestamp,
+                      s.metadata?.end as string | undefined,
+                    )
+                  : null
                 return (
                   <li key={s.id} className={`flex items-start gap-3 rounded-xl bg-white border p-3 ${ignored ? 'border-zinc-200 opacity-60' : 'border-sky-100'}`}>
                     <div className="flex flex-col gap-1 shrink-0">
@@ -218,10 +227,13 @@ export default function EveningPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-semibold text-zinc-400 uppercase">
-                        {SIGNAL_SOURCE_LABEL[s.source]} · {SIGNAL_TYPE_LABEL[s.type]}
+                        {providerLabel} · {SIGNAL_TYPE_LABEL[s.type]}
                         {s.metadata?.synced ? ' · synced' : ''}
                       </p>
                       <p className="font-medium text-zinc-900">{s.title}</p>
+                      {eventTime && (
+                        <p className="text-[10px] text-sky-600 font-medium">{eventTime}</p>
+                      )}
                       <p className="text-xs text-zinc-500 mt-0.5">{s.content}</p>
                       {s.type === 'idea' && mattered && (
                         <p className="text-[10px] text-indigo-600 mt-1">Idea signal — consider saving as knowledge below.</p>
