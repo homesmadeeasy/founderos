@@ -11,6 +11,7 @@ import ConnectedReality from '@/components/home/ConnectedReality'
 import RecentLearning from '@/components/home/RecentLearning'
 import TodayDecision from '@/components/home/TodayDecision'
 import QuickActionsDock from '@/components/home/QuickActionsDock'
+import FounderInsightCard from '@/components/home/FounderInsightCard'
 import FounderStatus from '@/components/home/FounderStatus'
 
 function HomeContent() {
@@ -38,6 +39,10 @@ function HomeContent() {
         <div className="home-grid home-grid-2 mt-5">
           <DomainSnapshot />
           <ConnectedReality />
+        </div>
+
+        <div className="mt-3.5">
+          <FounderInsightCard />
         </div>
 
         <div className="mt-4 space-y-3.5">

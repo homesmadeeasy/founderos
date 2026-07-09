@@ -125,7 +125,8 @@ export function buildProjectMap(state: AppState): Map<string, string> {
 export function buildNavigationActions(projectId: string | null): CommandAction[] {
   const global: CommandAction[] = [
     { id: 'nav-home', kind: 'navigate', label: 'Home', href: '/home', keywords: ['home', 'life hub', 'command centre', 'command center', 'today', 'what matters'] },
-    { id: 'nav-domains', kind: 'navigate', label: 'Domains', href: '/domains', keywords: ['domains', 'life areas', 'founder', 'school', 'health'] },
+    { id: 'nav-founder', kind: 'navigate', label: 'Founder AI', href: '/founder', keywords: ['founder', 'startup', 'build', 'product', 'validation', 'overengineering', 'sprint'] },
+    { id: 'nav-domains', kind: 'navigate', label: 'Domains', href: '/domains', keywords: ['domains', 'life areas', 'school', 'health'] },
     { id: 'nav-inbox', kind: 'navigate', label: 'Inbox', href: '/inbox', keywords: ['inbox', 'capture', 'unprocessed'] },
     { id: 'nav-signals', kind: 'navigate', label: 'Signals', href: '/signals', keywords: ['signals', 'connected reality', 'calendar', 'health', 'github', 'reality'] },
     { id: 'nav-morning', kind: 'navigate', label: 'Morning Execution', href: '/morning', keywords: ['morning', 'daily plan', 'execution', 'start day', 'first action'] },

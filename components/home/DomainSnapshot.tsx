@@ -39,19 +39,36 @@ export default function DomainSnapshot() {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {evaluations.map(e => e && (
-          <div
-            key={e.id}
-            className={`rounded-xl border border-white/80 bg-gradient-to-br ${DOMAIN_GRADIENTS[e.domainId] ?? 'from-white/60 to-white/40'} p-2.5 shadow-[0_1px_6px_rgba(99,102,241,0.04)]`}
-          >
-            <p className="text-[11px] font-semibold text-zinc-800 truncate">{e.domainName}</p>
-            <p className="text-2xl font-semibold text-zinc-900 mt-1 tabular-nums leading-none">{e.score}</p>
-            <span className={`inline-block mt-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${statusColorClass(e.status)}`}>
-              {e.status.replace('_', ' ')}
-            </span>
-            <p className="text-[10px] text-zinc-500 mt-1.5 line-clamp-2 leading-snug">
-              {domainOneLiner(e)}
-            </p>
-          </div>
+          e.domainId === 'founder' ? (
+            <Link
+              key={e.id}
+              href="/founder"
+              className={`rounded-xl border border-violet-200/60 bg-gradient-to-br ${DOMAIN_GRADIENTS.founder} p-2.5 shadow-[0_1px_6px_rgba(99,102,241,0.08)] hover:shadow-[0_2px_12px_rgba(99,102,241,0.12)] transition-shadow block`}
+            >
+              <p className="text-[11px] font-semibold text-violet-800 truncate">Founder AI</p>
+              <p className="text-2xl font-semibold text-zinc-900 mt-1 tabular-nums leading-none">{e.score}</p>
+              <span className={`inline-block mt-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${statusColorClass(e.status)}`}>
+                {e.status.replace('_', ' ')}
+              </span>
+              <p className="text-[10px] text-zinc-500 mt-1.5 line-clamp-2 leading-snug">
+                {domainOneLiner(e)}
+              </p>
+            </Link>
+          ) : (
+            <div
+              key={e.id}
+              className={`rounded-xl border border-white/80 bg-gradient-to-br ${DOMAIN_GRADIENTS[e.domainId] ?? 'from-white/60 to-white/40'} p-2.5 shadow-[0_1px_6px_rgba(99,102,241,0.04)]`}
+            >
+              <p className="text-[11px] font-semibold text-zinc-800 truncate">{e.domainName}</p>
+              <p className="text-2xl font-semibold text-zinc-900 mt-1 tabular-nums leading-none">{e.score}</p>
+              <span className={`inline-block mt-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${statusColorClass(e.status)}`}>
+                {e.status.replace('_', ' ')}
+              </span>
+              <p className="text-[10px] text-zinc-500 mt-1.5 line-clamp-2 leading-snug">
+                {domainOneLiner(e)}
+              </p>
+            </div>
+          )
         ))}
       </div>
     </Card>

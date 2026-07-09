@@ -21,7 +21,7 @@ const actions: {
   { id: 'focus', icon: Focus, color: 'text-violet-600', bg: 'hover:bg-violet-50/80', href: '/morning' },
   { id: 'workout', icon: Dumbbell, color: 'text-emerald-600', bg: 'hover:bg-emerald-50/80', href: '/evening' },
   { id: 'study', icon: BookOpen, color: 'text-amber-700', bg: 'hover:bg-amber-50/80', href: '/morning' },
-  { id: 'founder', icon: Rocket, color: 'text-violet-700', bg: 'hover:bg-violet-50/80', href: '/domains' },
+  { id: 'founder', icon: Rocket, color: 'text-violet-700', bg: 'hover:bg-violet-50/80', href: '/founder' },
 ]
 
 export default function QuickActionsDock() {

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import {
   Home,
+  Rocket,
   Sun,
   Moon,
   Zap,
@@ -24,6 +25,7 @@ import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 
 const nav = [
   { label: 'Home', href: '/home', icon: Home },
+  { label: 'Founder', href: '/founder', icon: Rocket },
   { label: 'Morning', href: '/morning', icon: Sun },
   { label: 'Evening', href: '/evening', icon: Moon },
   { label: 'Domains', href: '/domains', icon: LayoutGrid },
@@ -41,6 +43,8 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
   const { openCapture, unprocessedCount } = useUniversalCapture()
   const [loggingOut, setLoggingOut] = useState(false)
   const isHome = pathname === '/home' || pathname.startsWith('/home/')
+  const isFounder = pathname === '/founder' || pathname.startsWith('/founder/')
+  const isPremiumSurface = isHome || isFounder
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -55,7 +59,7 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
   return (
     <aside className={[
       'w-[168px] shrink-0 flex flex-col h-screen sticky top-0 border-r transition-colors',
-      isHome
+      isPremiumSurface
         ? 'bg-white/70 backdrop-blur-xl border-indigo-100/60'
         : 'bg-white border-zinc-200',
     ].join(' ')}>
@@ -107,7 +111,7 @@ export default function Sidebar({ userEmail }: { userEmail?: string }) {
               className={[
                 'flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
                 active
-                  ? isHome
+                  ? isPremiumSurface
                     ? 'bg-indigo-50/90 text-indigo-900 shadow-[0_1px_4px_rgba(99,102,241,0.08)]'
                     : 'bg-zinc-100 text-zinc-900'
                   : 'text-zinc-500 hover:text-zinc-800 hover:bg-white/60',

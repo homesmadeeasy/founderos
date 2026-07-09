@@ -54,6 +54,9 @@ import {
   computeRecoveryScore,
 } from '@/lib/home/homeUtils'
 import { buildTodayTimeline } from '@/lib/home/homeTimeline'
+import { buildFounderSnapshot } from '@/lib/specialists/founder/founderUtils'
+import { buildFounderInputFromAssistant } from '@/lib/specialists/founder/founderAssistant'
+import { answerFounderQuestion } from '@/lib/specialists/founder/founderQuestions'
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
   reasoningOutput: DailyReasoningOutput | null
@@ -422,7 +425,52 @@ function formatSummariseTodayResponse(ctx: AssistantContext): string {
   return lines.join('\n\n')
 }
 
+function formatFounderAIResponse(ctx: AssistantContext, prompt: string): string {
+  const snapshot = buildFounderSnapshot(buildFounderInputFromAssistant(ctx))
+  return answerFounderQuestion(snapshot, prompt)
+}
+
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['ask founder', 'founder ai'],
+    handler: ctx => formatFounderAIResponse(ctx, 'Ask Founder'),
+  },
+  {
+    keywords: ['what should i build next', 'build next', 'what to build'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What should I build next?'),
+  },
+  {
+    keywords: ['overengineering', 'over-engineering', 'am i overengineering'],
+    handler: ctx => formatFounderAIResponse(ctx, 'Am I overengineering?'),
+  },
+  {
+    keywords: ['founder bottleneck', 'what is the founder bottleneck'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What is the founder bottleneck?'),
+  },
+  {
+    keywords: ['how do i get user', 'get users', 'first user', 'how do i get first'],
+    handler: ctx => formatFounderAIResponse(ctx, 'How do I get users?'),
+  },
+  {
+    keywords: ['what should i ignore', 'should i ignore'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What should I ignore?'),
+  },
+  {
+    keywords: ['next sprint', 'founder sprint', 'what is the next sprint'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What is the next sprint?'),
+  },
+  {
+    keywords: ['biggest risk', 'founder risk', 'what is the biggest risk'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What is the biggest risk?'),
+  },
+  {
+    keywords: ['what would make this more useful', 'more useful'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What would make this more useful?'),
+  },
+  {
+    keywords: ['validate this week', 'what should i validate'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What should I validate this week?'),
+  },
   {
     keywords: ['go home', 'open home', 'take me home'],
     handler: () => 'Taking you to **Home** — your daily command surface.',
@@ -1287,8 +1335,8 @@ export async function fetchAssistantResponse(
 
 export const SUGGESTED_PROMPTS = [
   'What matters right now?',
+  'What should I build next?',
+  'Am I overengineering?',
   'Summarise today',
-  'What should I focus on today?',
-  'What do you remember?',
   'What changed?',
 ] as const

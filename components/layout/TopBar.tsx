@@ -10,7 +10,7 @@ export default function TopBar() {
   const { openCommandBar } = useCommandBar()
   const { openCapture, unprocessedCount } = useUniversalCapture()
 
-  if (pathname === '/home' || pathname.startsWith('/home/')) {
+  if (pathname === '/home' || pathname.startsWith('/home/') || pathname === '/founder' || pathname.startsWith('/founder/')) {
     return null
   }
 
