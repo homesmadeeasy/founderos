@@ -49,6 +49,12 @@ export type ConversationStatus = 'active' | 'paused' | 'finished' | 'abandoned'
 
 export type ConversationRole = 'founder_ai' | 'user' | 'system'
 
+export type ConversationEvidenceKind =
+  | 'system_inference'
+  | 'user_report'
+  | 'confirmed'
+  | 'historical'
+
 export interface ConversationEvidence {
   id: string
   sourceType: 'memory' | 'signal' | 'outcome' | 'decision' | 'domain' | 'knowledge' | 'founder' | 'object'
@@ -56,6 +62,56 @@ export interface ConversationEvidence {
   summary: string
   weight: number
   supports: boolean
+  evidenceKind?: ConversationEvidenceKind
+  sourceId?: string
+  snapshotAt?: string
+  superseded?: boolean
+}
+
+export type ConversationQuestionType =
+  | 'boolean'
+  | 'numeric'
+  | 'factual'
+  | 'multiple_choice'
+  | 'open_text'
+  | 'confirmation'
+  | 'evidence_request'
+
+export type ConversationQuestionStatus = 'unanswered' | 'answered' | 'superseded'
+
+export type ConversationBeliefStatus =
+  | 'inferred'
+  | 'user_claimed'
+  | 'confirmed'
+  | 'contradicted'
+  | 'unknown'
+
+export interface ConversationBelief {
+  key: string
+  topic: string
+  label: string
+  value: unknown
+  displayValue: string
+  status: ConversationBeliefStatus
+  confidence: number
+  sourceTurnIds: string[]
+  evidenceIds: string[]
+  updatedAt: string
+}
+
+export interface TrackedQuestion {
+  id: string
+  topic: ConversationTopic
+  questionType: ConversationQuestionType
+  text: string
+  answerOptions: string[]
+  status: ConversationQuestionStatus
+  askedAt?: string
+  answeredAt?: string
+  answerTurnId?: string
+  evidenceRequired: boolean
+  followUpStrategy?: string
+  beliefKey?: string
 }
 
 export interface ConversationQuestion {
@@ -153,6 +209,9 @@ export interface ConversationSession {
   knowledgeSuggestions: string[]
   nextQuestion?: ConversationQuestion
   recommendation?: ConversationRecommendation
+  beliefs?: ConversationBelief[]
+  trackedQuestions?: TrackedQuestion[]
+  activeQuestionId?: string
 }
 
 export interface ConversationContext {

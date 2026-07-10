@@ -42,7 +42,7 @@ export default function AssistantMessage({
       <div className="conv-msg-ai-body">
         <header className="conv-msg-ai-header">
           <span className="conv-msg-ai-label">Founder AI</span>
-          {time && <time className="conv-msg-time" dateTime={turn.createdAt}>{time}</time>}
+          {time && <time className="conv-msg-time" dateTime={turn.createdAt} suppressHydrationWarning>{time}</time>}
         </header>
         <div className="conv-msg-ai-content">
           {paragraphs.map((p, i) => renderParagraph(p, i))}

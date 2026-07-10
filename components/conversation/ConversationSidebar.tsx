@@ -6,6 +6,7 @@ import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import { useAppContext } from '@/contexts/AppContext'
 import type { ConversationSession } from '@/lib/conversation/conversationTypes'
 import { VALIDATION_SPRINT_PROJECT_TITLE } from '@/lib/conversation/conversationActions'
+import { beliefSummaryLabel } from '@/lib/conversation/conversationBeliefs'
 import EvidenceChips from './EvidenceChips'
 import Card from '@/components/home/Card'
 
@@ -73,6 +74,21 @@ export default function ConversationSidebar({ session }: ConversationSidebarProp
               <span key={d} className="conv-domain-chip capitalize">{d}</span>
             ))}
           </div>
+        </section>
+      )}
+
+      {session.beliefs && session.beliefs.length > 0 && (
+        <section>
+          <p className="conv-sidebar-label">Active beliefs</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {session.beliefs
+              .filter(b => b.key.startsWith('validation.'))
+              .map(b => (
+                <li key={b.key} className="text-xs text-zinc-600 leading-snug">
+                  {beliefSummaryLabel(b)}
+                </li>
+              ))}
+          </ul>
         </section>
       )}
 

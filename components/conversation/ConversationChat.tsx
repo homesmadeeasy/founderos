@@ -7,6 +7,7 @@ import ReplyChoices from './ReplyChoices'
 import ConversationComposer from './ConversationComposer'
 import ConversationTypingIndicator from './ConversationTypingIndicator'
 import ConversationEmptyState from './ConversationEmptyState'
+import { getActiveAnswerOptions } from '@/lib/conversation/conversationAdaptive'
 import Card from '@/components/home/Card'
 
 export default function ConversationChat() {
@@ -37,22 +38,22 @@ export default function ConversationChat() {
   }, [session?.turns.length, isTyping])
 
   const activeSession = session
+  const answerOptions = activeSession ? getActiveAnswerOptions(activeSession) : []
   const lastTurn = activeSession?.turns[activeSession.turns.length - 1]
   const showReplyChoices = Boolean(
     activeSession?.status === 'active'
-    && activeSession.nextQuestion
-    && activeSession.nextQuestion.answerType === 'yes_no'
+    && activeSession.activeQuestionId
+    && answerOptions.length > 0
     && !isTyping
     && lastTurn?.role === 'founder_ai',
   )
 
+  const onReply = useCallback((answer: string) => {
+    void reply(answer, activeSession?.activeQuestionId ?? activeSession?.nextQuestion?.id)
+  }, [reply, activeSession?.activeQuestionId, activeSession?.nextQuestion?.id])
   const onCustomFocus = useCallback(() => {
     composerFocusRef.current?.focus()
   }, [composerFocusRef])
-
-  const onReply = useCallback((answer: string) => {
-    void reply(answer, activeSession?.nextQuestion?.id)
-  }, [reply, activeSession?.nextQuestion?.id])
 
   return (
     <Card className="conv-panel p-0 overflow-hidden flex flex-col">
@@ -82,15 +83,16 @@ export default function ConversationChat() {
       {activeSession?.status === 'active' && (
         <div className="conv-panel-footer">
           <ReplyChoices
-            key={activeSession.nextQuestion?.id ?? 'no-question'}
+            key={activeSession.activeQuestionId ?? 'no-question'}
             visible={showReplyChoices}
             disabled={isTyping}
             onReply={onReply}
             onCustomFocus={onCustomFocus}
+            answerOptions={answerOptions}
           />
 
           <ConversationComposer
-            onSend={text => void reply(text, activeSession.nextQuestion?.id)}
+            onSend={text => void reply(text, activeSession.activeQuestionId ?? activeSession.nextQuestion?.id)}
             disabled={isTyping}
             inputRef={composerFocusRef}
           />

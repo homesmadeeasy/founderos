@@ -1,6 +1,11 @@
 import type { FounderInput } from '@/lib/specialists/founder/founderTypes'
 import { answerFounderQuestion } from '@/lib/specialists/founder/founderQuestions'
-import { generateContextualReply, confidenceDeltaForAnswer } from './conversationReplies'
+import {
+  processAdaptiveAnswer,
+  initializeAdaptiveSession,
+  migrateSession,
+} from './conversationAdaptive'
+import { confidenceDeltaForAdaptiveAnswer } from './conversationConfidence'
 import type {
   ConversationContext,
   ConversationSession,
@@ -36,7 +41,8 @@ export interface ConversationReasoner {
     session: ConversationSession,
     answer: string,
     questionId?: string,
-  ): ConversationTurn
+    userTurnId?: string,
+  ): { turn: ConversationTurn; adaptive: ReturnType<typeof processAdaptiveAnswer> }
   generateRecommendation(ctx: ConversationContext): ConversationRecommendation
   answerChipQuestion(ctx: ConversationContext, prompt: string): string
 }
@@ -69,14 +75,21 @@ export const ruleReasoner: ConversationReasoner = {
       intent: 'observe',
       mood: 'strategic',
       topic: nextQ?.topic ?? 'founder',
-      evidence,
-      questionId: nextQ?.id,
+      evidence: evidence.slice(0, 4),
+      questionId: nextQ?.id ?? 'q-validation-users',
       createdAt: nowISO(),
     }
   },
 
-  generateReply(ctx, session, answer, questionId) {
-    return generateContextualReply(ctx, session, answer, questionId)
+  generateReply(ctx, session, answer, questionId, userTurnId) {
+    const adaptive = processAdaptiveAnswer(
+      ctx,
+      session,
+      answer,
+      questionId,
+      userTurnId ?? newConversationId(),
+    )
+    return { turn: adaptive.reply, adaptive }
   },
 
   generateRecommendation(ctx) {
@@ -140,7 +153,7 @@ export function startConversation(
   const opening = activeReasoner.generateOpening(ctx, evidence)
   const recommendation = activeReasoner.generateRecommendation(ctx)
 
-  const session: ConversationSession = {
+  let session: ConversationSession = {
     id: newConversationId(),
     startedAt: nowISO(),
     updatedAt: nowISO(),
@@ -155,6 +168,24 @@ export function startConversation(
     nextQuestion: questions[0],
     recommendation,
   }
+
+  session = initializeAdaptiveSession(ctx, session)
+  session.nextQuestion = session.trackedQuestions?.find(q => q.status === 'unanswered')
+    ? {
+      id: 'q-validation-users',
+      topic: 'validation',
+      title: session.trackedQuestions!.find(q => q.id === 'q-validation-users')!.text,
+      reason: 'Opening validation question',
+      importance: 'critical',
+      answerType: 'yes_no',
+      relatedObjectIds: [],
+      relatedMemoryIds: [],
+      relatedSignalIds: [],
+      relatedDomains: ['founder', 'validation'],
+      suggestion: 'ask_now',
+      confidence: 88,
+    }
+    : questions[0]
 
   let store = loadConversationStore()
   store = upsertSession(store, session)
@@ -176,10 +207,11 @@ export function submitAnswer(
   userName = 'there',
 ): SubmitAnswerResult | null {
   const store = loadConversationStore()
-  const session = store.sessions.find(s => s.id === input.sessionId)
+  let session = store.sessions.find(s => s.id === input.sessionId)
   if (!session || session.status !== 'active') return null
 
   const ctx = buildConversationContext(founderInput, userName)
+  session = migrateSession(session, ctx)
 
   const userTurn: ConversationTurn = {
     id: newConversationId(),
@@ -189,30 +221,34 @@ export function submitAnswer(
     mood: 'calm',
     topic: session.topic,
     evidence: [],
-    questionId: input.questionId ?? session.nextQuestion?.id,
+    questionId: input.questionId ?? session.activeQuestionId ?? session.nextQuestion?.id,
     createdAt: nowISO(),
   }
 
-  const answeredQuestionId = input.questionId ?? session.nextQuestion?.id
-  const reply = activeReasoner.generateReply(ctx, session, input.answer, answeredQuestionId)
+  const answeredQuestionId = input.questionId ?? session.activeQuestionId ?? session.nextQuestion?.id
+  const { turn: reply, adaptive } = activeReasoner.generateReply(
+    ctx, session, input.answer, answeredQuestionId, userTurn.id,
+  )
+
   const updatedQuestions = session.activeQuestions.filter(q => q.id !== answeredQuestionId)
-  const nextQuestion = reply.followUpQuestion ?? updatedQuestions[0]
 
   let updated: ConversationSession = {
     ...session,
     updatedAt: nowISO(),
     turns: [...session.turns, userTurn, reply],
-    activeQuestions: reply.followUpQuestion
-      ? [reply.followUpQuestion, ...updatedQuestions]
+    activeQuestions: adaptive.nextQuestion
+      ? [adaptive.nextQuestion, ...updatedQuestions.filter(q => q.id !== adaptive.nextQuestion!.id)]
       : updatedQuestions,
-    nextQuestion,
-    confidence: clampConfidence(
-      session.confidence + confidenceDeltaForAnswer(input.answer, Boolean(reply.followUpQuestion)),
-    ),
+    nextQuestion: adaptive.nextQuestion,
+    activeQuestionId: adaptive.activeQuestionId,
+    beliefs: adaptive.beliefs,
+    trackedQuestions: adaptive.trackedQuestions,
+    evidence: adaptive.sessionEvidence,
+    confidence: clampConfidence(session.confidence + adaptive.confidenceDelta),
   }
 
   const userAnswerCount = updated.turns.filter(t => t.role === 'user').length
-  if (!nextQuestion && !reply.actionCard && userAnswerCount >= 2) {
+  if (!adaptive.nextQuestion && !adaptive.actionCard && userAnswerCount >= 3) {
     updated = finishConversationSession(updated)
   }
 
@@ -220,9 +256,9 @@ export function submitAnswer(
   newStore = addTimelineEntry(newStore, {
     sessionId: updated.id,
     type: 'answer',
-    title: input.questionId ?? 'user-reply',
+    title: answeredQuestionId ?? 'user-reply',
     detail: input.answer.slice(0, 200),
-    relatedIds: input.questionId ? [input.questionId] : [],
+    relatedIds: answeredQuestionId ? [answeredQuestionId] : [],
   })
   saveConversationStore(newStore)
 
@@ -281,7 +317,14 @@ export function continueOrStartSession(
 ): ConversationSession {
   const store = loadConversationStore()
   const active = store.sessions.find(s => s.status === 'active')
-  if (active) return active
+  if (active) {
+    const ctx = buildConversationContext(input, userName)
+    const migrated = migrateSession(active, ctx)
+    if (migrated !== active) {
+      saveConversationStore(upsertSession(store, migrated))
+    }
+    return migrated
+  }
   const yesterday = store.sessions.find(s =>
     s.status === 'finished'
     && s.updatedAt.slice(0, 10) !== new Date().toISOString().slice(0, 10),

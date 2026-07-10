@@ -56,10 +56,16 @@ export const SUGGESTED_QUESTION_CHIPS = [
 
 export const QUESTION_CHIPS = SUGGESTED_QUESTION_CHIPS
 
-export function formatConversationTime(iso: string): string {
+/** Deterministic 12-hour time — avoids locale hydration mismatch */
+export function formatConversationTime(iso: string, _timezone?: string): string {
   try {
     const d = new Date(iso)
-    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    if (Number.isNaN(d.getTime())) return ''
+    const hours = d.getHours()
+    const minutes = d.getMinutes().toString().padStart(2, '0')
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    const h12 = hours % 12 || 12
+    return `${h12}:${minutes} ${ampm}`
   } catch {
     return ''
   }
