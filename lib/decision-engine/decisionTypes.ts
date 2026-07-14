@@ -7,6 +7,7 @@ import type { FounderObject, LifeArea } from '@/lib/object-engine/objectTypes'
 import type { DailyReasoningOutput } from '@/lib/reasoning-engine/reasoningTypes'
 import type { Signal } from '@/lib/signal-engine/signalTypes'
 import type { DomainCoordinatorOutput } from '@/lib/domain-intelligence/domainTypes'
+import type { WorldModel } from '@/lib/cognitive-model/beliefTypes'
 
 export type DecisionArea = LifeArea | 'inbox' | 'recovery' | 'planning'
 export type DecisionUrgency = 'critical' | 'high' | 'medium' | 'low'
@@ -89,6 +90,7 @@ export interface DecisionInput {
   reasoningOutput?: DailyReasoningOutput | null
   unresolvedCaptureCount?: number
   domainCoordinator?: DomainCoordinatorOutput | null
+  worldModel?: WorldModel | null
 }
 
 export interface DecisionOutput {

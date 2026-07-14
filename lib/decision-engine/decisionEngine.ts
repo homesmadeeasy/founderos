@@ -24,6 +24,8 @@ import {
   todayISO,
   tomorrowISO,
 } from './decisionUtils'
+import { loadCognitiveStore } from '@/lib/cognitive-model/beliefStorage'
+import { worldModelRisksForDecision } from '@/lib/cognitive-model/cognitiveDecision'
 
 function candidateToDecision(candidate: CandidateAction, confidenceLabel: Decision['confidence']): Decision {
   return {
@@ -398,7 +400,9 @@ export function decide(input: DecisionInput): DecisionOutput {
   }
 
   const evidence = buildEvidenceForCandidate(primaryCandidate, safe)
-  const { risks, tradeoffs } = detectConflicts(ranked.map(r => r.candidate), safe)
+  const { risks: conflictRisks, tradeoffs } = detectConflicts(ranked.map(r => r.candidate), safe)
+  const cognitiveRisks = worldModelRisksForDecision(safe.worldModel)
+  const risks = [...new Set([...conflictRisks, ...cognitiveRisks])].slice(0, 6)
   const confidence = calculateConfidence(evidence, tradeoffs.length)
   const confidenceLabel = scoreToConfidenceLabel(confidence)
   const ignoreToday = buildIgnoreList(ranked.map(r => r.candidate), primaryCandidate, safe)
@@ -443,6 +447,7 @@ export function buildDecisionInputFromMorningState(params: {
   unresolvedCaptureCount?: number
   domainCoordinator?: DecisionInput['domainCoordinator']
 }): DecisionInput {
+  const worldModel = typeof window !== 'undefined' ? loadCognitiveStore().worldModel : null
   return normalizeDecisionInput({
     objects: params.objects ?? [],
     memories: params.memories ?? [],
@@ -454,6 +459,7 @@ export function buildDecisionInputFromMorningState(params: {
     reasoningOutput: params.reasoningOutput ?? null,
     unresolvedCaptureCount: params.unresolvedCaptureCount ?? 0,
     domainCoordinator: params.domainCoordinator ?? null,
+    worldModel,
     currentTime: nowISO(),
   })
 }

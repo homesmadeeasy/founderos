@@ -29,6 +29,7 @@ export type FounderEventType =
   | 'ConversationMemoryCreated'
   | 'ConversationKnowledgeSuggested'
   | 'ConversationDecisionUpdated'
+  | 'CognitiveModelUpdated'
 
 export type FounderEventStatus =
   | 'created'

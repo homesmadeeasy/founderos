@@ -93,7 +93,7 @@ export function buildConversationEvidence(
     }
   }
 
-  for (const risk of ctx.founderSnapshot.risks.slice(0, 2)) {
+  for (const risk of (ctx.founderSnapshot.risks ?? []).slice(0, 2)) {
     evidence.push({
       id: `ev-risk-${risk.id}`,
       sourceType: 'founder',
@@ -185,7 +185,7 @@ export function buildReconciledEvidence(
     })
   }
 
-  return dedupeConversationEvidence(evidence, 12)
+  return dedupeConversationEvidence(evidence, 12, { includeHistorical: true })
 }
 
 export function buildTurnEvidence(

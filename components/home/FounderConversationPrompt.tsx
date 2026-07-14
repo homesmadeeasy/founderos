@@ -4,26 +4,19 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MessageCircle, X, HelpCircle } from 'lucide-react'
 import { useConversation } from '@/contexts/ConversationContext'
-import { getProactiveHomeMessage } from '@/lib/conversation/conversationEngine'
-import { useFounderInput } from '@/components/founder/useFounderInput'
-import { useUserDisplayName } from '@/components/founder/useFounderInput'
 import EvidenceChips from '@/components/conversation/EvidenceChips'
 import Card from './Card'
 
 export default function FounderConversationPrompt() {
   const router = useRouter()
-  const founderInput = useFounderInput()
-  const userName = useUserDisplayName()
-  const { dismissProactive, start, proactiveDismissed } = useConversation()
+  const { dismissProactive, start, proactiveDismissed, proactiveMessage, proactiveEvidence } = useConversation()
   const [showWhy, setShowWhy] = useState(false)
-
-  const proactive = getProactiveHomeMessage(founderInput, userName)
 
   if (proactiveDismissed) return null
 
-  const paragraphs = proactive.message.split('\n\n')
+  const paragraphs = proactiveMessage.split('\n\n')
   const body = paragraphs.slice(0, -1).join('\n\n')
-  const question = paragraphs[paragraphs.length - 1] ?? proactive.question
+  const question = paragraphs[paragraphs.length - 1] ?? ''
 
   return (
     <Card className="p-4 sm:p-5 flex flex-col relative" delay={120}>
@@ -56,7 +49,7 @@ export default function FounderConversationPrompt() {
       {showWhy && (
         <div className="mt-3 pt-3 border-t border-white/80">
           <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-zinc-400 mb-2">Evidence</p>
-          <EvidenceChips evidence={proactive.evidence} />
+          <EvidenceChips evidence={proactiveEvidence} />
         </div>
       )}
 

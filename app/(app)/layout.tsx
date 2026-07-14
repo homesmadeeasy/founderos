@@ -10,6 +10,7 @@ import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
 import { SignalEngineProvider } from '@/contexts/SignalEngineContext'
 import { SyncEngineProvider } from '@/contexts/SyncEngineContext'
 import { FounderKernelProvider } from '@/contexts/FounderKernelContext'
+import { CognitiveModelProvider } from '@/contexts/CognitiveModelContext'
 import { ConversationProvider } from '@/contexts/ConversationContext'
 import { UniversalCaptureProvider } from '@/contexts/UniversalCaptureContext'
 import KernelSubscriberBootstrap from '@/components/kernel/KernelSubscriberBootstrap'
@@ -35,7 +36,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                     <FounderKernelProvider>
                       <MorningExecutionProvider>
                         <EveningReviewProvider>
-                          <ConversationProvider>
+                          <CognitiveModelProvider>
+                            <ConversationProvider>
                             <CommandBarProvider>
                               <KernelSubscriberBootstrap />
                               <div className="flex h-screen overflow-hidden bg-zinc-50">
@@ -48,7 +50,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                                 </div>
                               </div>
                             </CommandBarProvider>
-                          </ConversationProvider>
+                            </ConversationProvider>
+                          </CognitiveModelProvider>
                         </EveningReviewProvider>
                       </MorningExecutionProvider>
                     </FounderKernelProvider>

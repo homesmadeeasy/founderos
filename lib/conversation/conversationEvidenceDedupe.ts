@@ -9,15 +9,22 @@ function normalizeLabel(label: string): string {
     .trim()
 }
 
+export interface DedupeConversationEvidenceOptions {
+  /** Keep historical evidence in the reconciled session record. */
+  includeHistorical?: boolean
+}
+
 export function dedupeConversationEvidence(
   evidence: ConversationEvidence[],
   max = 12,
+  options?: DedupeConversationEvidenceOptions,
 ): ConversationEvidence[] {
+  const includeHistorical = options?.includeHistorical ?? false
   const seen = new Set<string>()
   const result: ConversationEvidence[] = []
 
   const sorted = [...evidence]
-    .filter(e => !e.superseded && e.evidenceKind !== 'historical')
+    .filter((e) => !e.superseded && (includeHistorical || e.evidenceKind !== 'historical'))
     .sort((a, b) => b.weight - a.weight)
 
   for (const item of sorted) {

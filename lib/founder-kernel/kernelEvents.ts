@@ -31,6 +31,7 @@ export const FOUNDER_EVENT_TYPES: FounderEventType[] = [
   'ConversationMemoryCreated',
   'ConversationKnowledgeSuggested',
   'ConversationDecisionUpdated',
+  'CognitiveModelUpdated',
 ]
 
 export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
@@ -64,6 +65,7 @@ export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
   ConversationMemoryCreated: 'Conversation memory created',
   ConversationKnowledgeSuggested: 'Conversation knowledge suggested',
   ConversationDecisionUpdated: 'Conversation decision updated',
+  CognitiveModelUpdated: 'Cognitive model updated',
 }
 
 export function summarizeEventPayload(type: FounderEventType, payload: Record<string, unknown>): string {
@@ -90,6 +92,8 @@ export function summarizeEventPayload(type: FounderEventType, payload: Record<st
       const suggestion = typeof payload.suggestion === 'string' ? payload.suggestion.slice(0, 40) : 'knowledge'
       return suggestion
     }
+    case 'CognitiveModelUpdated':
+      return String(payload.beliefCount ?? 'beliefs updated')
     default:
       return Object.keys(payload).slice(0, 3).join(', ') || type
   }

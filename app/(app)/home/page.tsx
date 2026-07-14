@@ -12,6 +12,7 @@ import RecentLearning from '@/components/home/RecentLearning'
 import TodayDecision from '@/components/home/TodayDecision'
 import QuickActionsDock from '@/components/home/QuickActionsDock'
 import FounderInsightCard from '@/components/home/FounderInsightCard'
+import CognitiveInsightCard from '@/components/home/CognitiveInsightCard'
 import FounderStatus from '@/components/home/FounderStatus'
 
 function HomeContent() {
@@ -24,6 +25,10 @@ function HomeContent() {
         <div className="home-grid home-grid-2 mt-4">
           <MissionCard />
           <FounderConversationPrompt />
+        </div>
+
+        <div className="mt-3.5">
+          <CognitiveInsightCard />
         </div>
 
         {/* Today + Focus with dock floating between rows */}

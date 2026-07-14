@@ -31,6 +31,8 @@ import {
   wasProactiveDismissedToday,
 } from './conversationSession'
 import { newConversationId, nowISO, clampConfidence, QUESTION_CHIPS } from './conversationUtils'
+import type { WorldModel } from '@/lib/cognitive-model/beliefTypes'
+import { buildCognitiveOpeningFromStore } from '@/lib/cognitive-model/cognitiveConversation'
 
 // ─── Reasoner interface (swap RuleReasoner → LLMReasoner later) ───────────────
 
@@ -121,7 +123,11 @@ export function getConversationReasoner(): ConversationReasoner {
   return activeReasoner
 }
 
-export function getProactiveHomeMessage(input: FounderInput, userName = 'there'): {
+export function getProactiveHomeMessage(
+  input: FounderInput,
+  userName = 'there',
+  worldModel?: WorldModel | null,
+): {
   message: string
   question: string
   evidence: ReturnType<typeof buildConversationEvidence>
@@ -130,7 +136,9 @@ export function getProactiveHomeMessage(input: FounderInput, userName = 'there')
   const store = loadConversationStore()
   const ctx = buildConversationContext(input, userName)
   const evidence = buildConversationEvidence(ctx, input)
-  const opening = activeReasoner.generateOpening(ctx, evidence)
+  const opening = worldModel
+    ? buildCognitiveOpeningFromStore(ctx, evidence, worldModel)
+    : activeReasoner.generateOpening(ctx, evidence)
   const lines = opening.content.split('\n\n')
   const question = lines[lines.length - 1] ?? ''
 

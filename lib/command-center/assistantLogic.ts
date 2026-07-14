@@ -57,6 +57,8 @@ import { buildTodayTimeline } from '@/lib/home/homeTimeline'
 import { buildFounderSnapshot } from '@/lib/specialists/founder/founderUtils'
 import { buildFounderInputFromAssistant } from '@/lib/specialists/founder/founderAssistant'
 import { answerFounderQuestion } from '@/lib/specialists/founder/founderQuestions'
+import { loadCognitiveStore } from '@/lib/cognitive-model/beliefStorage'
+import { answerCognitiveQuery } from '@/lib/cognitive-model/cognitiveAssistant'
 export interface MorningAssistantSnapshot {
   morningPlan: MorningExecutionPlan | null
   reasoningOutput: DailyReasoningOutput | null
@@ -426,11 +428,45 @@ function formatSummariseTodayResponse(ctx: AssistantContext): string {
 }
 
 function formatFounderAIResponse(ctx: AssistantContext, prompt: string): string {
+  const cognitive = answerCognitiveQuery(loadCognitiveStore(), prompt)
+  if (cognitive) return cognitive
   const snapshot = buildFounderSnapshot(buildFounderInputFromAssistant(ctx))
   return answerFounderQuestion(snapshot, prompt)
 }
 
 const PROMPT_MATCHERS: { keywords: string[]; handler: (ctx: AssistantContext) => string }[] = [
+  {
+    keywords: ['what do you believe', 'currently believe about', 'current beliefs'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What do you currently believe about my company?'),
+  },
+  {
+    keywords: ['why do you think', 'why do you believe'],
+    handler: ctx => formatFounderAIResponse(ctx, 'Why do you think that?'),
+  },
+  {
+    keywords: ['what changed since yesterday', 'what changed'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What changed since yesterday?'),
+  },
+  {
+    keywords: ['what evidence supports', 'evidence supports'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What evidence supports this?'),
+  },
+  {
+    keywords: ['what are you uncertain', 'uncertain about'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What are you uncertain about?'),
+  },
+  {
+    keywords: ['what hypothesis', 'testing a hypothesis'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What hypothesis are you currently testing?'),
+  },
+  {
+    keywords: ['changed your mind', 'have you changed'],
+    handler: ctx => formatFounderAIResponse(ctx, 'Have you changed your mind?'),
+  },
+  {
+    keywords: ['increase your confidence', 'increase my confidence', 'what information would'],
+    handler: ctx => formatFounderAIResponse(ctx, 'What information would increase your confidence?'),
+  },
   {
     keywords: ['ask founder', 'founder ai'],
     handler: ctx => formatFounderAIResponse(ctx, 'Ask Founder'),

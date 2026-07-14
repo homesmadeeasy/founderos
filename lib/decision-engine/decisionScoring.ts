@@ -11,6 +11,7 @@ import { clamp, importanceToScore, textIncludesAny, todayISO, tomorrowISO, urgen
 import { applyOutcomeFeedbackToCandidate } from '@/lib/outcome-engine/outcomeScoring'
 import { getSimilarPastOutcomes } from '@/lib/outcome-engine/outcomeEngine'
 import { candidateToDomainId } from '@/lib/domain-intelligence/domainUtils'
+import { applyWorldModelToDecisionScoring } from '@/lib/cognitive-model/cognitiveDecision'
 
 export interface ScoredCandidate {
   candidate: CandidateAction
@@ -129,6 +130,18 @@ export function scoreCandidate(candidate: CandidateAction, input: DecisionInput)
   const similar = getSimilarPastOutcomes(candidate.title, candidate.area, 6)
   const feedback = applyOutcomeFeedbackToCandidate(candidate, similar)
   const domainBoost = applyDomainScoringBoost(candidate, input)
+
+  const breakdownPreTotal = {
+    strategicAlignment,
+    riskReduction,
+    momentum,
+    lowConfidencePenalty,
+  }
+  applyWorldModelToDecisionScoring(breakdownPreTotal, input.worldModel, candidate.tags)
+  strategicAlignment = breakdownPreTotal.strategicAlignment
+  riskReduction = breakdownPreTotal.riskReduction
+  momentum = breakdownPreTotal.momentum
+  lowConfidencePenalty = breakdownPreTotal.lowConfidencePenalty
 
   const total = clamp(
     importance * 0.15

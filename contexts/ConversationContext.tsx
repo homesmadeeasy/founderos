@@ -27,12 +27,14 @@ import {
 } from '@/lib/conversation/conversationActions'
 import { newConversationId, nowISO } from '@/lib/conversation/conversationUtils'
 import { useFounderInput, useUserDisplayName } from '@/components/founder/useFounderInput'
+import { useCognitiveModel } from '@/contexts/CognitiveModelContext'
 
 interface ConversationContextValue {
   ready: boolean
   session: ConversationSession | null
   store: ConversationStore
   proactiveMessage: string
+  proactiveEvidence: ReturnType<typeof getProactiveHomeMessage>['evidence']
   proactiveDismissed: boolean
   questionChips: readonly string[]
   isTyping: boolean
@@ -51,6 +53,7 @@ const ConversationContext = createContext<ConversationContextValue | null>(null)
 export function ConversationProvider({ children }: { children: React.ReactNode }) {
   const founderInput = useFounderInput()
   const userName = useUserDisplayName()
+  const { worldModel, hydrated } = useCognitiveModel()
   const { appState, createProject, addTask } = useAppContext()
   const { recordMemory } = useMemoryEngine()
   const { publish } = useFounderKernel()
@@ -68,8 +71,8 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
   }, [])
 
   const proactive = useMemo(
-    () => getProactiveHomeMessage(founderInput, userName),
-    [founderInput, userName],
+    () => getProactiveHomeMessage(founderInput, userName, hydrated ? worldModel : null),
+    [founderInput, userName, hydrated, worldModel.updatedAt, worldModel.beliefs.length],
   )
 
   const refresh = useCallback(() => {
@@ -262,6 +265,7 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     session,
     store,
     proactiveMessage: proactive.message,
+    proactiveEvidence: proactive.evidence,
     proactiveDismissed: proactive.dismissed,
     questionChips: getQuestionChips(),
     isTyping,

@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useFounderKernel } from '@/contexts/FounderKernelContext'
+import { useCognitiveModel } from '@/contexts/CognitiveModelContext'
 import { useSignalEngine } from '@/contexts/SignalEngineContext'
 import { useObjectEngine } from '@/contexts/ObjectEngineContext'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
@@ -15,6 +16,9 @@ import type { DecisionOutput } from '@/lib/decision-engine/decisionTypes'
  */
 export default function KernelSubscriberBootstrap() {
   const { registerSubscriber } = useFounderKernel()
+  const { processKernelEvent } = useCognitiveModel()
+  const processKernelRef = useRef(processKernelEvent)
+  processKernelRef.current = processKernelEvent
   const { ingestFromCapture } = useSignalEngine()
   const { refresh: refreshObjects } = useObjectEngine()
   const { refresh: refreshMorning } = useMorningExecution()
@@ -42,6 +46,23 @@ export default function KernelSubscriberBootstrap() {
           if (['CaptureCreated', 'ObjectCreated', 'ObjectUpdated'].includes(event.type)) {
             refreshObjects()
           }
+        },
+      }),
+      registerSubscriber({
+        id: 'cognitive-model',
+        name: 'Cognitive Model',
+        priority: 45,
+        subscribedEvents: [
+          'MemoryCreated',
+          'SignalCreated',
+          'SignalProcessed',
+          'OutcomeRecorded',
+          'KnowledgeCreated',
+          'DecisionGenerated',
+          'ConversationAnswered',
+        ],
+        handler: (event) => {
+          processKernelRef.current(event)
         },
       }),
       registerSubscriber({
