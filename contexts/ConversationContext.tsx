@@ -5,6 +5,8 @@ import {
 } from 'react'
 import { useAppContext } from '@/contexts/AppContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
+import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
+import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { useFounderKernel } from '@/contexts/FounderKernelContext'
 import type { ConversationSession, ConversationStore, ConversationTopic } from '@/lib/conversation/conversationTypes'
 import {
@@ -28,6 +30,21 @@ import {
 import { newConversationId, nowISO } from '@/lib/conversation/conversationUtils'
 import { useFounderInput, useUserDisplayName } from '@/components/founder/useFounderInput'
 import { useCognitiveModel } from '@/contexts/CognitiveModelContext'
+import { processFounderAIMessage } from '@/lib/ai/founder/founderAI.integration'
+import {
+  getPendingProposals,
+  getProposalByTurnId,
+  loadProposalStore,
+} from '@/lib/ai/founder/founderAI.proposals'
+import {
+  approveProposalAction,
+  approveBeliefProposal,
+  dismissProposal,
+  type FounderApprovalDeps,
+} from '@/lib/ai/founder/founderAI.approvals'
+import { isFounderAILlmEnabled } from '@/lib/ai/founder/founderAI.prefs'
+import { whatChangedSince } from '@/lib/cognitive-model/cognitiveSummary'
+import type { FounderProposalBundle, FounderReasoningMode } from '@/lib/ai/founder/founderAI.types'
 
 interface ConversationContextValue {
   ready: boolean
@@ -38,6 +55,9 @@ interface ConversationContextValue {
   proactiveDismissed: boolean
   questionChips: readonly string[]
   isTyping: boolean
+  reasoningMode: FounderReasoningMode
+  pendingProposals: FounderProposalBundle[]
+  getProposalForTurn: (turnId: string) => FounderProposalBundle | null
   composerFocusRef: React.RefObject<HTMLTextAreaElement | null>
   start: (topic?: ConversationTopic) => ConversationSession
   continueSession: () => ConversationSession
@@ -46,6 +66,9 @@ interface ConversationContextValue {
   refresh: () => void
   handleActionCard: (action: string, turnId: string) => void
   startValidationSprint: () => Promise<void>
+  approveActionProposal: (proposalId: string, actionId: string, editedPayload?: Record<string, unknown>) => Promise<void>
+  approveBeliefProposal: (proposalId: string) => Promise<void>
+  dismissAIProposal: (proposalId: string) => void
 }
 
 const ConversationContext = createContext<ConversationContextValue | null>(null)
@@ -53,20 +76,26 @@ const ConversationContext = createContext<ConversationContextValue | null>(null)
 export function ConversationProvider({ children }: { children: React.ReactNode }) {
   const founderInput = useFounderInput()
   const userName = useUserDisplayName()
-  const { worldModel, hydrated } = useCognitiveModel()
+  const { worldModel, hydrated, store: cognitiveStore } = useCognitiveModel()
   const { appState, createProject, addTask } = useAppContext()
   const { recordMemory } = useMemoryEngine()
+  const { createKnowledge } = useKnowledgeEngine()
+  const { updatePrimaryMission } = useMorningExecution()
   const { publish } = useFounderKernel()
   const [session, setSession] = useState<ConversationSession | null>(null)
   const [store, setStore] = useState<ConversationStore>(() => loadConversationStore())
   const [isTyping, setIsTyping] = useState(false)
+  const [reasoningMode, setReasoningMode] = useState<FounderReasoningMode>('idle')
+  const [pendingProposals, setPendingProposals] = useState<FounderProposalBundle[]>(() => getPendingProposals())
   const [ready, setReady] = useState(false)
   const composerFocusRef = useRef<HTMLTextAreaElement | null>(null)
+  const lastChangeBaselineRef = useRef<string>(new Date().toISOString())
 
   useEffect(() => {
     setStore(loadConversationStore())
     const active = loadConversationStore().sessions.find(s => s.status === 'active')
     setSession(active ?? null)
+    setPendingProposals(loadProposalStore().pending)
     setReady(true)
   }, [])
 
@@ -79,6 +108,7 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     setStore(getConversationStore())
     const active = getConversationStore().sessions.find(s => s.status === 'active')
     setSession(active ?? null)
+    setPendingProposals(loadProposalStore().pending)
   }, [])
 
   const appendSystemTurn = useCallback((content: string) => {
@@ -154,6 +184,16 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     })
   }, [appState.projects, appState.tasks, createProject, addTask, appendSystemTurn, publish, session?.id])
 
+  const approvalDeps = useMemo<FounderApprovalDeps>(() => ({
+    recordMemory: (input) => recordMemory(input as never),
+    createKnowledge: (input) => createKnowledge(input as never),
+    addTask: async (input) => { await addTask(input as never) },
+    createProject: (input) => createProject(input as never),
+    updateMission: updatePrimaryMission,
+    publish,
+    startValidationSprint,
+  }), [recordMemory, createKnowledge, addTask, createProject, updatePrimaryMission, publish, startValidationSprint])
+
   const start = useCallback((topic?: ConversationTopic) => {
     const s = startConversation(founderInput, userName, topic ?? 'founder')
     setSession(s)
@@ -175,71 +215,160 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
 
   const reply = useCallback(async (answer: string, questionId?: string) => {
     if (!session) return
+
+    if (/what changed/i.test(answer.trim())) {
+      const explanation = whatChangedSince(cognitiveStore, lastChangeBaselineRef.current)
+      appendSystemTurn(explanation)
+      lastChangeBaselineRef.current = new Date().toISOString()
+      return
+    }
+
     setIsTyping(true)
-    await new Promise(r => setTimeout(r, 450))
-    const result = submitAnswer(
-      { sessionId: session.id, answer, questionId },
-      founderInput,
-      userName,
-    )
-    setIsTyping(false)
-    if (!result) return
+    setReasoningMode('thinking')
 
-    setSession(result.session)
-    setStore(getConversationStore())
-
-    void publish({
-      type: 'ConversationAnswered',
-      source: 'conversation-engine',
-      payload: {
-        sessionId: result.session.id,
-        questionId: questionId ?? result.session.nextQuestion?.id,
-        answer: answer.slice(0, 200),
-      },
-    })
-
-    const meaningful = isMeaningfulUserAnswer(answer)
-    if (result.memoryWrite && result.memoryWrite.confidence >= 65 && meaningful) {
-      const mem = recordMemory({
-        type: 'conversation',
-        title: result.memoryWrite.title,
-        content: result.memoryWrite.content,
-        importance: 'medium',
-        area: 'systems',
-        source: 'assistant',
-        relatedObjectIds: [],
-        tags: ['founder-ai', 'conversation', `dedupe:conv-${result.session.id}`],
+    try {
+      void publish({
+        type: 'FounderAIRequested',
+        source: 'founder-ai',
+        payload: { sessionId: session.id, questionId },
       })
-      if (mem) {
-        void publish({
-          type: 'ConversationMemoryCreated',
-          source: 'conversation-engine',
-          payload: { sessionId: result.session.id, memoryId: mem.id, title: mem.title },
+
+      const useLlm = session.topic === 'founder' && isFounderAILlmEnabled()
+
+      if (useLlm) {
+        const result = await processFounderAIMessage({
+          sessionId: session.id,
+          answer,
+          questionId,
+          founderInput,
+          userName,
+          worldModel,
+          llmEnabled: true,
         })
+
+        setSession(result.session)
+        setStore(getConversationStore())
+        setReasoningMode(result.reasoningMode)
+        if (result.proposal) {
+          setPendingProposals(loadProposalStore().pending)
+          void publish({
+            type: 'FounderProposalCreated',
+            source: 'founder-ai',
+            payload: { proposalId: result.proposal.id, sessionId: session.id, mode: result.mode },
+          })
+        }
+        void publish({
+          type: 'FounderAIResponded',
+          source: 'founder-ai',
+          payload: { sessionId: session.id, mode: result.mode, usedFallback: result.usedFallback },
+        })
+      } else {
+        await new Promise(r => setTimeout(r, 300))
+        const deterministic = submitAnswer(
+          { sessionId: session.id, answer, questionId },
+          founderInput,
+          userName,
+        )
+        setReasoningMode('deterministic')
+        if (!deterministic) return
+        setSession(deterministic.session)
+        setStore(getConversationStore())
+
+        const meaningful = isMeaningfulUserAnswer(answer)
+        if (deterministic.memoryWrite && deterministic.memoryWrite.confidence >= 65 && meaningful) {
+          const mem = recordMemory({
+            type: 'conversation',
+            title: deterministic.memoryWrite.title,
+            content: deterministic.memoryWrite.content,
+            importance: 'medium',
+            area: 'systems',
+            source: 'assistant',
+            relatedObjectIds: [],
+            tags: ['founder-ai', 'conversation', `dedupe:conv-${deterministic.session.id}`],
+          })
+          if (mem) {
+            void publish({
+              type: 'ConversationMemoryCreated',
+              source: 'conversation-engine',
+              payload: { sessionId: deterministic.session.id, memoryId: mem.id, title: mem.title },
+            })
+          }
+        }
+        if (deterministic.knowledgeSuggestion && meaningful) {
+          void publish({
+            type: 'ConversationKnowledgeSuggested',
+            source: 'conversation-engine',
+            payload: { sessionId: deterministic.session.id, suggestion: deterministic.knowledgeSuggestion },
+          })
+        }
       }
-    }
 
-    if (result.knowledgeSuggestion && meaningful) {
       void publish({
-        type: 'ConversationKnowledgeSuggested',
+        type: 'ConversationAnswered',
         source: 'conversation-engine',
-        payload: { sessionId: result.session.id, suggestion: result.knowledgeSuggestion },
+        payload: {
+          sessionId: session.id,
+          questionId: questionId ?? session.nextQuestion?.id,
+          answer: answer.slice(0, 200),
+        },
       })
+    } catch {
+      setReasoningMode('deterministic')
+      void publish({
+        type: 'FounderAIResponseFailed',
+        source: 'founder-ai',
+        payload: { sessionId: session.id },
+      })
+      const fallback = submitAnswer(
+        { sessionId: session.id, answer, questionId },
+        founderInput,
+        userName,
+      )
+      if (fallback) {
+        setSession(fallback.session)
+        setStore(getConversationStore())
+      }
+    } finally {
+      setIsTyping(false)
+      setTimeout(() => setReasoningMode('idle'), 400)
     }
+  }, [
+    session, founderInput, userName, worldModel, cognitiveStore,
+    publish, recordMemory, appendSystemTurn,
+  ])
 
-    if (result.session.status === 'finished' && result.session.summary) {
-      void publish({
-        type: 'ConversationFinished',
-        source: 'conversation-engine',
-        payload: { sessionId: result.session.id },
-      })
-      void publish({
-        type: 'ConversationSummaryCreated',
-        source: 'conversation-engine',
-        payload: { sessionId: result.session.id, summaryId: result.session.summary.id },
-      })
-    }
-  }, [session, founderInput, userName, publish, recordMemory])
+  const approveActionProposalFn = useCallback(async (
+    proposalId: string,
+    actionId: string,
+    editedPayload?: Record<string, unknown>,
+  ) => {
+    const proposal = pendingProposals.find((p) => p.id === proposalId)
+      ?? loadProposalStore().pending.find((p) => p.id === proposalId)
+    if (!proposal) return
+    const action = proposal.response.suggestedActions.find((a) => a.id === actionId)
+    if (!action) return
+    await approveProposalAction(proposal, action, approvalDeps, editedPayload)
+    setPendingProposals(loadProposalStore().pending)
+    void publish({
+      type: 'FounderProposalEdited',
+      source: 'founder-ai',
+      payload: { proposalId, actionId, edited: Boolean(editedPayload) },
+    })
+  }, [pendingProposals, approvalDeps, publish])
+
+  const approveBeliefProposalFn = useCallback(async (proposalId: string) => {
+    const proposal = pendingProposals.find((p) => p.id === proposalId)
+      ?? loadProposalStore().pending.find((p) => p.id === proposalId)
+    if (!proposal) return
+    await approveBeliefProposal(proposal, approvalDeps)
+    lastChangeBaselineRef.current = new Date(Date.now() - 60_000).toISOString()
+    setPendingProposals(loadProposalStore().pending)
+  }, [pendingProposals, approvalDeps])
+
+  const dismissAIProposalFn = useCallback((proposalId: string) => {
+    dismissProposal(proposalId, publish)
+    setPendingProposals(loadProposalStore().pending)
+  }, [publish])
 
   const handleActionCardFn = useCallback((action: string, turnId: string) => {
     if (action === 'start_sprint' || action === 'add_tasks') {
@@ -260,6 +389,8 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     setStore(getConversationStore())
   }, [])
 
+  const getProposalForTurn = useCallback((turnId: string) => getProposalByTurnId(turnId), [])
+
   const value = useMemo<ConversationContextValue>(() => ({
     ready,
     session,
@@ -269,6 +400,9 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     proactiveDismissed: proactive.dismissed,
     questionChips: getQuestionChips(),
     isTyping,
+    reasoningMode,
+    pendingProposals,
+    getProposalForTurn,
     composerFocusRef,
     start,
     continueSession,
@@ -277,10 +411,14 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     refresh,
     handleActionCard: handleActionCardFn,
     startValidationSprint,
+    approveActionProposal: approveActionProposalFn,
+    approveBeliefProposal: approveBeliefProposalFn,
+    dismissAIProposal: dismissAIProposalFn,
   }), [
-    ready, session, store, proactive, isTyping,
-    start, continueSession, reply, dismissProactiveFn, refresh,
+    ready, session, store, proactive, isTyping, reasoningMode, pendingProposals,
+    getProposalForTurn, start, continueSession, reply, dismissProactiveFn, refresh,
     handleActionCardFn, startValidationSprint,
+    approveActionProposalFn, approveBeliefProposalFn, dismissAIProposalFn,
   ])
 
   return (

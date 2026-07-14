@@ -7,6 +7,7 @@ import ReplyChoices from './ReplyChoices'
 import ConversationComposer from './ConversationComposer'
 import ConversationTypingIndicator from './ConversationTypingIndicator'
 import ConversationEmptyState from './ConversationEmptyState'
+import FounderAIThinkingIndicator from './FounderAIThinkingIndicator'
 import { getActiveAnswerOptions } from '@/lib/conversation/conversationAdaptive'
 import Card from '@/components/home/Card'
 
@@ -14,6 +15,8 @@ export default function ConversationChat() {
   const {
     session,
     isTyping,
+    reasoningMode,
+    getProposalForTurn,
     start,
     continueSession,
     reply,
@@ -21,6 +24,9 @@ export default function ConversationChat() {
     ready,
     handleActionCard,
     composerFocusRef,
+    approveActionProposal,
+    approveBeliefProposal,
+    dismissAIProposal,
   } = useConversation()
   const scrollRef = useRef<HTMLDivElement>(null)
   const initialized = useRef(false)
@@ -72,9 +78,17 @@ export default function ConversationChat() {
                   turn={turn}
                   showEvidence={turn.role === 'founder_ai'}
                   onAction={handleActionCard}
+                  proposal={getProposalForTurn(turn.id)}
+                  onApproveAction={approveActionProposal}
+                  onApproveBeliefs={approveBeliefProposal}
+                  onDismissProposal={dismissAIProposal}
                 />
               ))}
-              {isTyping && <ConversationTypingIndicator />}
+              {isTyping && reasoningMode !== 'idle' ? (
+                <FounderAIThinkingIndicator mode={reasoningMode} />
+              ) : isTyping ? (
+                <ConversationTypingIndicator />
+              ) : null}
             </div>
           )}
         </div>

@@ -2,14 +2,20 @@
 
 import { Sparkles } from 'lucide-react'
 import type { ConversationTurn } from '@/lib/conversation/conversationTypes'
+import type { FounderProposalBundle } from '@/lib/ai/founder/founderAI.types'
 import { formatConversationTime } from '@/lib/conversation/conversationUtils'
 import EvidenceChips from './EvidenceChips'
 import ConversationActionCard from './ConversationActionCard'
+import FounderAIMessageExtras from './FounderAIMessageExtras'
 
 interface AssistantMessageProps {
   turn: ConversationTurn
   showEvidence?: boolean
   onAction?: (action: string, turnId: string) => void
+  proposal?: FounderProposalBundle | null
+  onApproveAction?: (proposalId: string, actionId: string, editedPayload?: Record<string, unknown>) => void
+  onApproveBeliefs?: (proposalId: string) => void
+  onDismissProposal?: (proposalId: string) => void
 }
 
 function renderParagraph(text: string, key: number) {
@@ -30,6 +36,10 @@ export default function AssistantMessage({
   turn,
   showEvidence = true,
   onAction,
+  proposal,
+  onApproveAction,
+  onApproveBeliefs,
+  onDismissProposal,
 }: AssistantMessageProps) {
   const paragraphs = turn.content.split('\n\n').filter(Boolean)
   const time = formatConversationTime(turn.createdAt)
@@ -55,6 +65,26 @@ export default function AssistantMessage({
             card={turn.actionCard}
             turnId={turn.id}
             onAction={onAction}
+          />
+        )}
+        {proposal && onApproveAction && onApproveBeliefs && onDismissProposal && (
+          <FounderAIMessageExtras
+            proposal={proposal}
+            evidence={turn.evidence.map((e) => ({
+              id: e.id,
+              title: e.title,
+              summary: e.summary,
+              weight: e.weight,
+              supports: e.supports,
+              sourceType: e.sourceType,
+            }))}
+            onApproveAction={onApproveAction}
+            onDismissAction={(proposalId, actionId) => {
+              onDismissProposal(proposalId)
+              void actionId
+            }}
+            onApproveBeliefs={onApproveBeliefs}
+            onDismissProposal={onDismissProposal}
           />
         )}
       </div>

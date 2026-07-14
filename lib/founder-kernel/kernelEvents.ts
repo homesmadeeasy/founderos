@@ -32,6 +32,13 @@ export const FOUNDER_EVENT_TYPES: FounderEventType[] = [
   'ConversationKnowledgeSuggested',
   'ConversationDecisionUpdated',
   'CognitiveModelUpdated',
+  'FounderAIRequested',
+  'FounderAIResponded',
+  'FounderAIResponseFailed',
+  'FounderProposalCreated',
+  'FounderProposalApproved',
+  'FounderProposalEdited',
+  'FounderProposalDismissed',
 ]
 
 export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
@@ -66,6 +73,13 @@ export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
   ConversationKnowledgeSuggested: 'Conversation knowledge suggested',
   ConversationDecisionUpdated: 'Conversation decision updated',
   CognitiveModelUpdated: 'Cognitive model updated',
+  FounderAIRequested: 'Founder AI requested',
+  FounderAIResponded: 'Founder AI responded',
+  FounderAIResponseFailed: 'Founder AI response failed',
+  FounderProposalCreated: 'Founder proposal created',
+  FounderProposalApproved: 'Founder proposal approved',
+  FounderProposalEdited: 'Founder proposal edited',
+  FounderProposalDismissed: 'Founder proposal dismissed',
 }
 
 export function summarizeEventPayload(type: FounderEventType, payload: Record<string, unknown>): string {
@@ -94,6 +108,12 @@ export function summarizeEventPayload(type: FounderEventType, payload: Record<st
     }
     case 'CognitiveModelUpdated':
       return String(payload.beliefCount ?? 'beliefs updated')
+    case 'FounderAIResponded':
+      return String(payload.mode ?? 'response')
+    case 'FounderProposalApproved':
+      return String(payload.actionType ?? payload.proposalId ?? 'approved')
+    case 'FounderProposalDismissed':
+      return String(payload.proposalId ?? 'dismissed')
     default:
       return Object.keys(payload).slice(0, 3).join(', ') || type
   }

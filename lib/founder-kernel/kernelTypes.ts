@@ -30,6 +30,13 @@ export type FounderEventType =
   | 'ConversationKnowledgeSuggested'
   | 'ConversationDecisionUpdated'
   | 'CognitiveModelUpdated'
+  | 'FounderAIRequested'
+  | 'FounderAIResponded'
+  | 'FounderAIResponseFailed'
+  | 'FounderProposalCreated'
+  | 'FounderProposalApproved'
+  | 'FounderProposalEdited'
+  | 'FounderProposalDismissed'
 
 export type FounderEventStatus =
   | 'created'

@@ -52,6 +52,7 @@ export const SUGGESTED_QUESTION_CHIPS = [
   'What would YC tell me?',
   'What evidence supports this?',
   'What should I validate first?',
+  'What changed?',
 ] as const
 
 export const QUESTION_CHIPS = SUGGESTED_QUESTION_CHIPS
