@@ -15,7 +15,8 @@
     "test:providers": "npx tsx lib/contexts/providerTests.ts",
     "test:founder-intelligence": "npx tsx lib/evaluation/founder-ai/founderAIIntelligenceTests.ts",
     "test:founder-regression": "npx tsx lib/evaluation/founder-ai/founderAIIntelligenceTests.ts",
-    "test:action-engine": "npx tsx lib/action-engine/actionEngineTests.ts"
+    "test:action-engine": "npx tsx lib/action-engine/actionEngineTests.ts",
+    "test:gym-evidence": "npx tsx lib/specialists/gym/evidence/gymEvidenceTests.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

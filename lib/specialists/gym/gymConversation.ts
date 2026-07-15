@@ -22,16 +22,24 @@ export function answerGymQuestion(snapshot: GymSnapshot, prompt: string): string
 
   if (lower.includes('train today') || lower.includes('what should i train')) {
     const ex = snapshot.todaysWorkout.exercises
-      .map(e => `${e.order}. **${e.exerciseName}** — ${e.sets}×${e.reps} @ RPE ${e.targetRpe}`)
+      .map(e => {
+        const mode = e.prescription.prescriptionMode === 'evidence_informed' ? 'evidence-informed' : 'fallback'
+        return `${e.order}. **${e.exerciseName}** — ${e.sets}×${e.reps} @ RPE ${e.targetRpe} (${mode}, ${e.prescription.prescriptionConfidence}% confidence)`
+      })
       .join('\n')
+    const bench = snapshot.todaysWorkout.exercises.find(e => e.exerciseId === 'barbell-bench-press')
+    const benchNote = bench
+      ? `\n\n**Bench press note:** ${bench.prescription.rationale} Tap "Why this?" on the workout card for full research and personal context.`
+      : ''
     return [
       `**Today's session: ${snapshot.todaysWorkout.title}** (~${snapshot.todaysWorkout.estimatedMinutes} min)`,
       ex || 'No exercises planned — check equipment and recovery constraints.',
       `**Muscles:** ${snapshot.todaysWorkout.musclesTrained.map(m => MUSCLE_GROUP_LABELS[m]).join(', ') || '—'}`,
       `**Why:** ${snapshot.todaysWorkout.rationale}`,
       snapshot.evidence.length > 0
-        ? `**Evidence:** ${snapshot.evidence.slice(0, 2).map(e => e.title).join(' · ')}`
+        ? `**Personal evidence:** ${snapshot.evidence.slice(0, 2).map(e => e.title).join(' · ')}`
         : '',
+      benchNote,
     ].filter(Boolean).join('\n\n')
   }
 

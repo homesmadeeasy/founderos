@@ -59,6 +59,11 @@ export type FounderEventType =
   | 'ActionRejected'
   | 'ActionExecuted'
   | 'ActionFailed'
+  | 'GymEvidenceReviewed'
+  | 'GymPrescriptionGenerated'
+  | 'GymPrescriptionExplained'
+  | 'GymResearchSourceAdded'
+  | 'GymPrescriptionAdjusted'
 
 export type FounderEventStatus =
   | 'created'

@@ -4,14 +4,15 @@ import type {
   GoalProfile,
   RecoveryStatus,
   MuscleGroup,
-  GymGoal,
+  WorkoutSession,
 } from './gymTypes'
-import type { WorkoutSession } from './gymTypes'
-import { GYM_EXERCISE_LIBRARY } from './gymExerciseLibrary'
-import { recommendExercises } from './gymExerciseSelection'
 import type { WeeklyVolume } from './gymTypes'
 import type { GymWeakness } from './gymTypes'
 import type { EquipmentProfile, InjuryProfile } from './gymTypes'
+import { GYM_EXERCISE_LIBRARY } from './gymExerciseLibrary'
+import { recommendExercises } from './gymExerciseSelection'
+import { buildExercisePrescription, buildWorkoutResearchSummary } from './evidence/gymPrescriptionReasoning'
+import { buildPrescriptionContext } from './evidence/gymPrescriptionContext'
 
 const SPLIT_TEMPLATES: Record<string, string[]> = {
   push: ['barbell-bench-press', 'incline-dumbbell-press', 'overhead-press', 'lateral-raise', 'tricep-pushdown'],
@@ -43,22 +44,50 @@ function pickSplit(
   return 'legs'
 }
 
-function buildPlannedExercise(exerciseId: string, order: number, goal: GymGoal, light: boolean): PlannedExercise | null {
+function buildPlannedExercise(
+  exerciseId: string,
+  order: number,
+  params: {
+    goal: GoalProfile
+    recovery: RecoveryStatus
+    sessions: WorkoutSession[]
+    volume: WeeklyVolume[]
+    injuries: InjuryProfile
+    equipment: EquipmentProfile
+    userEvidenceIds: string[]
+    healthText: string
+    shortSession: boolean
+  },
+): PlannedExercise | null {
   const ex = GYM_EXERCISE_LIBRARY.find(e => e.id === exerciseId)
   if (!ex) return null
-  const sets = light ? 2 : ex.compound ? 3 : 3
-  const reps = goal === 'strength' || goal === 'powerlifting'
-    ? (ex.compound ? '5' : '8')
-    : ex.repRange.split('-')[0] ?? '8'
+
+  const light = params.recovery === 'train_light' || params.recovery === 'deload'
+  const ctx = buildPrescriptionContext({
+    exercise: ex,
+    goal: params.goal,
+    recovery: params.recovery,
+    sessions: params.sessions,
+    volume: params.volume,
+    injuries: params.injuries,
+    equipment: params.equipment,
+    userEvidenceIds: params.userEvidenceIds,
+    shortSession: params.shortSession,
+    healthText: params.healthText,
+  })
+
+  const prescription = buildExercisePrescription(ex, ctx, light)
+
   return {
     exerciseId: ex.id,
     exerciseName: ex.name,
     order,
-    sets,
-    reps,
-    restSeconds: light ? Math.round(ex.restSeconds * 0.75) : ex.restSeconds,
-    targetRpe: light ? 6 : goal === 'strength' ? 8 : 7,
+    sets: prescription.sets,
+    reps: String(prescription.targetReps),
+    restSeconds: prescription.restSeconds,
+    targetRpe: prescription.targetRPE ?? 7,
     primaryMuscle: ex.primaryMuscle,
+    prescription,
   }
 }
 
@@ -71,6 +100,8 @@ export function generateTodaysWorkout(params: {
   equipment: EquipmentProfile
   injuries: InjuryProfile
   evidenceIds: string[]
+  healthText?: string
+  shortSession?: boolean
 }): TodaysWorkout {
   const splitKey = pickSplit(params.recovery, params.sessions, params.goal)
   let exerciseIds = [...(SPLIT_TEMPLATES[splitKey] ?? SPLIT_TEMPLATES.full)]
@@ -100,13 +131,26 @@ export function generateTodaysWorkout(params: {
   }
 
   const light = params.recovery === 'train_light' || params.recovery === 'deload'
+  const planParams = {
+    goal: params.goal,
+    recovery: params.recovery,
+    sessions: params.sessions,
+    volume: params.volume,
+    injuries: params.injuries,
+    equipment: params.equipment,
+    userEvidenceIds: params.evidenceIds,
+    healthText: params.healthText ?? '',
+    shortSession: params.shortSession ?? false,
+  }
+
   const exercises = exerciseIds
-    .map((id, i) => buildPlannedExercise(id, i + 1, params.goal.primaryGoal, light))
+    .map((id, i) => buildPlannedExercise(id, i + 1, planParams))
     .filter((e): e is PlannedExercise => e != null)
     .slice(0, light ? 4 : 6)
 
   const muscles = [...new Set(exercises.map(e => e.primaryMuscle))] as MuscleGroup[]
   const estimatedMinutes = exercises.reduce((sum, e) => sum + e.sets * (e.restSeconds / 60 + 0.75), 0)
+  const researchSummary = buildWorkoutResearchSummary(exercises.map(e => e.prescription))
 
   const title = splitKey === 'deload'
     ? 'Deload session'
@@ -115,8 +159,8 @@ export function generateTodaysWorkout(params: {
       : `${splitKey.charAt(0).toUpperCase()}${splitKey.slice(1)} day`
 
   const rationale = params.sessions.length === 0
-    ? 'No logged workout history — starter session from your goal and recovery signals.'
-    : `Built from ${params.sessions.length} logged session(s), weekly volume, and ${params.recovery} recovery status.`
+    ? 'Evidence-informed starter session from your goal, recovery signals, and approved research — confidence is limited until you log workouts.'
+    : `Built from ${params.sessions.length} logged session(s), weekly volume, recovery status, and approved research claims (${researchSummary.evidenceInformedCount} evidence-informed, ${researchSummary.fallbackCount} fallback).`
 
   return {
     title,
@@ -125,6 +169,7 @@ export function generateTodaysWorkout(params: {
     musclesTrained: muscles,
     rationale,
     evidenceIds: params.evidenceIds,
+    researchSummary,
   }
 }
 

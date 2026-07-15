@@ -61,6 +61,11 @@ export const FOUNDER_EVENT_TYPES: FounderEventType[] = [
   'ActionRejected',
   'ActionExecuted',
   'ActionFailed',
+  'GymEvidenceReviewed',
+  'GymPrescriptionGenerated',
+  'GymPrescriptionExplained',
+  'GymResearchSourceAdded',
+  'GymPrescriptionAdjusted',
 ]
 
 export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
@@ -124,6 +129,11 @@ export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
   ActionRejected: 'Action rejected',
   ActionExecuted: 'Action executed',
   ActionFailed: 'Action failed',
+  GymEvidenceReviewed: 'Gym evidence reviewed',
+  GymPrescriptionGenerated: 'Gym prescription generated',
+  GymPrescriptionExplained: 'Gym prescription explained',
+  GymResearchSourceAdded: 'Gym research source added',
+  GymPrescriptionAdjusted: 'Gym prescription adjusted',
 }
 
 export function summarizeEventPayload(type: FounderEventType, payload: Record<string, unknown>): string {

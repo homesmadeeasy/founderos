@@ -185,6 +185,7 @@ export interface PlannedExercise {
   restSeconds: number
   targetRpe: number
   primaryMuscle: MuscleGroup
+  prescription: import('./evidence/gymEvidenceTypes').WorkoutExercisePrescription
 }
 
 export interface TodaysWorkout {
@@ -194,6 +195,7 @@ export interface TodaysWorkout {
   musclesTrained: MuscleGroup[]
   rationale: string
   evidenceIds: string[]
+  researchSummary: import('./evidence/gymEvidenceTypes').WorkoutResearchSummary
 }
 
 export interface GymWeakness {

@@ -9,6 +9,7 @@ import { recommendExercises } from './gymExerciseSelection'
 import { generateTodaysWorkout } from './gymWorkoutPlanner'
 import { generateGymNarrative } from './gymNarrative'
 import { GYM_GOAL_LABELS } from './gymTypes'
+import { extractHealthTextFromInput } from './evidence/gymPrescriptionContext'
 
 function buildGymEvidence(input: GymInput, data: ReturnType<typeof gatherGymData>): GymEvidence[] {
   const evidence: GymEvidence[] = []
@@ -191,6 +192,7 @@ export function buildGymSnapshot(input: GymInput): GymSnapshot {
   const evidence = buildGymEvidence(input, data)
   const evidenceIds = evidence.map(e => e.id)
 
+  const healthText = extractHealthTextFromInput(input)
   const todaysWorkout = generateTodaysWorkout({
     goal: goalProfile,
     recovery: recoveryAssessment.status,
@@ -200,6 +202,8 @@ export function buildGymSnapshot(input: GymInput): GymSnapshot {
     equipment: equipmentProfile,
     injuries: injuryProfile,
     evidenceIds,
+    healthText,
+    shortSession: false,
   })
 
   const recommendations = recommendExercises({

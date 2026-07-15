@@ -26,12 +26,13 @@ export default function GymConversationCard({ snapshot }: Props) {
   const proposeQuickWorkout = useCallback(async () => {
     const first = snapshot.todaysWorkout.exercises[0]
     if (!first) return
+    const p = first.prescription
     const payload = {
       exerciseName: first.exerciseName,
       exerciseId: first.exerciseId,
       weight: 0,
-      reps: parseInt(first.reps, 10) || 8,
-      sets: 3,
+      reps: p.targetReps,
+      sets: p.sets,
       notes: `Completed ${snapshot.todaysWorkout.title}`,
     }
     const proposal = await proposeAction({
