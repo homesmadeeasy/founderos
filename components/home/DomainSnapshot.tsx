@@ -54,6 +54,21 @@ export default function DomainSnapshot() {
                 {domainOneLiner(e)}
               </p>
             </Link>
+          ) : e.domainId === 'health' ? (
+            <Link
+              key={e.id}
+              href="/gym"
+              className={`rounded-xl border border-emerald-200/60 bg-gradient-to-br ${DOMAIN_GRADIENTS.health} p-2.5 shadow-[0_1px_6px_rgba(16,185,129,0.08)] hover:shadow-[0_2px_12px_rgba(16,185,129,0.12)] transition-shadow block`}
+            >
+              <p className="text-[11px] font-semibold text-emerald-800 truncate">Gym AI</p>
+              <p className="text-2xl font-semibold text-zinc-900 mt-1 tabular-nums leading-none">{e.score}</p>
+              <span className={`inline-block mt-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full border ${statusColorClass(e.status)}`}>
+                {e.status.replace('_', ' ')}
+              </span>
+              <p className="text-[10px] text-zinc-500 mt-1.5 line-clamp-2 leading-snug">
+                {domainOneLiner(e)}
+              </p>
+            </Link>
           ) : (
             <div
               key={e.id}

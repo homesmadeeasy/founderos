@@ -14,6 +14,7 @@ import {
   History,
   BookOpen,
   Crown,
+  Dumbbell,
   Settings,
   LogOut,
   Command,
@@ -26,6 +27,7 @@ import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
 const nav = [
   { label: 'Home', href: '/home', icon: Home },
   { label: 'Founder', href: '/founder', icon: Rocket },
+  { label: 'Gym', href: '/gym', icon: Dumbbell },
   { label: 'Morning', href: '/morning', icon: Sun },
   { label: 'Evening', href: '/evening', icon: Moon },
   { label: 'Domains', href: '/domains', icon: LayoutGrid },

@@ -52,6 +52,7 @@ function testUseCognitiveModelCallSites() {
   const allowed = new Set([
     'components/home/CognitiveInsightCard.tsx',
     'components/founder/useFounderInput.ts',
+    'components/gym/useGymInput.ts',
     'contexts/ConversationContext.tsx',
     'contexts/CognitiveModelContext.tsx',
     'components/kernel/KernelSubscriberBootstrap.tsx',
@@ -81,11 +82,28 @@ function testUseCognitiveModelCallSites() {
   console.log(`PASS: all ${out.length} useCognitiveModel() call sites are allowed descendants`)
 }
 
+function testGymBaseInputHasNoCognitiveDependency() {
+  const src = read('components/gym/useGymBaseInput.ts')
+  assert(!/from\s+['"]@\/contexts\/CognitiveModelContext['"]/.test(src), 'useGymBaseInput must not import CognitiveModelContext')
+  assert(!/=\s*useCognitiveModel\s*\(/.test(src), 'useGymBaseInput must not call useCognitiveModel()')
+  console.log('PASS: useGymBaseInput has no cognitive dependency')
+}
+
+function testGymInputMergesCognitive() {
+  const src = read('components/gym/useGymInput.ts')
+  assert(src.includes('useGymBaseInput'), 'useGymInput must compose base input')
+  assert(src.includes('useCognitiveModel'), 'useGymInput must merge cognitive model for descendants')
+  assert(src.includes('mergeGymInputWithWorldModel'), 'useGymInput must use merge helper')
+  console.log('PASS: useGymInput composes base + cognitive')
+}
+
 function run() {
   console.log('Provider dependency audit\n')
   testCognitiveProviderDoesNotUseFounderInput()
   testBaseInputHasNoCognitiveDependency()
   testFounderInputMergesCognitive()
+  testGymBaseInputHasNoCognitiveDependency()
+  testGymInputMergesCognitive()
   testLayoutProviderOrder()
   testUseCognitiveModelCallSites()
   console.log('\nAll provider dependency tests passed.')

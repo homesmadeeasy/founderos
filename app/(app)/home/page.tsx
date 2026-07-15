@@ -12,6 +12,8 @@ import RecentLearning from '@/components/home/RecentLearning'
 import TodayDecision from '@/components/home/TodayDecision'
 import QuickActionsDock from '@/components/home/QuickActionsDock'
 import FounderInsightCard from '@/components/home/FounderInsightCard'
+import GymInsightCard from '@/components/home/GymInsightCard'
+import GymHomeSummary from '@/components/home/GymHomeSummary'
 import CognitiveInsightCard from '@/components/home/CognitiveInsightCard'
 import FounderStatus from '@/components/home/FounderStatus'
 
@@ -48,6 +50,14 @@ function HomeContent() {
 
         <div className="mt-3.5">
           <FounderInsightCard />
+        </div>
+
+        <div className="mt-3.5">
+          <GymInsightCard />
+        </div>
+
+        <div className="mt-3.5">
+          <GymHomeSummary />
         </div>
 
         <div className="mt-4 space-y-3.5">
