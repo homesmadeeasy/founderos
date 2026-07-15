@@ -25,6 +25,18 @@ export type FounderActionType =
   | 'create_knowledge_draft'
   | 'update_mission'
   | 'schedule_placeholder'
+  | 'WorkoutLogged'
+  | 'GoalUpdated'
+  | 'MissionUpdated'
+  | 'MemoryCreated'
+  | 'KnowledgeCreated'
+  | 'TaskCreated'
+  | 'ProjectCreated'
+  | 'RecoveryUpdated'
+  | 'WorkoutCompleted'
+  | 'RoutineGenerated'
+  | 'ValidationLogged'
+  | 'UserFeedbackAdded'
 
 export interface CompactEvidenceRef {
   id: string

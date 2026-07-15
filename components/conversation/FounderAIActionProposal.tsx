@@ -71,7 +71,11 @@ export default function FounderAIActionProposal({
       ) : (
         <>
           <p className="text-sm font-medium text-zinc-900">{title}</p>
-          <p className="text-xs text-zinc-600 mt-1 leading-relaxed">{description}</p>
+          {action.type === 'WorkoutLogged' ? (
+            <pre className="text-xs text-zinc-600 mt-1 leading-relaxed whitespace-pre-wrap font-sans">{description}</pre>
+          ) : (
+            <p className="text-xs text-zinc-600 mt-1 leading-relaxed">{description}</p>
+          )}
           <p className="text-[10px] text-zinc-400 mt-2">{action.rationale}</p>
         </>
       )}

@@ -9,15 +9,35 @@ import type {
 } from './founderAI.types'
 import { resolveProposal } from './founderAI.proposals'
 import type { FounderEvent } from '@/lib/founder-kernel/kernelTypes'
+import { ensureActionHandlersRegistered } from '@/lib/action-engine/registerActionHandlers'
+import { canExecuteActionType } from '@/lib/action-engine/actionDispatcher'
+import { runActionHandler } from '@/lib/action-engine/actionExecution'
+import type { ActionExecutionContext } from '@/lib/action-engine/actionTypes'
+import { recordActionHistory } from '@/lib/action-engine/actionHistory'
+import { buildActionPreview } from '@/lib/action-engine/actionProposal'
 
 export interface FounderApprovalDeps {
   recordMemory: (input: Record<string, unknown>) => { id: string; title: string } | null
   createKnowledge: (input: Record<string, unknown>) => Promise<{ id: string } | null> | { id: string } | null
+  createObject: (input: Record<string, unknown>) => { id: string } | null
   addTask: (input: Record<string, unknown>) => Promise<void> | void
   createProject: (input: Record<string, unknown>) => Promise<{ id: string }>
   updateMission: (mission: string) => void
   publish: (event: Omit<FounderEvent, 'id' | 'timestamp' | 'status'>) => Promise<unknown> | unknown
   startValidationSprint: () => Promise<void>
+}
+
+function toActionContext(deps: FounderApprovalDeps): ActionExecutionContext {
+  return {
+    recordMemory: deps.recordMemory,
+    createKnowledge: deps.createKnowledge,
+    createObject: deps.createObject,
+    addTask: deps.addTask,
+    createProject: deps.createProject,
+    updateMission: deps.updateMission,
+    startValidationSprint: deps.startValidationSprint,
+    publish: (event) => deps.publish({ type: event.type, source: event.source, payload: event.payload }),
+  }
 }
 
 function topicFromDomain(domain: string): BeliefTopic {
@@ -73,6 +93,43 @@ export async function approveProposalAction(
   editedPayload?: Record<string, unknown>,
 ): Promise<void> {
   const payload = { ...action.payload, ...editedPayload }
+  ensureActionHandlersRegistered()
+
+  if (canExecuteActionType(action.type)) {
+    await deps.publish({
+      type: 'ActionApproved',
+      source: 'founder-ai',
+      payload: { actionId: action.id, actionType: action.type, proposalId: proposal.id },
+    })
+    const result = await runActionHandler(
+      action.type as import('@/lib/action-engine/actionTypes').ActionType,
+      payload,
+      toActionContext(deps),
+      {
+        proposalId: action.id,
+        source: 'founder-ai',
+        preview: action.description || buildActionPreview(action.type as import('@/lib/action-engine/actionTypes').ActionType, payload),
+      },
+    )
+    if (result.success) {
+      recordActionHistory({
+        proposalId: proposal.id,
+        type: action.type as import('@/lib/action-engine/actionTypes').ActionType,
+        status: 'executed',
+        preview: action.description,
+        undoPayload: result.createdIds,
+        createdIds: result.createdIds,
+        source: 'founder-ai',
+      })
+    }
+    resolveProposal(proposal.id, 'approved')
+    await deps.publish({
+      type: 'FounderProposalApproved',
+      source: 'founder-ai',
+      payload: { proposalId: proposal.id, actionId: action.id, actionType: action.type },
+    })
+    return
+  }
 
   switch (action.type) {
     case 'create_memory_draft': {

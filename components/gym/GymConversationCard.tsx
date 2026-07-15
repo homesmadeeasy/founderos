@@ -3,9 +3,8 @@
 import { useState, useCallback } from 'react'
 import type { GymSnapshot } from '@/lib/specialists/gym/gymTypes'
 import { GYM_QUESTION_CHIPS, answerGymQuestion } from '@/lib/specialists/gym/gymConversation'
-import { useFounderKernel } from '@/contexts/FounderKernelContext'
-import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
-import { buildWorkoutLogMemory } from '@/lib/specialists/gym/gymWorkoutLogger'
+import { useActionEngine } from '@/contexts/ActionEngineContext'
+import { buildActionPreview } from '@/lib/action-engine/actionProposal'
 import GymCard from './GymCard'
 
 interface Props {
@@ -15,31 +14,58 @@ interface Props {
 export default function GymConversationCard({ snapshot }: Props) {
   const [prompt, setPrompt] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
-  const { publish } = useFounderKernel()
-  const { createMemory } = useMemoryEngine()
+  const [pendingProposalId, setPendingProposalId] = useState<string | null>(null)
+  const [proposalPreview, setProposalPreview] = useState<string | null>(null)
+  const { proposeAction, approveAction, rejectActionProposal } = useActionEngine()
 
   const ask = useCallback((text: string) => {
     setPrompt(text)
     setAnswer(answerGymQuestion(snapshot, text))
-    void publish({ type: 'UserAskedQuestion', source: 'gym-ai', payload: { question: text.slice(0, 80) } })
-  }, [snapshot, publish])
+  }, [snapshot])
 
-  const logQuickWorkout = useCallback(() => {
+  const proposeQuickWorkout = useCallback(async () => {
     const first = snapshot.todaysWorkout.exercises[0]
     if (!first) return
-    const mem = buildWorkoutLogMemory({
-      exercises: [{
-        exerciseId: first.exerciseId,
-        exerciseName: first.exerciseName,
-        sets: [{ setNumber: 1, reps: parseInt(first.reps, 10) || 8, weight: 0, completed: true }],
-      }],
+    const payload = {
+      exerciseName: first.exerciseName,
+      exerciseId: first.exerciseId,
+      weight: 0,
+      reps: parseInt(first.reps, 10) || 8,
+      sets: 3,
       notes: `Completed ${snapshot.todaysWorkout.title}`,
+    }
+    const proposal = await proposeAction({
+      type: 'WorkoutLogged',
+      payload,
+      title: `Log ${first.exerciseName}`,
+      description: buildActionPreview('WorkoutLogged', payload),
+      rationale: 'Log today\'s workout after approval.',
+      source: 'gym-ai',
     })
-    createMemory(mem)
-    void publish({ type: 'WorkoutLogged', source: 'gym-ai', payload: { title: snapshot.todaysWorkout.title } })
-    void publish({ type: 'WeeklyVolumeUpdated', source: 'gym-ai', payload: { muscle: first.primaryMuscle } })
-    setAnswer('Workout logged to Memory. Refresh to update volume and progression.')
-  }, [snapshot, createMemory, publish])
+    if (proposal) {
+      setPendingProposalId(proposal.id)
+      setProposalPreview(proposal.preview)
+      setAnswer('Workout proposal ready. Approve below to update volume, progression, and recovery.')
+    }
+  }, [snapshot, proposeAction])
+
+  const approvePending = useCallback(async () => {
+    if (!pendingProposalId) return
+    const result = await approveAction(pendingProposalId)
+    setPendingProposalId(null)
+    setProposalPreview(null)
+    setAnswer(result.success
+      ? 'Workout approved and logged. All subscribers refreshed via kernel events.'
+      : `Failed to log workout: ${result.error ?? 'unknown error'}`)
+  }, [pendingProposalId, approveAction])
+
+  const rejectPending = useCallback(async () => {
+    if (!pendingProposalId) return
+    await rejectActionProposal(pendingProposalId)
+    setPendingProposalId(null)
+    setProposalPreview(null)
+    setAnswer('Workout proposal dismissed.')
+  }, [pendingProposalId, rejectActionProposal])
 
   return (
     <GymCard className="p-4 sm:p-5">
@@ -75,13 +101,29 @@ export default function GymConversationCard({ snapshot }: Props) {
           {answer}
         </div>
       )}
-      <button
-        type="button"
-        onClick={logQuickWorkout}
-        className="mt-3 text-xs font-medium text-emerald-700 hover:underline"
-      >
-        Log today&apos;s workout to Memory
-      </button>
+      {proposalPreview && pendingProposalId && (
+        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+          <p className="text-[10px] font-semibold tracking-[0.16em] uppercase text-emerald-600 mb-1">Action proposal</p>
+          <pre className="text-xs text-zinc-700 whitespace-pre-wrap font-sans">{proposalPreview}</pre>
+          <div className="flex gap-2 mt-2">
+            <button type="button" onClick={approvePending} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white">
+              Approve
+            </button>
+            <button type="button" onClick={rejectPending} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      {!pendingProposalId && (
+        <button
+          type="button"
+          onClick={proposeQuickWorkout}
+          className="mt-3 text-xs font-medium text-emerald-700 hover:underline"
+        >
+          Propose logging today&apos;s workout
+        </button>
+      )}
     </GymCard>
   )
 }

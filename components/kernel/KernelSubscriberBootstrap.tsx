@@ -49,6 +49,25 @@ export default function KernelSubscriberBootstrap() {
         },
       }),
       registerSubscriber({
+        id: 'action-engine-refresh',
+        name: 'Action Engine Refresh',
+        priority: 35,
+        subscribedEvents: [
+          'ActionExecuted',
+          'ActionApproved',
+          'WorkoutLogged',
+          'WeeklyVolumeUpdated',
+          'RecoveryUpdated',
+          'RoutineGenerated',
+        ],
+        handler: (event) => {
+          if (['ActionExecuted', 'ActionApproved', 'WorkoutLogged', 'WeeklyVolumeUpdated', 'RecoveryUpdated', 'RoutineGenerated'].includes(event.type)) {
+            refreshObjects()
+            refreshMorning()
+          }
+        },
+      }),
+      registerSubscriber({
         id: 'cognitive-model',
         name: 'Cognitive Model',
         priority: 45,
@@ -60,6 +79,9 @@ export default function KernelSubscriberBootstrap() {
           'KnowledgeCreated',
           'DecisionGenerated',
           'ConversationAnswered',
+          'ActionExecuted',
+          'WorkoutLogged',
+          'ObjectCreated',
         ],
         handler: (event) => {
           processKernelRef.current(event)
@@ -80,9 +102,9 @@ export default function KernelSubscriberBootstrap() {
         id: 'morning-execution',
         name: 'Morning Execution',
         priority: 70,
-        subscribedEvents: ['CaptureCreated', 'EveningCompleted', 'SignalProcessed', 'OutcomeRecorded'],
+        subscribedEvents: ['CaptureCreated', 'EveningCompleted', 'SignalProcessed', 'OutcomeRecorded', 'ActionExecuted', 'WorkoutLogged', 'WeeklyVolumeUpdated'],
         handler: (event) => {
-          if (['CaptureCreated', 'EveningCompleted', 'SignalProcessed', 'OutcomeRecorded'].includes(event.type)) {
+          if (['CaptureCreated', 'EveningCompleted', 'SignalProcessed', 'OutcomeRecorded', 'ActionExecuted', 'WorkoutLogged', 'WeeklyVolumeUpdated'].includes(event.type)) {
             refreshMorning()
           }
         },
@@ -111,9 +133,9 @@ export default function KernelSubscriberBootstrap() {
         id: 'domain-intelligence',
         name: 'Domain Intelligence',
         priority: 55,
-        subscribedEvents: ['MorningStarted', 'CaptureCreated', 'EveningCompleted'],
+        subscribedEvents: ['MorningStarted', 'CaptureCreated', 'EveningCompleted', 'ActionExecuted', 'WorkoutLogged'],
         handler: (event) => {
-          if (['MorningStarted', 'CaptureCreated', 'EveningCompleted'].includes(event.type)) {
+          if (['MorningStarted', 'CaptureCreated', 'EveningCompleted', 'ActionExecuted', 'WorkoutLogged'].includes(event.type)) {
             refreshMorning()
           }
         },

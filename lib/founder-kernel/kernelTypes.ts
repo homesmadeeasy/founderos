@@ -54,6 +54,11 @@ export type FounderEventType =
   | 'FounderEvaluationScenarioCompleted'
   | 'FounderEvaluationCompleted'
   | 'FounderEvaluationCriticalFailure'
+  | 'ActionProposed'
+  | 'ActionApproved'
+  | 'ActionRejected'
+  | 'ActionExecuted'
+  | 'ActionFailed'
 
 export type FounderEventStatus =
   | 'created'

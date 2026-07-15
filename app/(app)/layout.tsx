@@ -11,6 +11,7 @@ import { SignalEngineProvider } from '@/contexts/SignalEngineContext'
 import { SyncEngineProvider } from '@/contexts/SyncEngineContext'
 import { FounderKernelProvider } from '@/contexts/FounderKernelContext'
 import { CognitiveModelProvider } from '@/contexts/CognitiveModelContext'
+import { ActionEngineProvider } from '@/contexts/ActionEngineContext'
 import { ConversationProvider } from '@/contexts/ConversationContext'
 import { UniversalCaptureProvider } from '@/contexts/UniversalCaptureContext'
 import KernelSubscriberBootstrap from '@/components/kernel/KernelSubscriberBootstrap'
@@ -37,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                       <MorningExecutionProvider>
                         <EveningReviewProvider>
                           <CognitiveModelProvider>
+                            <ActionEngineProvider>
                             <ConversationProvider>
                             <CommandBarProvider>
                               <KernelSubscriberBootstrap />
@@ -51,6 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                               </div>
                             </CommandBarProvider>
                             </ConversationProvider>
+                            </ActionEngineProvider>
                           </CognitiveModelProvider>
                         </EveningReviewProvider>
                       </MorningExecutionProvider>

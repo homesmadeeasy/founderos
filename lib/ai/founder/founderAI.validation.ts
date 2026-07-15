@@ -16,6 +16,18 @@ const ALLOWED_ACTION_TYPES = new Set<string>([
   'create_knowledge_draft',
   'update_mission',
   'schedule_placeholder',
+  'WorkoutLogged',
+  'GoalUpdated',
+  'MissionUpdated',
+  'MemoryCreated',
+  'KnowledgeCreated',
+  'TaskCreated',
+  'ProjectCreated',
+  'RecoveryUpdated',
+  'WorkoutCompleted',
+  'RoutineGenerated',
+  'ValidationLogged',
+  'UserFeedbackAdded',
 ])
 
 const SAFE_PAYLOAD_KEYS: Record<string, Set<string>> = {
@@ -27,6 +39,18 @@ const SAFE_PAYLOAD_KEYS: Record<string, Set<string>> = {
   create_knowledge_draft: new Set(['title', 'principle', 'domain']),
   update_mission: new Set(['mission']),
   schedule_placeholder: new Set(['title', 'startAt', 'durationMinutes', 'note']),
+  WorkoutLogged: new Set(['exerciseName', 'weight', 'reps', 'sets', 'exerciseId', 'rpe', 'notes']),
+  WorkoutCompleted: new Set(['title', 'durationMinutes', 'exercises']),
+  RecoveryUpdated: new Set(['status', 'score', 'rationale']),
+  RoutineGenerated: new Set(['title', 'exerciseCount', 'exercises']),
+  GoalUpdated: new Set(['title', 'goalId', 'description']),
+  MissionUpdated: new Set(['mission']),
+  MemoryCreated: new Set(['title', 'content', 'type', 'area', 'tags']),
+  KnowledgeCreated: new Set(['title', 'principle', 'domain', 'tags']),
+  TaskCreated: new Set(['title', 'description', 'dueDate', 'priority', 'projectId']),
+  ProjectCreated: new Set(['title', 'description']),
+  ValidationLogged: new Set(['title', 'notes']),
+  UserFeedbackAdded: new Set(['title', 'content']),
 }
 
 function clamp(n: number, min: number, max: number): number {

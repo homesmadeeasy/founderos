@@ -6,6 +6,9 @@ import { buildCompactFounderContext } from './founderAI.context'
 import type { CompactFounderContext, FounderAIResponse } from './founderAI.types'
 import { validateFounderAIResponse } from './founderAI.validation'
 import { newConversationId, nowISO } from '@/lib/conversation/conversationUtils'
+import { extractWorkoutFromMessage } from '@/lib/action-engine/actionUtils'
+import { buildActionPreview, buildActionTitle } from '@/lib/action-engine/actionProposal'
+import type { ProposedAction } from './founderAI.types'
 
 export function buildDeterministicFounderAIResponse(params: {
   userMessage: string
@@ -26,8 +29,37 @@ export function buildDeterministicFounderAIResponse(params: {
   })
 
   const reconciliation = params.reconciliation
+
+  const beliefsToUpdate = (reconciliation?.changes ?? []).slice(0, 4).map(c => ({
+    beliefId: c.beliefId,
+    proposition: c.newStatement,
+    operation: 'update' as const,
+    confidenceDelta: c.newConfidence - c.previousConfidence,
+    rationale: c.reason,
+    evidenceIds: c.evidenceIds.slice(0, 4),
+  }))
+
+  const suggestedActions: ProposedAction[] = []
+  const workout = extractWorkoutFromMessage(params.userMessage)
+  if (workout) {
+    suggestedActions.push({
+      id: newConversationId(),
+      type: 'WorkoutLogged',
+      title: buildActionTitle('WorkoutLogged', workout),
+      description: buildActionPreview('WorkoutLogged', workout),
+      rationale: 'Parsed workout from your message. Approve to log volume, progression, and recovery updates.',
+      confidence: 85,
+      domain: 'health',
+      reversible: true,
+      requiresApproval: true,
+      payload: workout,
+    })
+  }
+
   const message = reconciliation?.responseMessage
-    || 'I need a bit more detail before updating my view.'
+    || (workout
+      ? 'I parsed your workout. Review the action proposal below and approve to log it across FounderOS.'
+      : 'I need a bit more detail before updating my view.')
 
   const nextQuestion = reconciliation?.nextQuestion
     ? {
@@ -39,15 +71,6 @@ export function buildDeterministicFounderAIResponse(params: {
     }
     : undefined
 
-  const beliefsToUpdate = (reconciliation?.changes ?? []).slice(0, 4).map(c => ({
-    beliefId: c.beliefId,
-    proposition: c.newStatement,
-    operation: 'update' as const,
-    confidenceDelta: c.newConfidence - c.previousConfidence,
-    rationale: c.reason,
-    evidenceIds: c.evidenceIds.slice(0, 4),
-  }))
-
   const raw: FounderAIResponse = {
     message,
     reasoningSummary: reconciliation?.reasoningSummary
@@ -57,7 +80,7 @@ export function buildDeterministicFounderAIResponse(params: {
     beliefsToUpdate,
     contradictionsToCreate: [],
     nextQuestion,
-    suggestedActions: [],
+    suggestedActions,
     memoryDrafts: [],
     knowledgeDrafts: [],
     usedDeterministicFallback: true,

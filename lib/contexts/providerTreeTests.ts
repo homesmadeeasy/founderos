@@ -22,6 +22,8 @@ import { FounderKernelProvider } from '@/contexts/FounderKernelContext'
 import { MorningExecutionProvider } from '@/contexts/MorningExecutionContext'
 import { EveningReviewProvider } from '@/contexts/EveningReviewContext'
 import { CognitiveModelProvider } from '@/contexts/CognitiveModelContext'
+import { ActionEngineProvider } from '@/contexts/ActionEngineContext'
+import { ConversationProvider } from '@/contexts/ConversationContext'
 import { useFounderInput } from '@/components/founder/useFounderInput'
 import type { FounderInput } from '@/lib/specialists/founder/founderTypes'
 
@@ -94,10 +96,32 @@ function testFounderInputReceivesWorldModelUnderProvider() {
   console.log('PASS: useFounderInput receives cognitive world model under provider')
 }
 
+function testActionAndConversationProvidersMount() {
+  let threw: Error | null = null
+  try {
+    renderToString(
+      createElement(AppProviderTree, {
+        children: createElement(CognitiveModelProvider, {
+          children: createElement(ActionEngineProvider, {
+            children: createElement(ConversationProvider, {
+              children: createElement('span', null, 'mounted'),
+            }),
+          }),
+        }),
+      }),
+    )
+  } catch (error) {
+    threw = error as Error
+  }
+  assert.strictEqual(threw, null, `ActionEngine/Conversation mount threw: ${threw?.message ?? ''}`)
+  console.log('PASS: ActionEngineProvider and ConversationProvider mount without hook errors')
+}
+
 function run() {
   console.log('Provider tree render tests\n')
   testCognitiveProviderMountsWithoutContextError()
   testFounderInputReceivesWorldModelUnderProvider()
+  testActionAndConversationProvidersMount()
   console.log('\nAll provider tree render tests passed.')
 }
 

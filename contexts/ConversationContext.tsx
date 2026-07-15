@@ -6,6 +6,7 @@ import {
 import { useAppContext } from '@/contexts/AppContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
+import { useObjectEngine } from '@/contexts/ObjectEngineContext'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { useFounderKernel } from '@/contexts/FounderKernelContext'
 import type { ConversationSession, ConversationStore, ConversationTopic } from '@/lib/conversation/conversationTypes'
@@ -82,6 +83,7 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
   const { worldModel, hydrated, store: cognitiveStore, refresh: refreshCognitive } = useCognitiveModel()
   const { appState, createProject, addTask } = useAppContext()
   const { recordMemory } = useMemoryEngine()
+  const { createObject } = useObjectEngine()
   const { createKnowledge } = useKnowledgeEngine()
   const { updatePrimaryMission } = useMorningExecution()
   const { publish } = useFounderKernel()
@@ -190,12 +192,16 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
   const approvalDeps = useMemo<FounderApprovalDeps>(() => ({
     recordMemory: (input) => recordMemory(input as never),
     createKnowledge: (input) => createKnowledge(input as never),
+    createObject: (input) => {
+      const created = createObject(input as never)
+      return { id: created.id }
+    },
     addTask: async (input) => { await addTask(input as never) },
     createProject: (input) => createProject(input as never),
     updateMission: updatePrimaryMission,
     publish,
     startValidationSprint,
-  }), [recordMemory, createKnowledge, addTask, createProject, updatePrimaryMission, publish, startValidationSprint])
+  }), [recordMemory, createKnowledge, createObject, addTask, createProject, updatePrimaryMission, publish, startValidationSprint])
 
   const start = useCallback((topic?: ConversationTopic) => {
     const s = startConversation(founderInput, userName, topic ?? 'founder')

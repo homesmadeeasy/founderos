@@ -56,6 +56,11 @@ export const FOUNDER_EVENT_TYPES: FounderEventType[] = [
   'FounderEvaluationScenarioCompleted',
   'FounderEvaluationCompleted',
   'FounderEvaluationCriticalFailure',
+  'ActionProposed',
+  'ActionApproved',
+  'ActionRejected',
+  'ActionExecuted',
+  'ActionFailed',
 ]
 
 export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
@@ -114,6 +119,11 @@ export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
   FounderEvaluationScenarioCompleted: 'Evaluation scenario completed',
   FounderEvaluationCompleted: 'Founder evaluation completed',
   FounderEvaluationCriticalFailure: 'Evaluation critical failure',
+  ActionProposed: 'Action proposed',
+  ActionApproved: 'Action approved',
+  ActionRejected: 'Action rejected',
+  ActionExecuted: 'Action executed',
+  ActionFailed: 'Action failed',
 }
 
 export function summarizeEventPayload(type: FounderEventType, payload: Record<string, unknown>): string {
@@ -148,6 +158,13 @@ export function summarizeEventPayload(type: FounderEventType, payload: Record<st
       return String(payload.actionType ?? payload.proposalId ?? 'approved')
     case 'FounderProposalDismissed':
       return String(payload.proposalId ?? 'dismissed')
+    case 'ActionProposed':
+    case 'ActionApproved':
+    case 'ActionExecuted':
+    case 'ActionFailed':
+      return String(payload.actionType ?? payload.actionId ?? type)
+    case 'ActionRejected':
+      return String(payload.reason ?? payload.actionType ?? 'rejected')
     default:
       return Object.keys(payload).slice(0, 3).join(', ') || type
   }

@@ -41,11 +41,43 @@ function testFounderInputMergesCognitive() {
 function testLayoutProviderOrder() {
   const src = read('app/(app)/layout.tsx')
   const kernelIdx = src.indexOf('<FounderKernelProvider>')
+  const morningIdx = src.indexOf('<MorningExecutionProvider>')
   const cognitiveIdx = src.indexOf('<CognitiveModelProvider>')
+  const actionIdx = src.indexOf('<ActionEngineProvider>')
   const conversationIdx = src.indexOf('<ConversationProvider>')
   assert(kernelIdx >= 0 && cognitiveIdx > kernelIdx, 'CognitiveModelProvider must be inside FounderKernelProvider')
-  assert(conversationIdx > cognitiveIdx, 'ConversationProvider must be inside CognitiveModelProvider')
+  assert(morningIdx >= 0 && morningIdx < cognitiveIdx, 'MorningExecutionProvider must wrap CognitiveModelProvider')
+  assert(actionIdx > cognitiveIdx, 'ActionEngineProvider must be inside CognitiveModelProvider')
+  assert(conversationIdx > actionIdx, 'ConversationProvider must be inside ActionEngineProvider')
   console.log('PASS: layout provider order is acyclic')
+}
+
+function testHookImports(hookName: string, files: string[]) {
+  for (const rel of files) {
+    const src = read(rel)
+    if (!src.includes(`${hookName}(`)) continue
+    assert(
+      new RegExp(`import\\s*\\{[^}]*\\b${hookName}\\b`).test(src),
+      `${rel} calls ${hookName}() but does not import it`,
+    )
+  }
+}
+
+function testCriticalHookImports() {
+  testHookImports('useMorningExecution', [
+    'contexts/ConversationContext.tsx',
+    'contexts/ActionEngineContext.tsx',
+    'contexts/CognitiveModelContext.tsx',
+    'components/kernel/KernelSubscriberBootstrap.tsx',
+  ])
+  testHookImports('useObjectEngine', [
+    'contexts/ConversationContext.tsx',
+    'contexts/ActionEngineContext.tsx',
+  ])
+  testHookImports('useActionEngine', [
+    'components/gym/GymConversationCard.tsx',
+  ])
+  console.log('PASS: critical custom hooks have matching imports')
 }
 
 function testUseCognitiveModelCallSites() {
@@ -105,6 +137,7 @@ function run() {
   testGymBaseInputHasNoCognitiveDependency()
   testGymInputMergesCognitive()
   testLayoutProviderOrder()
+  testCriticalHookImports()
   testUseCognitiveModelCallSites()
   console.log('\nAll provider dependency tests passed.')
 }
