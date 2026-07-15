@@ -147,6 +147,12 @@ export function buildIdempotencyKey(sessionId: string, messageId: string, claimK
   return `${sessionId}:${messageId}:${claimKey}`
 }
 
+/** Dedupes identical user text within a session even when messageId differs (e.g. resend). */
+export function buildContentIdempotencyKey(sessionId: string, userMessage: string, claimKey: string): string {
+  const normalized = userMessage.trim().toLowerCase().replace(/\s+/g, ' ')
+  return `${sessionId}:content:${normalized}:${claimKey}`
+}
+
 export function extractClaimsFromText(text: string): RealityClaim[] {
   const trimmed = text.trim()
   if (!trimmed || trimmed.length < 3) return []

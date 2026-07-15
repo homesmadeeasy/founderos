@@ -7,6 +7,7 @@ import type {
 } from './realityTypes'
 import {
   buildIdempotencyKey,
+  buildContentIdempotencyKey,
   extractClaimsFromText,
   normalizeClaimKey,
 } from './claimExtraction'
@@ -139,9 +140,11 @@ export function reconcileUserEvidence(
     const newKeys: string[] = []
     const unprocessedClaims: typeof claims = []
     for (const claim of claims) {
-      const key = buildIdempotencyKey(input.sessionId, input.messageId, normalizeClaimKey(claim))
-      newKeys.push(key)
-      if (!meta.processedMessageKeys.includes(key)) {
+      const claimKey = normalizeClaimKey(claim)
+      const key = buildIdempotencyKey(input.sessionId, input.messageId, claimKey)
+      const contentKey = buildContentIdempotencyKey(input.sessionId, input.userMessage, claimKey)
+      newKeys.push(key, contentKey)
+      if (!meta.processedMessageKeys.includes(key) && !meta.processedMessageKeys.includes(contentKey)) {
         unprocessedClaims.push(claim)
       }
     }

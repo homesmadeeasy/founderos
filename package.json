@@ -12,7 +12,9 @@
     "test:cognitive": "npx tsx lib/cognitive-model/cognitiveModelTests.ts",
     "test:founder-ai": "npx tsx lib/ai/founder/founderAITests.ts",
     "test:reality-model": "npx tsx lib/cognitive-model/realityTests.ts",
-    "test:providers": "npx tsx lib/contexts/providerTests.ts"
+    "test:providers": "npx tsx lib/contexts/providerTests.ts",
+    "test:founder-intelligence": "npx tsx lib/evaluation/founder-ai/founderAIIntelligenceTests.ts",
+    "test:founder-regression": "npx tsx lib/evaluation/founder-ai/founderAIIntelligenceTests.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

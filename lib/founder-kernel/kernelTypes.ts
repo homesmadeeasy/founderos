@@ -44,6 +44,10 @@ export type FounderEventType =
   | 'RealityUnknownCreated'
   | 'RealityModelReconciled'
   | 'RealityCompacted'
+  | 'FounderEvaluationStarted'
+  | 'FounderEvaluationScenarioCompleted'
+  | 'FounderEvaluationCompleted'
+  | 'FounderEvaluationCriticalFailure'
 
 export type FounderEventStatus =
   | 'created'

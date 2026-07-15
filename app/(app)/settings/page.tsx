@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import ConnectedSourcesSection from '@/components/settings/ConnectedSourcesSection'
 import CognitiveStorageSection from '@/components/settings/CognitiveStorageSection'
 import FounderAISettingsSection from '@/components/settings/FounderAISettingsSection'
+import FounderReliabilitySection from '@/components/settings/FounderReliabilitySection'
 import LoadingScreen from '@/components/ui/LoadingScreen'
 import type { MemoryIndexStatus } from '@/lib/types'
 
@@ -213,6 +214,8 @@ export default function SettingsPage() {
       </section>
 
       <FounderAISettingsSection />
+
+      <FounderReliabilitySection />
 
       <CognitiveStorageSection />
 
