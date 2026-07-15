@@ -212,6 +212,13 @@ export interface ConversationSession {
   beliefs?: ConversationBelief[]
   trackedQuestions?: TrackedQuestion[]
   activeQuestionId?: string
+  realityChanges?: {
+    id: string
+    label: string
+    previous: string
+    next: string
+    timestamp: string
+  }[]
 }
 
 export interface ConversationContext {

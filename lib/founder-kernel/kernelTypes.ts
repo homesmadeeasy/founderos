@@ -37,6 +37,13 @@ export type FounderEventType =
   | 'FounderProposalApproved'
   | 'FounderProposalEdited'
   | 'FounderProposalDismissed'
+  | 'RealityEvidenceReceived'
+  | 'RealityBeliefUpdated'
+  | 'RealityContradictionDetected'
+  | 'RealityHypothesisCreated'
+  | 'RealityUnknownCreated'
+  | 'RealityModelReconciled'
+  | 'RealityCompacted'
 
 export type FounderEventStatus =
   | 'created'

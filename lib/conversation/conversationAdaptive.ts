@@ -229,10 +229,20 @@ export function processAdaptiveAnswer(
       if (activeQ) tracked = tracked.map(q => q.id === activeQ.id ? { ...q, status: 'unanswered' as const, answeredAt: undefined, answerTurnId: undefined } : q)
     } else {
       beliefs = applyParsedValidationFacts(beliefs, answer, userTurnId)
-      content = [
-        `Noted: "${answer.slice(0, 80)}".`,
-        formatBeliefChange(beliefs, VALIDATION_BELIEF_KEYS.usersTested),
-      ]
+      const usersTested = getBelief(beliefs, VALIDATION_BELIEF_KEYS.usersTested)
+      if (usersTested?.status === 'user_claimed' || usersTested?.status === 'confirmed') {
+        content = [
+          'That updates my validation view from your report.',
+          formatBeliefChange(beliefs, VALIDATION_BELIEF_KEYS.usersTested),
+          'What exact words or screen did you show them first?',
+        ]
+        intent = 'question'
+      } else {
+        content = [
+          `I heard: "${answer.slice(0, 80)}".`,
+          formatBeliefChange(beliefs, VALIDATION_BELIEF_KEYS.usersTested),
+        ]
+      }
     }
   } else if (activeQ?.id === 'q-validation-user-count') {
     beliefs = applyParsedValidationFacts(beliefs, answer, userTurnId)

@@ -1,15 +1,21 @@
 import type { FounderRisk, FounderBottleneck } from './founderTypes'
 import type { FilteredFounderData } from './founderSignals'
 import type { FounderScores } from './founderScoring'
+import type { WorldModel } from '@/lib/cognitive-model/beliefTypes'
 
 export function detectFounderRisks(
   data: FilteredFounderData,
   scores: FounderScores,
   unprocessedCaptures = 0,
+  worldModel?: WorldModel | null,
 ): FounderRisk[] {
   const risks: FounderRisk[] = []
+  const snapshot = worldModel?.realitySnapshot
+  const userReportedTesting = snapshot?.activeBeliefs.some(b =>
+    b.predicate === 'validation.users_tested' && b.normalizedValue === 'true',
+  )
 
-  if (scores.architectureScore > 65 && scores.validationScore < 40) {
+  if (scores.architectureScore > 65 && scores.validationScore < 40 && !userReportedTesting) {
     risks.push({
       id: 'overengineering',
       title: 'Overengineering',
@@ -18,7 +24,7 @@ export function detectFounderRisks(
     })
   }
 
-  if (data.validationMemories.length === 0 && scores.productScore > 50) {
+  if (!userReportedTesting && data.validationMemories.length === 0 && scores.productScore > 50) {
     risks.push({
       id: 'no-users',
       title: 'No real users yet',
@@ -33,6 +39,15 @@ export function detectFounderRisks(
       title: 'Too many engines',
       severity: 'medium',
       description: 'The system is becoming powerful faster than it is becoming useful.',
+    })
+  }
+
+  if (snapshot && snapshot.positioningRisk > 55) {
+    risks.push({
+      id: 'positioning-clarity',
+      title: 'Positioning clarity',
+      severity: 'high',
+      description: 'Users may be misreading FounderOS as a generic productivity dashboard.',
     })
   }
 
@@ -94,9 +109,16 @@ export function detectMainBottleneck(
   scores: FounderScores,
   data: FilteredFounderData,
   risks: FounderRisk[],
+  worldModel?: WorldModel | null,
 ): FounderBottleneck {
+  const snapshot = worldModel?.realitySnapshot
+  const userReportedTesting = snapshot?.activeBeliefs.some(b =>
+    b.predicate === 'validation.users_tested' && b.normalizedValue === 'true',
+  )
+  if (userReportedTesting && snapshot && snapshot.positioningRisk > 50) return 'UX clarity'
+  if (risks.some(r => r.id === 'positioning-clarity')) return 'UX clarity'
   if (risks.some(r => r.id === 'overengineering')) return 'Overengineering'
-  if (scores.validationScore < 40) return 'Validation'
+  if (scores.validationScore < 40 && !userReportedTesting) return 'Validation'
   if (scores.uxScore < 45) return 'UX clarity'
   if (scores.validationScore < 55 && scores.productScore > 55) return 'Distribution'
   if (data.openAppTasks > 8 || data.activeTasks.length > 6) return 'Product focus'

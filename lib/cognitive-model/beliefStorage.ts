@@ -21,6 +21,7 @@ import {
 } from './cognitiveMemory'
 import { nowISO } from './cognitiveUtils'
 import { createEmptyWorldModel } from './worldModel'
+import { migrateCognitiveStoreToRealityV2 } from './realityReducer'
 
 const STORAGE_KEY = 'founderos-cognitive-model-v1'
 
@@ -101,21 +102,22 @@ export function loadCognitiveStore(): CognitiveStore {
 
     const recovered = recoverOversizedRaw(raw)
     const compacted = compactCognitiveStore(recovered).store
-    setActiveMemoryStore(compacted)
-    setLastPersistedSnapshot(cognitiveStoreSnapshot(compacted))
+    const migrated = migrateCognitiveStoreToRealityV2(compacted)
+    setActiveMemoryStore(migrated)
+    setLastPersistedSnapshot(cognitiveStoreSnapshot(migrated))
 
-    const writeBackSize = getCognitiveStoreSizeBytes(compacted)
+    const writeBackSize = getCognitiveStoreSizeBytes(migrated)
     if (raw.length > writeBackSize) {
       try {
-        tryPersist(JSON.stringify(compacted))
-        setLastPersistedSnapshot(cognitiveStoreSnapshot(compacted))
+        tryPersist(JSON.stringify(migrated))
+        setLastPersistedSnapshot(cognitiveStoreSnapshot(migrated))
       } catch (error) {
         if (process.env.NODE_ENV === 'development') {
           console.warn('[cognitive-model] Recovered store kept in memory; write-back failed.', error)
         }
       }
     }
-    return compacted
+    return migrated
   } catch (error) {
     if (process.env.NODE_ENV === 'development') {
       console.warn('[cognitive-model] Failed to load cognitive store; using empty in-memory model.', error)

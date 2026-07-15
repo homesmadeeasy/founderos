@@ -121,6 +121,16 @@ export function normalizeBelief(raw: unknown): Belief | null {
     history: asArray<unknown>(item.history)
       .map(normalizeBeliefHistory)
       .filter((h): h is BeliefHistoryEntry => h !== null),
+    reality: item.reality && typeof item.reality === 'object'
+      ? {
+        entityId: asString((item.reality as Record<string, unknown>).entityId).trim() || undefined,
+        predicate: asString((item.reality as Record<string, unknown>).predicate).trim() || undefined,
+        normalizedValue: asString((item.reality as Record<string, unknown>).normalizedValue).trim() || undefined,
+        sourceClassification: asString((item.reality as Record<string, unknown>).sourceClassification).trim() || undefined,
+        staleAt: asString((item.reality as Record<string, unknown>).staleAt).trim() || undefined,
+        supersededAt: asString((item.reality as Record<string, unknown>).supersededAt).trim() || undefined,
+      }
+      : undefined,
   }
 }
 
@@ -255,6 +265,9 @@ export function normalizeWorldModel(raw: unknown): WorldModel {
         .filter((c): c is BeliefContradiction => c !== null),
     ),
     updatedAt: safeTimestamp(item.updatedAt),
+    realitySnapshot: item.realitySnapshot && typeof item.realitySnapshot === 'object'
+      ? item.realitySnapshot as WorldModel['realitySnapshot']
+      : undefined,
   }
 }
 
@@ -283,5 +296,8 @@ export function normalizeCognitiveStore(raw: unknown): CognitiveStore {
         }
       }),
     lastKernelSyncAt: asString(item.lastKernelSyncAt).trim() || null,
+    realityMeta: item.realityMeta && typeof item.realityMeta === 'object'
+      ? item.realityMeta as CognitiveStore['realityMeta']
+      : undefined,
   }
 }

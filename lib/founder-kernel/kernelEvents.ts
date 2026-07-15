@@ -39,6 +39,13 @@ export const FOUNDER_EVENT_TYPES: FounderEventType[] = [
   'FounderProposalApproved',
   'FounderProposalEdited',
   'FounderProposalDismissed',
+  'RealityEvidenceReceived',
+  'RealityBeliefUpdated',
+  'RealityContradictionDetected',
+  'RealityHypothesisCreated',
+  'RealityUnknownCreated',
+  'RealityModelReconciled',
+  'RealityCompacted',
 ]
 
 export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
@@ -80,6 +87,13 @@ export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
   FounderProposalApproved: 'Founder proposal approved',
   FounderProposalEdited: 'Founder proposal edited',
   FounderProposalDismissed: 'Founder proposal dismissed',
+  RealityEvidenceReceived: 'Reality evidence received',
+  RealityBeliefUpdated: 'Reality belief updated',
+  RealityContradictionDetected: 'Reality contradiction detected',
+  RealityHypothesisCreated: 'Reality hypothesis created',
+  RealityUnknownCreated: 'Reality unknown created',
+  RealityModelReconciled: 'Reality model reconciled',
+  RealityCompacted: 'Reality model compacted',
 }
 
 export function summarizeEventPayload(type: FounderEventType, payload: Record<string, unknown>): string {

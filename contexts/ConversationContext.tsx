@@ -44,7 +44,10 @@ import {
 } from '@/lib/ai/founder/founderAI.approvals'
 import { isFounderAILlmEnabled } from '@/lib/ai/founder/founderAI.prefs'
 import { whatChangedSince } from '@/lib/cognitive-model/cognitiveSummary'
+import { answerCognitiveQuery } from '@/lib/cognitive-model/cognitiveAssistant'
+import { reconcileUserMessage, syncSessionBeliefsFromReconciliation } from '@/lib/cognitive-model/realityIntegration'
 import type { FounderProposalBundle, FounderReasoningMode } from '@/lib/ai/founder/founderAI.types'
+import type { ReconciliationResult } from '@/lib/cognitive-model/realityTypes'
 
 interface ConversationContextValue {
   ready: boolean
@@ -76,7 +79,7 @@ const ConversationContext = createContext<ConversationContextValue | null>(null)
 export function ConversationProvider({ children }: { children: React.ReactNode }) {
   const founderInput = useFounderInput()
   const userName = useUserDisplayName()
-  const { worldModel, hydrated, store: cognitiveStore } = useCognitiveModel()
+  const { worldModel, hydrated, store: cognitiveStore, refresh: refreshCognitive } = useCognitiveModel()
   const { appState, createProject, addTask } = useAppContext()
   const { recordMemory } = useMemoryEngine()
   const { createKnowledge } = useKnowledgeEngine()
@@ -216,7 +219,14 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
   const reply = useCallback(async (answer: string, questionId?: string) => {
     if (!session) return
 
-    if (/what changed/i.test(answer.trim())) {
+    const trimmed = answer.trim()
+    const cognitiveAnswer = answerCognitiveQuery(cognitiveStore, trimmed)
+    if (cognitiveAnswer) {
+      appendSystemTurn(cognitiveAnswer)
+      return
+    }
+
+    if (/what changed/i.test(trimmed)) {
       const explanation = whatChangedSince(cognitiveStore, lastChangeBaselineRef.current)
       appendSystemTurn(explanation)
       lastChangeBaselineRef.current = new Date().toISOString()
@@ -226,7 +236,43 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     setIsTyping(true)
     setReasoningMode('thinking')
 
+    const userTurnId = newConversationId()
+    let reconciliation: ReconciliationResult | undefined
+    let activeWorldModel = worldModel
+
     try {
+      if (isMeaningfulUserAnswer(trimmed)) {
+        reconciliation = reconcileUserMessage({
+          userMessage: trimmed,
+          sessionId: session.id,
+          messageId: userTurnId,
+        })
+        activeWorldModel = reconciliation.store.worldModel
+        refreshCognitive()
+
+        if (reconciliation.changes.length) {
+          lastChangeBaselineRef.current = new Date(Date.now() - 60_000).toISOString()
+        }
+
+        void publish({
+          type: 'RealityModelReconciled',
+          source: 'cognitive-model',
+          payload: {
+            sessionId: session.id,
+            messageId: userTurnId,
+            changeCount: reconciliation.changes.length,
+            idempotent: reconciliation.idempotent,
+          },
+        })
+        for (const change of reconciliation.changes.slice(0, 3)) {
+          void publish({
+            type: 'RealityBeliefUpdated',
+            source: 'cognitive-model',
+            payload: { beliefId: change.beliefId, sessionId: session.id },
+          })
+        }
+      }
+
       void publish({
         type: 'FounderAIRequested',
         source: 'founder-ai',
@@ -242,11 +288,22 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
           questionId,
           founderInput,
           userName,
-          worldModel,
+          worldModel: activeWorldModel,
           llmEnabled: true,
+          reconciliation,
+          userTurnId,
         })
 
-        setSession(result.session)
+        let updatedSession = reconciliation
+          ? syncSessionBeliefsFromReconciliation(result.session, reconciliation, userTurnId)
+          : result.session
+
+        if (reconciliation?.changes.length) {
+          const convStore = upsertSession(loadConversationStore(), updatedSession)
+          saveConversationStore(convStore)
+        }
+
+        setSession(updatedSession)
         setStore(getConversationStore())
         setReasoningMode(result.reasoningMode)
         if (result.proposal) {
@@ -264,43 +321,30 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
         })
       } else {
         await new Promise(r => setTimeout(r, 300))
-        const deterministic = submitAnswer(
-          { sessionId: session.id, answer, questionId },
+        const result = await processFounderAIMessage({
+          sessionId: session.id,
+          answer,
+          questionId,
           founderInput,
           userName,
-        )
-        setReasoningMode('deterministic')
-        if (!deterministic) return
-        setSession(deterministic.session)
-        setStore(getConversationStore())
+          worldModel: activeWorldModel,
+          llmEnabled: false,
+          reconciliation,
+          userTurnId,
+        })
 
-        const meaningful = isMeaningfulUserAnswer(answer)
-        if (deterministic.memoryWrite && deterministic.memoryWrite.confidence >= 65 && meaningful) {
-          const mem = recordMemory({
-            type: 'conversation',
-            title: deterministic.memoryWrite.title,
-            content: deterministic.memoryWrite.content,
-            importance: 'medium',
-            area: 'systems',
-            source: 'assistant',
-            relatedObjectIds: [],
-            tags: ['founder-ai', 'conversation', `dedupe:conv-${deterministic.session.id}`],
-          })
-          if (mem) {
-            void publish({
-              type: 'ConversationMemoryCreated',
-              source: 'conversation-engine',
-              payload: { sessionId: deterministic.session.id, memoryId: mem.id, title: mem.title },
-            })
-          }
+        let updatedSession = reconciliation
+          ? syncSessionBeliefsFromReconciliation(result.session, reconciliation, userTurnId)
+          : result.session
+
+        if (reconciliation?.changes.length) {
+          const convStore = upsertSession(loadConversationStore(), updatedSession)
+          saveConversationStore(convStore)
         }
-        if (deterministic.knowledgeSuggestion && meaningful) {
-          void publish({
-            type: 'ConversationKnowledgeSuggested',
-            source: 'conversation-engine',
-            payload: { sessionId: deterministic.session.id, suggestion: deterministic.knowledgeSuggestion },
-          })
-        }
+
+        setReasoningMode('deterministic')
+        setSession(updatedSession)
+        setStore(getConversationStore())
       }
 
       void publish({
@@ -310,6 +354,7 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
           sessionId: session.id,
           questionId: questionId ?? session.nextQuestion?.id,
           answer: answer.slice(0, 200),
+          realityReconciled: Boolean(reconciliation?.changes.length || reconciliation?.idempotent),
         },
       })
     } catch {
@@ -334,7 +379,7 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
     }
   }, [
     session, founderInput, userName, worldModel, cognitiveStore,
-    publish, recordMemory, appendSystemTurn,
+    publish, recordMemory, appendSystemTurn, refreshCognitive,
   ])
 
   const approveActionProposalFn = useCallback(async (

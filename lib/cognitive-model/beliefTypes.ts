@@ -49,6 +49,15 @@ export interface BeliefHistoryEntry {
   triggerEvent?: string
 }
 
+export interface BeliefRealityFields {
+  entityId?: string
+  predicate?: string
+  normalizedValue?: string
+  sourceClassification?: string
+  staleAt?: string
+  supersededAt?: string
+}
+
 export interface Belief {
   id: string
   topic: BeliefTopic
@@ -63,6 +72,7 @@ export interface Belief {
   supportingEvidence: BeliefEvidence[]
   contradictingEvidence: BeliefEvidence[]
   history: BeliefHistoryEntry[]
+  reality?: BeliefRealityFields
 }
 
 export interface Hypothesis {
@@ -134,12 +144,14 @@ export interface WorldModel {
   beliefs: Belief[]
   contradictions: BeliefContradiction[]
   updatedAt: string
+  realitySnapshot?: import('./realityTypes').RealitySnapshot
 }
 
 export interface CognitiveStore {
   worldModel: WorldModel
   timeline: CognitiveTimelineEntry[]
   lastKernelSyncAt: string | null
+  realityMeta?: import('./realityTypes').RealityStoreMeta
 }
 
 export interface CognitiveTimelineEntry {

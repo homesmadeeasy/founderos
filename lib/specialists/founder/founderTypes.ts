@@ -9,6 +9,7 @@ import type { FounderObject } from '@/lib/object-engine/objectTypes'
 import type { OutcomeHistoryEntry } from '@/lib/outcome-engine/outcomeTypes'
 import type { Signal } from '@/lib/signal-engine/signalTypes'
 import type { Project, Task } from '@/lib/types'
+import type { WorldModel } from '@/lib/cognitive-model/beliefTypes'
 
 export type FounderStage = 'idea' | 'prototype' | 'mvp' | 'validation' | 'growth'
 
@@ -90,6 +91,7 @@ export interface FounderInput {
   unprocessedCaptureCount?: number
   openTaskCount?: number
   activeProjectCount?: number
+  worldModel?: WorldModel | null
 }
 
 export type FounderQuestionId =

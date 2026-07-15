@@ -63,17 +63,20 @@ export function buildConversationEvidence(
   const evidence = baseSystemEvidence(ctx, snapshotAt)
 
   if (ctx.validationScore < 45) {
-    evidence.push({
-      id: 'ev-system-no-users',
-      sourceType: 'signal',
-      sourceId: 'validation-absence',
-      title: 'No stored validation signals',
-      summary: 'System inference: no confirmed real-user testing in engines',
-      weight: 0.88,
-      supports: false,
-      evidenceKind: 'system_inference',
-      snapshotAt,
-    })
+    const userTested = ctx.founderSnapshot.validationScore >= 45
+    if (!userTested) {
+      evidence.push({
+        id: 'ev-system-no-users',
+        sourceType: 'signal',
+        sourceId: 'validation-absence',
+        title: 'No stored validation signals',
+        summary: 'System inference: no confirmed real-user testing in engines',
+        weight: 0.88,
+        supports: false,
+        evidenceKind: 'system_inference',
+        snapshotAt,
+      })
+    }
   }
 
   if (input) {

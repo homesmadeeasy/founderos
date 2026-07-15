@@ -170,6 +170,10 @@ export interface FounderAIResponse {
   memoryDrafts: MemoryDraft[]
   knowledgeDrafts: KnowledgeDraft[]
   usedDeterministicFallback?: boolean
+  extractedClaims?: { predicate: string; value: string | number | boolean; confidence: number }[]
+  proposedBeliefChanges?: { beliefId: string; previous: string; next: string }[]
+  hypotheses?: string[]
+  unknowns?: string[]
 }
 
 export interface FounderAIRequest {

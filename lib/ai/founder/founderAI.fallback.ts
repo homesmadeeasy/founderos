@@ -1,14 +1,11 @@
 import type { FounderInput } from '@/lib/specialists/founder/founderTypes'
 import type { ConversationSession } from '@/lib/conversation/conversationTypes'
 import type { WorldModel } from '@/lib/cognitive-model/beliefTypes'
-import { buildConversationContext } from '@/lib/conversation/conversationContext'
-import { buildConversationEvidence } from '@/lib/conversation/conversationEvidence'
-import { getConversationReasoner } from '@/lib/conversation/conversationEngine'
-import { processAdaptiveAnswer } from '@/lib/conversation/conversationAdaptive'
-import { newConversationId, nowISO } from '@/lib/conversation/conversationUtils'
+import type { ReconciliationResult } from '@/lib/cognitive-model/realityTypes'
 import { buildCompactFounderContext } from './founderAI.context'
 import type { CompactFounderContext, FounderAIResponse } from './founderAI.types'
 import { validateFounderAIResponse } from './founderAI.validation'
+import { newConversationId, nowISO } from '@/lib/conversation/conversationUtils'
 
 export function buildDeterministicFounderAIResponse(params: {
   userMessage: string
@@ -18,6 +15,7 @@ export function buildDeterministicFounderAIResponse(params: {
   worldModel: WorldModel
   userTurnId: string
   questionId?: string
+  reconciliation?: ReconciliationResult
 }): { context: CompactFounderContext; response: FounderAIResponse } {
   const context = buildCompactFounderContext({
     userMessage: params.userMessage,
@@ -27,68 +25,54 @@ export function buildDeterministicFounderAIResponse(params: {
     worldModel: params.worldModel,
   })
 
-  const ctx = buildConversationContext(params.input, params.userName)
-  const reasoner = getConversationReasoner()
-  const evidence = buildConversationEvidence(ctx, params.input)
-  const { turn, adaptive } = reasoner.generateReply(
-    ctx,
-    params.session,
-    params.userMessage,
-    params.questionId,
-    params.userTurnId,
-  )
+  const reconciliation = params.reconciliation
+  const message = reconciliation?.responseMessage
+    || 'I need a bit more detail before updating my view.'
 
-  const evidenceIds = turn.evidence.map((e) => e.id).slice(0, 6)
-  const nextQuestion = adaptive.nextQuestion
+  const nextQuestion = reconciliation?.nextQuestion
     ? {
-      text: adaptive.nextQuestion.title,
-      purpose: adaptive.nextQuestion.reason,
-      answerType: adaptive.nextQuestion.answerType === 'yes_no'
-        ? 'yes_no' as const
-        : 'open_text' as const,
-      options: adaptive.nextQuestion.choices,
+      text: reconciliation.nextQuestion,
+      purpose: reconciliation.nextQuestionPurpose,
+      answerType: 'open_text' as const,
+      options: undefined,
       targetBeliefId: undefined,
     }
     : undefined
 
-  const beliefsToUpdate = (adaptive.beliefs ?? [])
-    .filter((b) => b.updatedAt >= params.userTurnId || b.status === 'user_claimed')
-    .slice(0, 3)
-    .map((b) => ({
-      proposition: `${b.label}: ${b.displayValue}`,
-      operation: b.status === 'user_claimed' ? 'confirm' as const : 'update' as const,
-      confidenceDelta: 5,
-      rationale: 'Updated from conversation belief state',
-      evidenceIds: b.evidenceIds.slice(0, 4),
-    }))
-
-  const suggestedActions = adaptive.actionCard
-    ? [{
-      id: adaptive.actionCard.id,
-      type: 'create_sprint' as const,
-      title: adaptive.actionCard.title,
-      description: adaptive.actionCard.steps.join('; '),
-      rationale: 'Validation sprint recommended from current evidence',
-      confidence: params.session.confidence,
-      domain: 'validation',
-      reversible: true,
-      requiresApproval: true as const,
-      payload: { title: adaptive.actionCard.title, tasks: adaptive.actionCard.steps },
-    }]
-    : []
+  const beliefsToUpdate = (reconciliation?.changes ?? []).slice(0, 4).map(c => ({
+    beliefId: c.beliefId,
+    proposition: c.newStatement,
+    operation: 'update' as const,
+    confidenceDelta: c.newConfidence - c.previousConfidence,
+    rationale: c.reason,
+    evidenceIds: c.evidenceIds.slice(0, 4),
+  }))
 
   const raw: FounderAIResponse = {
-    message: turn.content,
-    reasoningSummary: 'Used built-in deterministic reasoning because external AI was unavailable.',
+    message,
+    reasoningSummary: reconciliation?.reasoningSummary
+      ?? 'Used built-in deterministic reasoning because external AI was unavailable.',
     confidence: params.session.confidence,
-    evidenceIds,
+    evidenceIds: reconciliation?.changes.flatMap(c => c.evidenceIds).slice(0, 6) ?? [],
     beliefsToUpdate,
     contradictionsToCreate: [],
     nextQuestion,
-    suggestedActions,
+    suggestedActions: [],
     memoryDrafts: [],
     knowledgeDrafts: [],
     usedDeterministicFallback: true,
+    extractedClaims: reconciliation?.claims.map(c => ({
+      predicate: c.predicate,
+      value: c.value,
+      confidence: c.confidence,
+    })),
+    proposedBeliefChanges: reconciliation?.changes.map(c => ({
+      beliefId: c.beliefId,
+      previous: c.previousStatement,
+      next: c.newStatement,
+    })),
+    hypotheses: reconciliation?.hypotheses.map(h => h.statement),
+    unknowns: reconciliation?.unknowns.map(u => u.statement),
   }
 
   return {

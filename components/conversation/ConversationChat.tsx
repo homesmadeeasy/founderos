@@ -72,6 +72,20 @@ export default function ConversationChat() {
             <ConversationEmptyState onStart={() => start()} />
           ) : (
             <div className="conv-messages-inner">
+              {activeSession.realityChanges && activeSession.realityChanges.length > 0 && (
+                <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-indigo-500/[0.06] border border-indigo-200/40">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-600/80 mb-1">Reality change</p>
+                  <ul className="space-y-0.5">
+                    {activeSession.realityChanges.slice(0, 2).map(rc => (
+                      <li key={rc.id} className="text-[11px] text-zinc-600 leading-snug">
+                        {rc.previous && rc.previous !== '(none)'
+                          ? `${rc.previous} → ${rc.next}`
+                          : rc.next}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {activeSession.turns.map(turn => (
                 <ConversationMessage
                   key={turn.id}

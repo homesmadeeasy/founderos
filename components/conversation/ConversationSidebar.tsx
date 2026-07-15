@@ -79,7 +79,7 @@ export default function ConversationSidebar({ session }: ConversationSidebarProp
 
       {session.beliefs && session.beliefs.length > 0 && (
         <section>
-          <p className="conv-sidebar-label">Active beliefs</p>
+          <p className="conv-sidebar-label">What FounderOS currently understands</p>
           <ul className="mt-1.5 space-y-1.5">
             {session.beliefs
               .filter(b => b.key.startsWith('validation.'))
@@ -88,6 +88,19 @@ export default function ConversationSidebar({ session }: ConversationSidebarProp
                   {beliefSummaryLabel(b)}
                 </li>
               ))}
+          </ul>
+        </section>
+      )}
+
+      {session.realityChanges && session.realityChanges.length > 0 && (
+        <section>
+          <p className="conv-sidebar-label">What changed</p>
+          <ul className="mt-1.5 space-y-1">
+            {session.realityChanges.slice(0, 3).map(rc => (
+              <li key={rc.id} className="text-[11px] text-zinc-600 leading-snug">
+                {rc.previous !== '(none)' ? `${rc.previous} → ${rc.next}` : rc.next}
+              </li>
+            ))}
           </ul>
         </section>
       )}

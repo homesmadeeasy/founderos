@@ -1,5 +1,6 @@
 import type { FilteredFounderData } from './founderSignals'
 import type { FounderInput } from './founderTypes'
+import type { WorldModel } from '@/lib/cognitive-model/beliefTypes'
 import { textMatchesValidation } from './founderSignals'
 
 function clamp(n: number, min = 15, max = 95): number {
@@ -19,6 +20,7 @@ export interface FounderScores {
 export function computeFounderScores(data: FilteredFounderData, input: FounderInput): FounderScores {
   const founderEval = input.domainIntelligence?.evaluations.find(e => e.domainId === 'founder')
   const domainScore = founderEval?.score ?? 50
+  const reality = input.worldModel?.realitySnapshot
 
   // Architecture — technical progress, engines, docs, milestones
   let architectureScore = 35
@@ -43,6 +45,15 @@ export function computeFounderScores(data: FilteredFounderData, input: FounderIn
   )
   validationScore += Math.min(userOutcomes.length * 8, 16)
   if (architectureScore > 65 && validationScore < 40) validationScore -= 10
+  if (reality?.validationScore && reality.validationScore > validationScore) {
+    validationScore = reality.validationScore
+  }
+  const userReportedTesting = reality?.activeBeliefs.some(b =>
+    b.predicate === 'validation.users_tested' && b.normalizedValue === 'true',
+  )
+  if (userReportedTesting) {
+    validationScore = Math.max(validationScore, 48)
+  }
   validationScore = clamp(validationScore, 10, 90)
 
   // Product — user-facing surfaces shipped
@@ -60,6 +71,7 @@ export function computeFounderScores(data: FilteredFounderData, input: FounderIn
 
   // UX — clarity and usability signals
   let uxScore = productScore * 0.5 + validationScore * 0.3
+  if (reality?.positioningRisk && reality.positioningRisk > 55) uxScore -= 12
   if (data.memories.some(m => m.content.toLowerCase().includes('clutter') || m.content.toLowerCase().includes('ux'))) {
     uxScore -= 8
   }
@@ -100,6 +112,18 @@ export function computeFounderScores(data: FilteredFounderData, input: FounderIn
     executionScore,
     riskScore,
     uxScore,
+  }
+}
+
+export function applyRealityBeliefsToScores(scores: FounderScores, world?: WorldModel | null): FounderScores {
+  const snapshot = world?.realitySnapshot
+  if (!snapshot) return scores
+  return {
+    ...scores,
+    validationScore: Math.max(scores.validationScore, snapshot.validationScore),
+    uxScore: snapshot.positioningRisk > 55
+      ? Math.min(scores.uxScore, 100 - snapshot.positioningRisk)
+      : scores.uxScore,
   }
 }
 

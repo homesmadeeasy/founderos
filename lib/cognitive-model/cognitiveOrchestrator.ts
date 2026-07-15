@@ -184,6 +184,7 @@ export function handleKernelEventForCognitive(event: FounderEvent): CognitiveSto
   if (reconciling) return null
 
   if (event.type === 'ConversationAnswered') {
+    if (event.payload.realityReconciled) return null
     const answer = String(event.payload.answer ?? '')
     if (!answer) return null
     return processConversationAnswer(answer, String(event.payload.beliefKey ?? ''))

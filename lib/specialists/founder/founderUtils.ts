@@ -55,8 +55,8 @@ export function buildFounderSnapshot(input: FounderInput): FounderSnapshot {
   const data = gatherFounderData(input)
   const scores = computeFounderScores(data, input)
   const stage = inferFounderStage(scores, data)
-  const risks = detectFounderRisks(data, scores, input.unprocessedCaptureCount ?? 0)
-  const mainBottleneck = detectMainBottleneck(scores, data, risks)
+  const risks = detectFounderRisks(data, scores, input.unprocessedCaptureCount ?? 0, input.worldModel)
+  const mainBottleneck = detectMainBottleneck(scores, data, risks, input.worldModel)
   const ignoreToday = buildIgnoreToday(
     mainBottleneck,
     data,

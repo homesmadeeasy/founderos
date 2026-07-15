@@ -9,19 +9,22 @@ import { contradictionPhrase } from './beliefContradictions'
 
 export function buildCognitiveInsight(world: WorldModel): CognitiveInsight {
   const model = normalizeWorldModel(world)
-  const belief = topBelief(model)
-  const unknown = biggestUnknown(model)
+  const snapshot = model.realitySnapshot
+  const topReality = snapshot?.activeBeliefs[0]
+  const belief = topReality ?? topBelief(model)
+  const unknown = snapshot?.biggestUnknowns[0] ?? biggestUnknown(model)
   const question = selectHighestValueQuestion(model)
 
   return {
     currentBelief: belief
       ? `${epistemicPhrase(belief.status, belief.confidence)} ${belief.statement}`
       : 'I am still forming my first beliefs about your company.',
-    biggestUnknown: unknown
-      ? unknown.statement
-      : 'Most foundational unknowns are starting to resolve.',
-    highestRisk: highestRisk(world),
-    topQuestion: question?.text ?? 'What should we focus on together this week?',
+    biggestUnknown: unknown?.statement ?? 'Most foundational unknowns are starting to resolve.',
+    highestRisk: snapshot?.domainSummaries.find(s => s.primaryRisk)?.primaryRisk
+      ?? highestRisk(world),
+    topQuestion: snapshot?.biggestUnknowns[0]?.statement
+      ?? question?.text
+      ?? 'What should we focus on together this week?',
   }
 }
 

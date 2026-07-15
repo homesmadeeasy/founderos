@@ -16,7 +16,8 @@ import { compactStoredCognitiveModel, getCognitiveStoreStats } from '@/lib/cogni
 import { buildCognitiveInsight } from '@/lib/cognitive-model/cognitiveSummary'
 import { createCognitiveReasoner } from '@/lib/cognitive-model/cognitiveConversation'
 import { setConversationReasoner } from '@/lib/conversation/conversationEngine'
-import { useFounderInput } from '@/components/founder/useFounderInput'
+import { useFounderBaseInput } from '@/components/founder/useFounderBaseInput'
+import { mergeFounderInputWithWorldModel } from '@/lib/specialists/founder/founderInputBuilder'
 import { useFounderKernel } from '@/contexts/FounderKernelContext'
 import { useMorningExecution } from '@/contexts/MorningExecutionContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
@@ -45,7 +46,14 @@ interface CognitiveModelContextValue {
 const CognitiveModelContext = createContext<CognitiveModelContextValue | null>(null)
 
 export function CognitiveModelProvider({ children }: { children: React.ReactNode }) {
-  const founderInput = useFounderInput()
+  // Dependency inversion: consume base engine input only — never useFounderInput(),
+  // because useFounderInput() calls useCognitiveModel() and would read this
+  // provider's context before it exists (provider cycle).
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    void ('CognitiveModelProvider must use useFounderBaseInput, not useFounderInput')
+  }
+  const founderBaseInput = useFounderBaseInput()
   const { publish } = useFounderKernel()
   const { ready: morningReady } = useMorningExecution()
   const { ready: memoriesReady } = useMemoryEngine()
@@ -59,12 +67,11 @@ export function CognitiveModelProvider({ children }: { children: React.ReactNode
   const [hydrated, setHydrated] = useState(false)
   const [storageWarning, setStorageWarningState] = useState<string | null>(getStorageWarning())
 
-  const inputRef = useRef<FounderInput>(founderInput)
-  inputRef.current = founderInput
+  const inputRef = useRef<FounderInput>(mergeFounderInputWithWorldModel(founderBaseInput, null, false))
 
   const rawInput = useMemo<RawCognitiveInput>(
-    () => buildRawCognitiveInputFromFounder(founderInput),
-    [founderInput],
+    () => buildRawCognitiveInputFromFounder(founderBaseInput),
+    [founderBaseInput],
   )
 
   const inputFingerprint = useMemo(
@@ -123,6 +130,10 @@ export function CognitiveModelProvider({ children }: { children: React.ReactNode
       publishingKernelRef.current = false
     })
   }, [publish])
+
+  useEffect(() => {
+    inputRef.current = mergeFounderInputWithWorldModel(founderBaseInput, store.worldModel, hydrated)
+  }, [founderBaseInput, store.worldModel, hydrated])
 
   useEffect(() => {
     if (!reasonerInstalledRef.current) {

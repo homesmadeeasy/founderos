@@ -14,7 +14,7 @@ export function buildTopRecommendation(
     case 'Validation':
       return 'Show Home or one specialist flow to 3 people and ask what they understand — record every reaction.'
     case 'UX clarity':
-      return 'Simplify one core screen until a non-builder understands it in 30 seconds without explanation.'
+      return 'Clarify positioning on the first screen — test onboarding copy and collect detailed reactions from the next 3 viewers.'
     case 'Distribution':
       return 'Find one channel where your first users already are — do not build more product until you have a distribution hypothesis.'
     case 'Product focus':

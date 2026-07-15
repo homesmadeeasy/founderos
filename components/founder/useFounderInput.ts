@@ -1,56 +1,24 @@
 'use client'
 
-import { useMemo } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useAppContext } from '@/contexts/AppContext'
-import { useMorningExecution } from '@/contexts/MorningExecutionContext'
-import { useObjectEngine } from '@/contexts/ObjectEngineContext'
-import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
-import { useKnowledgeEngine } from '@/contexts/KnowledgeEngineContext'
-import { useSignalEngine } from '@/contexts/SignalEngineContext'
-import { useUniversalCapture } from '@/contexts/UniversalCaptureContext'
-import { useEveningReview } from '@/contexts/EveningReviewContext'
-import { getOutcomeHistory } from '@/lib/outcome-engine/outcomeEngine'
+import { useCognitiveModel } from '@/contexts/CognitiveModelContext'
+import { mergeFounderInputWithWorldModel } from '@/lib/specialists/founder/founderInputBuilder'
 import type { FounderInput } from '@/lib/specialists/founder/founderTypes'
+import { useFounderBaseInput } from '@/components/founder/useFounderBaseInput'
 
+/**
+ * Full FounderInput for descendants inside CognitiveModelProvider.
+ * Merges engine-sourced base data with the reconciled cognitive world model.
+ */
 export function useFounderInput(): FounderInput {
-  const { appState } = useAppContext()
-  const { objects } = useObjectEngine()
-  const { memories } = useMemoryEngine()
-  const { knowledge } = useKnowledgeEngine()
-  const { signals } = useSignalEngine()
-  const { unprocessedCount } = useUniversalCapture()
-  const { eveningReview } = useEveningReview()
-  const {
-    dailyContext,
-    morningPlan,
-    decisionOutput,
-    domainIntelligence,
-  } = useMorningExecution()
+  const base = useFounderBaseInput()
+  const { worldModel } = useCognitiveModel()
 
-  const outcomes = useMemo(() => getOutcomeHistory(12), [])
-
-  return useMemo(() => ({
-    objects,
-    memories,
-    knowledge,
-    signals,
-    outcomes,
-    tasks: appState.tasks,
-    projects: appState.projects,
-    decisionOutput,
-    domainIntelligence,
-    morningPlan,
-    dailyContext,
-    eveningReview,
-    unprocessedCaptureCount: unprocessedCount,
-  }), [
-    objects, memories, knowledge, signals, outcomes,
-    appState.tasks, appState.projects,
-    decisionOutput, domainIntelligence, morningPlan,
-    dailyContext, eveningReview, unprocessedCount,
-  ])
+  return useMemo(
+    () => mergeFounderInputWithWorldModel(base, worldModel, true),
+    [base, worldModel],
+  )
 }
 
 export function useUserDisplayName(): string {

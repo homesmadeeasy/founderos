@@ -1,6 +1,7 @@
 import type { FounderInput } from '@/lib/specialists/founder/founderTypes'
 import type { ConversationSession } from '@/lib/conversation/conversationTypes'
 import type { WorldModel } from '@/lib/cognitive-model/beliefTypes'
+import type { ReconciliationResult } from '@/lib/cognitive-model/realityTypes'
 import { submitAnswer } from '@/lib/conversation/conversationEngine'
 import { upsertSession, saveConversationStore, loadConversationStore, addTimelineEntry } from '@/lib/conversation/conversationSession'
 import { newConversationId, nowISO, clampConfidence } from '@/lib/conversation/conversationUtils'
@@ -19,6 +20,8 @@ export interface ProcessFounderMessageInput {
   userName: string
   worldModel: WorldModel
   llmEnabled?: boolean
+  reconciliation?: ReconciliationResult
+  userTurnId?: string
 }
 
 export interface ProcessFounderMessageResult {
@@ -98,6 +101,7 @@ export async function processFounderAIMessage(
 
   const llmEnabled = input.llmEnabled ?? isFounderAILlmEnabled()
   const userTurn = createUserTurn(input.answer, session, input.questionId)
+  const userTurnId = input.userTurnId ?? userTurn.id
   let working: ConversationSession = {
     ...session,
     turns: [...session.turns, userTurn],
@@ -105,6 +109,49 @@ export async function processFounderAIMessage(
   }
 
   if (!shouldUseLlmPath(session, llmEnabled)) {
+    if (input.reconciliation?.responseMessage) {
+      const { response } = buildDeterministicFounderAIResponse({
+        userMessage: input.answer,
+        session: working,
+        input: input.founderInput,
+        userName: input.userName,
+        worldModel: input.worldModel,
+        userTurnId,
+        questionId: input.questionId,
+        reconciliation: input.reconciliation,
+      })
+
+      const assistantTurn = createAssistantTurnFromResponse(
+        response,
+        working,
+        response.evidenceIds,
+        [],
+      )
+
+      let updated: ConversationSession = {
+        ...working,
+        turns: [...working.turns, assistantTurn],
+        confidence: clampConfidence(response.confidence),
+        updatedAt: nowISO(),
+        realityChanges: input.reconciliation.changes.map(c => ({
+          id: c.id,
+          label: c.newStatement.slice(0, 60),
+          previous: c.previousStatement.slice(0, 60),
+          next: c.newStatement.slice(0, 60),
+          timestamp: c.timestamp,
+        })),
+      }
+      updated = applyTrackedQuestionFromResponse(updated, response)
+      updated = persistSession(updated, response.message)
+
+      return {
+        session: updated,
+        mode: 'deterministic',
+        reasoningMode: 'deterministic',
+        usedFallback: true,
+      }
+    }
+
     const deterministic = submitAnswer(
       { sessionId: input.sessionId, answer: input.answer, questionId: input.questionId },
       input.founderInput,
@@ -175,8 +222,9 @@ export async function processFounderAIMessage(
       input: input.founderInput,
       userName: input.userName,
       worldModel: input.worldModel,
-      userTurnId: userTurn.id,
+      userTurnId,
       questionId: input.questionId,
+      reconciliation: input.reconciliation,
     })
 
     const assistantTurn = createAssistantTurnFromResponse(
