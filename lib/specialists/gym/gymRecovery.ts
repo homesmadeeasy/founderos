@@ -41,6 +41,7 @@ export function assessRecovery(
   }
 
   const weekSessions = sessions.filter(s => {
+    if (!s.completed) return false
     const weekAgo = new Date()
     weekAgo.setDate(weekAgo.getDate() - 7)
     return s.date >= weekAgo.toISOString()

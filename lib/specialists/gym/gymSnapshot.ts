@@ -1,6 +1,7 @@
-import type { GymInput, GymEvidence, GymSnapshot, TrainingBlock, TechniqueReview, VideoAnalysis, MovementAnalysis } from './gymTypes'
+import type { GymInput, GymEvidence, GymSnapshot, TrainingBlock, TechniqueReview, VideoAnalysis, MovementAnalysis, ProgressionRecommendation } from './gymTypes'
 import { gatherGymData, inferGoalProfile, inferEquipmentProfile, inferInjuryProfile, startOfWeekISO } from './gymUtils'
-import { parseWorkoutSessions } from './gymWorkoutLogger'
+import { mergeWorkoutSessions, hasStructuredHistory } from './gymSessionMerge'
+import { filterCompletedSessionRecords } from './gymSessionStatus'
 import { computeWeeklyVolume, volumeScoreFromWeekly } from './gymVolume'
 import { assessRecovery, recoveryScoreFromAssessment } from './gymRecovery'
 import { computeStrengthEstimates, progressionScoreFromEstimates } from './gymProgression'
@@ -10,6 +11,13 @@ import { generateTodaysWorkout } from './gymWorkoutPlanner'
 import { generateGymNarrative } from './gymNarrative'
 import { GYM_GOAL_LABELS } from './gymTypes'
 import { extractHealthTextFromInput } from './evidence/gymPrescriptionContext'
+import {
+  gymProfileToGoalProfile,
+  gymProfileToEquipmentProfile,
+  gymProfileToInjuryProfile,
+} from './gymProfileUtils'
+import { isProfileComplete } from './gymStorage/gymStorageSchema'
+import { computeDoubleProgression } from './gymStorage/gymDoubleProgression'
 
 function buildGymEvidence(input: GymInput, data: ReturnType<typeof gatherGymData>): GymEvidence[] {
   const evidence: GymEvidence[] = []
@@ -176,24 +184,86 @@ function buildPlaceholders(): {
 
 export function buildGymSnapshot(input: GymInput): GymSnapshot {
   const data = gatherGymData(input)
-  const sessions = parseWorkoutSessions(input)
-  const hasWorkoutHistory = sessions.some(s => s.exercises.some(e => e.sets.length > 0))
+  const structured = input.structuredSessions ?? []
+  const sessions = mergeWorkoutSessions(input, structured)
+  const structuredHist = hasStructuredHistory(structured)
+  const hasWorkoutHistory = structuredHist || sessions.some(s =>
+    s.completed && s.exercises.some(e => e.sets.some(set => set.completed)),
+  )
   const weekStart = startOfWeekISO()
-  const sessionsThisWeek = sessions.filter(s => s.date >= weekStart).length
+  const sessionsThisWeek = sessions.filter(s => s.completed && s.date >= weekStart).length
 
-  const goalProfile = inferGoalProfile(data, input)
-  const equipmentProfile = inferEquipmentProfile(data)
-  const injuryProfile = inferInjuryProfile(data)
+  const storedGoal = gymProfileToGoalProfile(input.storedProfile ?? null)
+  const goalProfile = storedGoal ?? inferGoalProfile(data, input)
+  const equipmentProfile = gymProfileToEquipmentProfile(input.storedProfile ?? null) ?? inferEquipmentProfile(data)
+  const injuryProfile = gymProfileToInjuryProfile(input.storedProfile ?? null) ?? inferInjuryProfile(data)
+  const profileComplete = isProfileComplete(input.storedProfile ?? null)
 
   const recoveryAssessment = assessRecovery(input, sessions)
-  const weeklyVolume = computeWeeklyVolume(sessions, recoveryAssessment.status === 'recover' ? ['quads', 'back'] : [])
+  const weeklyVolume = computeWeeklyVolume(
+    sessions,
+    recoveryAssessment.status === 'recover' ? ['quads', 'back'] : [],
+    structured,
+  )
   const strengthEstimates = computeStrengthEstimates(sessions)
+  const progressionRecommendations: ProgressionRecommendation[] = []
+  const seenProg = new Set<string>()
+  for (const session of filterCompletedSessionRecords(structured)) {
+    for (const ex of session.exercises) {
+      if (seenProg.has(ex.exerciseId)) continue
+      seenProg.add(ex.exerciseId)
+      const working = ex.sets.filter(s => s.completed && s.setType === 'working')
+      const reps = working.map(s => s.reps)
+      const targetRange = reps.length ? `${Math.min(...reps)}-${Math.max(...reps)}` : '8-10'
+      const result = computeDoubleProgression({
+        exerciseId: ex.exerciseId,
+        exerciseName: ex.exerciseName,
+        sessions: structured,
+        targetRepRange: targetRange,
+        profile: input.storedProfile ?? null,
+        painBlocked: working.some(s => s.painFlag),
+      })
+      progressionRecommendations.push({
+        exerciseId: ex.exerciseId,
+        exerciseName: ex.exerciseName,
+        action: result.action,
+        recommendation: result.recommendation,
+        evidence: result.evidence,
+        suggestedWeight: result.suggestedWeight,
+      })
+    }
+  }
+  if (progressionRecommendations.length === 0) {
+    for (const est of strengthEstimates.slice(0, 6)) {
+      const result = computeDoubleProgression({
+        exerciseId: est.exerciseId,
+        exerciseName: est.exerciseName,
+        sessions: structured,
+        targetRepRange: '8-10',
+        profile: input.storedProfile ?? null,
+      })
+      progressionRecommendations.push({
+        exerciseId: est.exerciseId,
+        exerciseName: est.exerciseName,
+        action: result.action,
+        recommendation: result.recommendation,
+        evidence: result.evidence,
+        suggestedWeight: result.suggestedWeight,
+      })
+    }
+  }
   const weaknesses = detectWeaknesses(weeklyVolume, sessions, goalProfile)
   const evidence = buildGymEvidence(input, data)
   const evidenceIds = evidence.map(e => e.id)
-
   const healthText = extractHealthTextFromInput(input)
-  const todaysWorkout = generateTodaysWorkout({
+
+  const rationale = structuredHist
+    ? `Built from ${filterCompletedSessionRecords(structured).length} completed session(s), weekly volume, recovery, and approved research.`
+    : hasWorkoutHistory
+      ? `Built from parsed completed session notes — log workouts in the Gym logger for accurate volume and progression.`
+      : 'No structured completed workout history — recommendations use profile, recovery signals, and approved research only. Planned or skipped sessions do not count.'
+
+  const todaysWorkoutBase = generateTodaysWorkout({
     goal: goalProfile,
     recovery: recoveryAssessment.status,
     sessions,
@@ -205,6 +275,7 @@ export function buildGymSnapshot(input: GymInput): GymSnapshot {
     healthText,
     shortSession: false,
   })
+  const todaysWorkout = { ...todaysWorkoutBase, rationale: todaysWorkoutBase.rationale || rationale }
 
   const recommendations = recommendExercises({
     goal: goalProfile,
@@ -236,6 +307,7 @@ export function buildGymSnapshot(input: GymInput): GymSnapshot {
     todaysWorkout,
     weeklyVolume,
     strengthEstimates,
+    progressionRecommendations,
     weaknesses,
     recommendations,
     recentSessions: sessions.slice(0, 8),
@@ -246,6 +318,8 @@ export function buildGymSnapshot(input: GymInput): GymSnapshot {
     evidence,
     narrative: '',
     hasWorkoutHistory,
+    hasStructuredHistory: structuredHist,
+    profileComplete,
     sessionsThisWeek,
     ...placeholders,
   }

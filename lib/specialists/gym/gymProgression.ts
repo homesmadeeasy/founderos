@@ -10,6 +10,7 @@ export function computeStrengthEstimates(sessions: WorkoutSession[]): StrengthEs
   const byExercise = new Map<string, { weights: number[]; reps: number[]; dates: string[]; best: { weight: number; reps: number; date: string } | null }>()
 
   for (const session of sessions) {
+    if (!session.completed) continue
     for (const perf of session.exercises) {
       if (!byExercise.has(perf.exerciseId)) {
         byExercise.set(perf.exerciseId, { weights: [], reps: [], dates: [], best: null })

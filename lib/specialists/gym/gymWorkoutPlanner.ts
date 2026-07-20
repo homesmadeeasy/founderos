@@ -13,6 +13,10 @@ import { GYM_EXERCISE_LIBRARY } from './gymExerciseLibrary'
 import { recommendExercises } from './gymExerciseSelection'
 import { buildExercisePrescription, buildWorkoutResearchSummary } from './evidence/gymPrescriptionReasoning'
 import { buildPrescriptionContext } from './evidence/gymPrescriptionContext'
+import {
+  normalizeExerciseId,
+  finalizeTodaysWorkout,
+} from './gymPlannedExerciseUtils'
 
 const SPLIT_TEMPLATES: Record<string, string[]> = {
   push: ['barbell-bench-press', 'incline-dumbbell-press', 'overhead-press', 'lateral-raise', 'tricep-pushdown'],
@@ -58,7 +62,7 @@ function buildPlannedExercise(
     healthText: string
     shortSession: boolean
   },
-): PlannedExercise | null {
+): Omit<PlannedExercise, 'plannedExerciseId'> | null {
   const ex = GYM_EXERCISE_LIBRARY.find(e => e.id === exerciseId)
   if (!ex) return null
 
@@ -91,20 +95,17 @@ function buildPlannedExercise(
   }
 }
 
-export function generateTodaysWorkout(params: {
+/** Build exercise ID list without accidental duplicates (tracks selected canonical IDs). */
+export function buildUniqueExerciseIdList(params: {
+  splitKey: string
   goal: GoalProfile
-  recovery: RecoveryStatus
-  sessions: WorkoutSession[]
-  volume: WeeklyVolume[]
-  weaknesses: GymWeakness[]
   equipment: EquipmentProfile
   injuries: InjuryProfile
-  evidenceIds: string[]
-  healthText?: string
-  shortSession?: boolean
-}): TodaysWorkout {
-  const splitKey = pickSplit(params.recovery, params.sessions, params.goal)
-  let exerciseIds = [...(SPLIT_TEMPLATES[splitKey] ?? SPLIT_TEMPLATES.full)]
+  volume: WeeklyVolume[]
+  weaknesses: GymWeakness[]
+  maxExercises: number
+}): string[] {
+  let exerciseIds = [...(SPLIT_TEMPLATES[params.splitKey] ?? SPLIT_TEMPLATES.full)]
 
   if (params.injuries.areas.includes('knee')) {
     exerciseIds = exerciseIds.filter(id => id !== 'barbell-squat')
@@ -118,19 +119,62 @@ export function generateTodaysWorkout(params: {
     )
   }
 
+  // Canonical-dedupe template + substitution collisions (e.g. bench→incline when barbell missing).
+  const selected = new Set<string>()
+  const unique: string[] = []
+  for (const id of exerciseIds) {
+    const canonical = normalizeExerciseId(id)
+    if (selected.has(canonical)) continue
+    selected.add(canonical)
+    unique.push(id)
+  }
+
   const recs = recommendExercises({
     goal: params.goal,
     equipment: params.equipment,
     injuries: params.injuries,
     volume: params.volume,
     weaknesses: params.weaknesses,
-    excludeIds: exerciseIds,
+    excludeIds: unique,
   })
-  if (recs[0] && exerciseIds.length < 6) {
-    exerciseIds.push(recs[0].exerciseId)
+
+  for (const rec of recs) {
+    if (unique.length >= params.maxExercises) break
+    const canonical = normalizeExerciseId(rec.exerciseId)
+    if (selected.has(canonical)) continue
+    selected.add(canonical)
+    unique.push(rec.exerciseId)
   }
 
+  return unique.slice(0, params.maxExercises)
+}
+
+export function generateTodaysWorkout(params: {
+  goal: GoalProfile
+  recovery: RecoveryStatus
+  sessions: WorkoutSession[]
+  volume: WeeklyVolume[]
+  weaknesses: GymWeakness[]
+  equipment: EquipmentProfile
+  injuries: InjuryProfile
+  evidenceIds: string[]
+  healthText?: string
+  shortSession?: boolean
+}): TodaysWorkout {
+  const splitKey = pickSplit(params.recovery, params.sessions, params.goal)
   const light = params.recovery === 'train_light' || params.recovery === 'deload'
+  const maxExercises = light ? 4 : 6
+
+  const exerciseIds = buildUniqueExerciseIdList({
+    splitKey,
+    goal: params.goal,
+    equipment: params.equipment,
+    injuries: params.injuries,
+    volume: params.volume,
+    weaknesses: params.weaknesses,
+    maxExercises,
+  })
+
   const planParams = {
     goal: params.goal,
     recovery: params.recovery,
@@ -143,14 +187,14 @@ export function generateTodaysWorkout(params: {
     shortSession: params.shortSession ?? false,
   }
 
-  const exercises = exerciseIds
+  const rawExercises = exerciseIds
     .map((id, i) => buildPlannedExercise(id, i + 1, planParams))
-    .filter((e): e is PlannedExercise => e != null)
-    .slice(0, light ? 4 : 6)
+    .filter((e): e is Omit<PlannedExercise, 'plannedExerciseId'> => e != null)
+    .map(e => ({ ...e, plannedExerciseId: '' }))
 
-  const muscles = [...new Set(exercises.map(e => e.primaryMuscle))] as MuscleGroup[]
-  const estimatedMinutes = exercises.reduce((sum, e) => sum + e.sets * (e.restSeconds / 60 + 0.75), 0)
-  const researchSummary = buildWorkoutResearchSummary(exercises.map(e => e.prescription))
+  const muscles = [...new Set(rawExercises.map(e => e.primaryMuscle))] as MuscleGroup[]
+  const estimatedMinutes = rawExercises.reduce((sum, e) => sum + e.sets * (e.restSeconds / 60 + 0.75), 0)
+  const researchSummary = buildWorkoutResearchSummary(rawExercises.map(e => e.prescription))
 
   const title = splitKey === 'deload'
     ? 'Deload session'
@@ -162,15 +206,15 @@ export function generateTodaysWorkout(params: {
     ? 'Evidence-informed starter session from your goal, recovery signals, and approved research — confidence is limited until you log workouts.'
     : `Built from ${params.sessions.length} logged session(s), weekly volume, recovery status, and approved research claims (${researchSummary.evidenceInformedCount} evidence-informed, ${researchSummary.fallbackCount} fallback).`
 
-  return {
+  return finalizeTodaysWorkout({
     title,
-    exercises,
+    exercises: rawExercises,
     estimatedMinutes: Math.round(estimatedMinutes),
     musclesTrained: muscles,
     rationale,
     evidenceIds: params.evidenceIds,
     researchSummary,
-  }
+  })
 }
 
 export function buildPushPullLegsRoutine(goal: GoalProfile): { name: string; days: string[] } {
@@ -183,3 +227,5 @@ export function buildPushPullLegsRoutine(goal: GoalProfile): { name: string; day
     ],
   }
 }
+
+export { SPLIT_TEMPLATES }

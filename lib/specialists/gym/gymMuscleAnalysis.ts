@@ -20,7 +20,9 @@ export function summarizeMuscleBalance(volume: WeeklyVolume[]): {
 }
 
 export function neglectedMuscles(volume: WeeklyVolume[]): MuscleGroup[] {
-  return volume.filter(v => v.status === 'neglected' || v.status === 'low').map(v => v.muscle)
+  return volume
+    .filter(v => v.status === 'below_baseline' || v.status === 'low')
+    .map(v => v.muscle)
 }
 
 export function overtrainedMuscles(volume: WeeklyVolume[]): MuscleGroup[] {

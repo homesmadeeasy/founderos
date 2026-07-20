@@ -10,6 +10,7 @@ import ConnectedSourcesSection from '@/components/settings/ConnectedSourcesSecti
 import CognitiveStorageSection from '@/components/settings/CognitiveStorageSection'
 import FounderAISettingsSection from '@/components/settings/FounderAISettingsSection'
 import FounderReliabilitySection from '@/components/settings/FounderReliabilitySection'
+import GymSettingsSection from '@/components/settings/GymSettingsSection'
 import LoadingScreen from '@/components/ui/LoadingScreen'
 import type { MemoryIndexStatus } from '@/lib/types'
 
@@ -220,6 +221,8 @@ export default function SettingsPage() {
       <CognitiveStorageSection />
 
       <ConnectedSourcesSection />
+
+      <GymSettingsSection />
 
       <div className="space-y-4">
         {sections.map(section => {

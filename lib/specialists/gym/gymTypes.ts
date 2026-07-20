@@ -37,7 +37,17 @@ export type MuscleGroup =
   | 'abs'
   | 'lower_back'
 
-export type VolumeStatus = 'optimal' | 'low' | 'high' | 'recovering' | 'neglected' | 'unknown'
+export type VolumeStatus =
+  | 'optimal'
+  | 'low'
+  | 'high'
+  | 'recovering'
+  | 'neglected'
+  | 'unknown'
+  | 'insufficient_data'
+  | 'below_baseline'
+  | 'within_baseline'
+  | 'above_baseline'
 
 export type RecoveryStatus = 'ready' | 'train_light' | 'recover' | 'deload'
 
@@ -80,9 +90,12 @@ export interface SetPerformance {
   reps: number
   weight: number
   rpe?: number
+  rir?: number
   restSeconds?: number
   completed: boolean
   notes?: string
+  setType?: 'warmup' | 'working'
+  painFlag?: boolean
 }
 
 export interface ExercisePerformance {
@@ -116,6 +129,8 @@ export interface WorkoutTemplate {
 export interface WeeklyVolume {
   muscle: MuscleGroup
   sets: number
+  directSets?: number
+  secondarySets?: number
   status: VolumeStatus
   trend: 'up' | 'down' | 'stable' | 'unknown'
 }
@@ -177,6 +192,7 @@ export interface MovementAnalysis {
 }
 
 export interface PlannedExercise {
+  plannedExerciseId: string
   exerciseId: string
   exerciseName: string
   order: number
@@ -189,6 +205,7 @@ export interface PlannedExercise {
 }
 
 export interface TodaysWorkout {
+  workoutInstanceId: string
   title: string
   exercises: PlannedExercise[]
   estimatedMinutes: number
@@ -196,6 +213,7 @@ export interface TodaysWorkout {
   rationale: string
   evidenceIds: string[]
   researchSummary: import('./evidence/gymEvidenceTypes').WorkoutResearchSummary
+  allowRepeatedExercise?: boolean
 }
 
 export interface GymWeakness {
@@ -222,6 +240,15 @@ export interface GymRecommendation {
   priority: 'high' | 'medium' | 'low'
 }
 
+export interface ProgressionRecommendation {
+  exerciseId: string
+  exerciseName: string
+  action: 'maintain' | 'increase' | 'reduce' | 'deload_consideration' | 'insufficient_data'
+  recommendation: string
+  evidence: string
+  suggestedWeight?: number
+}
+
 export interface GymSnapshot {
   momentumScore: number
   consistencyScore: number
@@ -234,6 +261,7 @@ export interface GymSnapshot {
   todaysWorkout: TodaysWorkout
   weeklyVolume: WeeklyVolume[]
   strengthEstimates: StrengthEstimate[]
+  progressionRecommendations: ProgressionRecommendation[]
   weaknesses: GymWeakness[]
   recommendations: GymRecommendation[]
   recentSessions: WorkoutSession[]
@@ -244,6 +272,8 @@ export interface GymSnapshot {
   evidence: GymEvidence[]
   narrative: string
   hasWorkoutHistory: boolean
+  hasStructuredHistory: boolean
+  profileComplete: boolean
   sessionsThisWeek: number
   techniqueReviews: TechniqueReview[]
   videoAnalysis: VideoAnalysis[]
@@ -265,6 +295,8 @@ export interface GymInput {
   eveningReview?: EveningReview | null
   healthSignals?: HealthSignals | null
   worldModel?: WorldModel | null
+  structuredSessions?: import('./gymStorage/gymStorageTypes').WorkoutSessionRecord[]
+  storedProfile?: import('./gymStorage/gymStorageTypes').GymProfile | null
 }
 
 export type GymQuestionId =
@@ -280,6 +312,11 @@ export type GymQuestionId =
   | 'replace_exercise'
   | 'chest_volume'
   | 'train_tomorrow'
+  | 'last_workout'
+  | 'last_time'
+  | 'why_exercise'
+  | 'maintain_increase'
+  | 'short_session'
 
 export const GYM_GOAL_LABELS: Record<GymGoal, string> = {
   muscle_growth: 'Muscle Growth',

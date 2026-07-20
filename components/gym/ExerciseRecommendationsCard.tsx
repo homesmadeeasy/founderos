@@ -14,8 +14,8 @@ export default function ExerciseRecommendationsCard({ snapshot }: Props) {
       <ul className="space-y-2">
         {snapshot.recommendations.length === 0 ? (
           <li className="text-sm text-zinc-500">Balanced selection — follow today&apos;s workout.</li>
-        ) : snapshot.recommendations.map(r => (
-          <li key={r.exerciseId} className="text-sm">
+        ) : snapshot.recommendations.map((r, i) => (
+          <li key={`${r.exerciseId}-${i}`} className="text-sm">
             <span className="font-medium text-zinc-800">{r.exerciseName}</span>
             <p className="text-xs text-zinc-500 mt-0.5">{r.reason}</p>
           </li>

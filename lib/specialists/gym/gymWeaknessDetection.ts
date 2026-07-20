@@ -8,6 +8,9 @@ export function detectWeaknesses(
   goal: GoalProfile,
 ): GymWeakness[] {
   const weaknesses: GymWeakness[] = []
+  const hasVolumeData = volume.some(v => v.sets > 0 && v.status !== 'insufficient_data')
+  if (!hasVolumeData) return weaknesses
+
   const balance = summarizeMuscleBalance(volume)
 
   for (const muscle of neglectedMuscles(volume).slice(0, 4)) {

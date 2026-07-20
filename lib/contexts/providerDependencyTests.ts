@@ -129,6 +129,14 @@ function testGymInputMergesCognitive() {
   console.log('PASS: useGymInput composes base + cognitive')
 }
 
+function testGymLayoutProvider() {
+  const src = read('app/(app)/gym/layout.tsx')
+  assert(src.includes('GymDataProvider'), 'gym layout must mount GymDataProvider')
+  const page = read('components/gym/useGymSnapshot.ts')
+  assert(page.includes('useGymData'), 'useGymSnapshot must use GymDataProvider data')
+  console.log('PASS: gym layout provider wiring')
+}
+
 function run() {
   console.log('Provider dependency audit\n')
   testCognitiveProviderDoesNotUseFounderInput()
@@ -137,6 +145,7 @@ function run() {
   testGymBaseInputHasNoCognitiveDependency()
   testGymInputMergesCognitive()
   testLayoutProviderOrder()
+  testGymLayoutProvider()
   testCriticalHookImports()
   testUseCognitiveModelCallSites()
   console.log('\nAll provider dependency tests passed.')

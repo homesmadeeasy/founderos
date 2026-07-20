@@ -16,13 +16,18 @@ export function buildPrescriptionContext(params: {
   healthText?: string
 }): PrescriptionContext {
   const muscleVolume = params.volume.find(v => v.muscle === params.exercise.primaryMuscle)
-  const hasWorkoutHistory = params.sessions.some(s => s.exercises.some(e => e.sets.length > 0))
+  const hasWorkoutHistory = params.sessions.some(s =>
+    s.completed && s.exercises.some(e => e.sets.some(set => set.completed)),
+  )
 
   const weekStart = new Date()
   weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1)
-  const sessionsThisWeek = params.sessions.filter(s => s.date >= weekStart.toISOString()).length
+  const sessionsThisWeek = params.sessions.filter(s =>
+    s.completed && s.date >= weekStart.toISOString(),
+  ).length
 
   const recentForExercise = params.sessions
+    .filter(s => s.completed)
     .flatMap(s => s.exercises.filter(e => e.exerciseId === params.exercise.id))
     .flatMap(e => e.sets.filter(set => set.completed))
   const lastSet = recentForExercise[0]

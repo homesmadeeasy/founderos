@@ -1,43 +1,55 @@
-import type { WeeklyVolume, MuscleGroup, VolumeStatus } from './gymTypes'
-import type { WorkoutSession } from './gymTypes'
+import type { WeeklyVolume, MuscleGroup, VolumeStatus, WorkoutSession } from './gymTypes'
+import type { WorkoutSessionRecord } from './gymStorage/gymStorageTypes'
 import { getExerciseById } from './gymExerciseLibrary'
 import { allMuscleGroups, startOfWeekISO } from './gymUtils'
+import {
+  computeMuscleVolumeFromSessions,
+  hasCompleteTrainingWeek,
+  SECONDARY_MUSCLE_WEIGHT,
+} from './gymStorage/gymMuscleMapping'
 
-const OPTIMAL_SETS: Record<MuscleGroup, { min: number; max: number }> = {
-  chest: { min: 10, max: 20 },
-  back: { min: 12, max: 22 },
-  shoulders: { min: 8, max: 18 },
-  front_delts: { min: 4, max: 12 },
-  side_delts: { min: 8, max: 16 },
-  rear_delts: { min: 6, max: 14 },
-  triceps: { min: 6, max: 14 },
-  biceps: { min: 6, max: 14 },
-  forearms: { min: 2, max: 8 },
-  quads: { min: 10, max: 20 },
-  hamstrings: { min: 8, max: 16 },
-  glutes: { min: 8, max: 16 },
-  calves: { min: 6, max: 14 },
-  abs: { min: 4, max: 12 },
-  lower_back: { min: 4, max: 10 },
+function isWorkingSet(set: { completed: boolean; setType?: 'warmup' | 'working' }): boolean {
+  if (!set.completed) return false
+  return set.setType !== 'warmup'
 }
 
-function classifyVolume(muscle: MuscleGroup, sets: number): VolumeStatus {
-  const range = OPTIMAL_SETS[muscle]
-  if (sets === 0) return 'neglected'
-  if (sets < range.min * 0.5) return 'low'
-  if (sets > range.max * 1.25) return 'high'
-  if (sets >= range.min && sets <= range.max) return 'optimal'
-  if (sets < range.min) return 'low'
-  return 'high'
+function volumeStatusFromBreakdown(
+  status: 'insufficient_data' | 'below_baseline' | 'within_baseline' | 'above_baseline',
+  directSets: number,
+  secondarySets: number,
+): VolumeStatus {
+  if (directSets + secondarySets === 0) return 'insufficient_data'
+  if (status === 'insufficient_data') return 'within_baseline'
+  return status
 }
 
 export function computeWeeklyVolume(
   sessions: WorkoutSession[],
   recoveringMuscles: MuscleGroup[] = [],
+  structuredRecords: WorkoutSessionRecord[] = [],
 ): WeeklyVolume[] {
   const weekStart = startOfWeekISO()
-  const recent = sessions.filter(s => s.date >= weekStart)
+  const hasFullWeek = hasCompleteTrainingWeek(structuredRecords)
+  const breakdown = computeMuscleVolumeFromSessions(structuredRecords, hasFullWeek)
 
+  if (structuredRecords.length > 0) {
+    return breakdown.map(b => {
+      let status = volumeStatusFromBreakdown(b.status, b.directSets, b.secondarySets)
+      if (recoveringMuscles.includes(b.muscle) && b.directSets + b.secondarySets > 0) {
+        status = 'recovering'
+      }
+      return {
+        muscle: b.muscle,
+        sets: Math.round((b.directSets + b.secondarySets) * 10) / 10,
+        directSets: b.directSets,
+        secondarySets: b.secondarySets,
+        status,
+        trend: b.directSets > 0 ? 'stable' as const : 'unknown' as const,
+      }
+    })
+  }
+
+  const recent = sessions.filter(s => s.date >= weekStart)
   const setCounts = Object.fromEntries(
     allMuscleGroups().map(m => [m, 0]),
   ) as Record<MuscleGroup, number>
@@ -45,21 +57,20 @@ export function computeWeeklyVolume(
   for (const session of recent) {
     for (const perf of session.exercises) {
       const exercise = getExerciseById(perf.exerciseId)
-      const setCount = perf.sets.filter(s => s.completed).length
+      const setCount = perf.sets.filter(isWorkingSet).length
       if (setCount === 0) continue
-
       if (exercise) {
         setCounts[exercise.primaryMuscle] += setCount
         for (const sec of exercise.secondaryMuscles) {
-          setCounts[sec] += Math.ceil(setCount * 0.5)
+          setCounts[sec] += setCount * SECONDARY_MUSCLE_WEIGHT
         }
       }
     }
   }
 
   return allMuscleGroups().map(muscle => {
-    const sets = setCounts[muscle]
-    let status = classifyVolume(muscle, sets)
+    const sets = Math.round(setCounts[muscle] * 10) / 10
+    let status: VolumeStatus = sets === 0 ? 'insufficient_data' : 'within_baseline'
     if (recoveringMuscles.includes(muscle) && sets > 0) status = 'recovering'
     return {
       muscle,
@@ -75,10 +86,10 @@ export function totalWeeklySets(volume: WeeklyVolume[]): number {
 }
 
 export function volumeScoreFromWeekly(volume: WeeklyVolume[]): number {
-  const tracked = volume.filter(v => v.sets > 0)
+  const tracked = volume.filter(v => v.sets > 0 && v.status !== 'insufficient_data')
   if (tracked.length === 0) return 35
-  const optimal = tracked.filter(v => v.status === 'optimal').length
-  const neglected = volume.filter(v => v.status === 'neglected').length
-  const base = Math.round((optimal / Math.max(tracked.length, 1)) * 70)
-  return Math.max(20, Math.min(95, base - neglected * 3))
+  const within = tracked.filter(v => v.status === 'within_baseline' || v.status === 'optimal').length
+  const below = volume.filter(v => v.status === 'below_baseline' || v.status === 'low').length
+  const base = Math.round((within / Math.max(tracked.length, 1)) * 70)
+  return Math.max(20, Math.min(95, base - below * 2))
 }
