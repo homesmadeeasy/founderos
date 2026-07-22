@@ -34,6 +34,20 @@ function withEnv(vars: Record<string, string | undefined>, fn: () => void) {
 
 console.log('Env and route protection tests\n')
 
+// Guardrail: public.ts must keep static process.env.NEXT_PUBLIC_* access for
+// Next.js client inlining. Dynamic process.env[name] breaks the browser bundle.
+withEnv(
+  {
+    NEXT_PUBLIC_SUPABASE_URL: 'https://static-access.supabase.co',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: 'static-anon',
+  },
+  () => {
+    assert.equal(process.env.NEXT_PUBLIC_SUPABASE_URL, 'https://static-access.supabase.co')
+    assert.equal(getPublicEnv().supabaseUrl, 'https://static-access.supabase.co')
+    console.log('PASS: getPublicEnv reads statically accessed NEXT_PUBLIC vars')
+  },
+)
+
 withEnv(
   {
     NEXT_PUBLIC_SUPABASE_URL: undefined,

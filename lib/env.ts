@@ -29,24 +29,27 @@ export interface ServerEnv {
   google: GoogleIntegrationEnv
 }
 
-const DEV_HINT = 'Check .env.local in the project root and restart the dev server.'
+const DEV_HINT = 'Check .env.local in the Next.js project root (alongside package.json) and restart the dev server.'
 
-function read(name: string): string | undefined {
-  const value = process.env[name]?.trim()
-  return value || undefined
+function trimServerEnv(value: string | undefined): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed || undefined
 }
 
 /**
  * Server environment snapshot.
  * Requires public Supabase vars. OPENAI_* and Google vars are optional.
+ *
+ * Server-only secrets use static property access for clarity. This module must
+ * never be imported from Client Components.
  */
 export function getServerEnv(): ServerEnv {
   const publicEnv = getPublicEnv()
 
   return {
     public: publicEnv,
-    openaiApiKey: read('OPENAI_API_KEY'),
-    openaiFounderModel: read('OPENAI_FOUNDER_MODEL'),
+    openaiApiKey: trimServerEnv(process.env.OPENAI_API_KEY),
+    openaiFounderModel: trimServerEnv(process.env.OPENAI_FOUNDER_MODEL),
     google: getGoogleIntegrationEnv(),
   }
 }
@@ -54,9 +57,9 @@ export function getServerEnv(): ServerEnv {
 /** Google Calendar OAuth — all optional; integration stays disabled until complete. */
 export function getGoogleIntegrationEnv(): GoogleIntegrationEnv {
   return {
-    clientId: read('GOOGLE_CLIENT_ID'),
-    clientSecret: read('GOOGLE_CLIENT_SECRET'),
-    redirectUri: read('GOOGLE_REDIRECT_URI'),
+    clientId: trimServerEnv(process.env.GOOGLE_CLIENT_ID),
+    clientSecret: trimServerEnv(process.env.GOOGLE_CLIENT_SECRET),
+    redirectUri: trimServerEnv(process.env.GOOGLE_REDIRECT_URI),
   }
 }
 
@@ -70,7 +73,7 @@ export function isGoogleOAuthConfigured(): boolean {
  * Prefer optional reads + deterministic fallback for Founder AI.
  */
 export function getOpenAIApiKey(): string {
-  const key = read('OPENAI_API_KEY')
+  const key = trimServerEnv(process.env.OPENAI_API_KEY)
   if (!key) {
     throw new Error(`Missing OPENAI_API_KEY. ${DEV_HINT}`)
   }
@@ -79,11 +82,11 @@ export function getOpenAIApiKey(): string {
 
 /** Optional OpenAI key — null when unset (Founder AI deterministic mode). */
 export function getOptionalOpenAIApiKey(): string | null {
-  return read('OPENAI_API_KEY') ?? null
+  return trimServerEnv(process.env.OPENAI_API_KEY) ?? null
 }
 
 export function getOptionalOpenAIFounderModel(): string | undefined {
-  return read('OPENAI_FOUNDER_MODEL')
+  return trimServerEnv(process.env.OPENAI_FOUNDER_MODEL)
 }
 
 /**
