@@ -23,10 +23,13 @@ Run these in the Supabase SQL Editor **in order** for a fresh project.
 | `vector_memory.sql` | `memory_embeddings` + pgvector + `match_memory_embeddings()` |
 | `world_types.sql` | `projects.world_type`, `world_purpose`, `life_area` |
 | `goals.sql` | `goals`, `goal_links`, `goal_reviews` |
+| `gym.sql` | Gym profile, templates, sessions, sets, progression, user state + RLS |
 
 ## RLS
 
 Every migration enables Row Level Security and adds policies so users can only access their own rows (`auth.uid() = user_id`).
+
+Gym child tables (`gym_workout_template_exercises`, `gym_exercise_performances`, `gym_set_performances`) authorise via an `EXISTS` join to the owning parent template/session instead of a denormalised `user_id` column.
 
 Do not disable RLS in production.
 

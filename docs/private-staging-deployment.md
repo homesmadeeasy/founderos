@@ -2,7 +2,7 @@
 
 This guide prepares FounderOS for a **private live staging** deployment on Vercel while preserving local development. It does **not** mean staging has already been deployed.
 
-Gym cloud persistence (database tables, sync queue, local import UI) is a later phase. Phase 1 only covers environment boundaries, auth route protection, docs, and verification scripts.
+Phase 1 covers environment boundaries, auth route protection, docs, and verification scripts. Phase 2 adds the Gym SQL schema (`supabase/gym.sql`) only — the app still uses localStorage until a later repository phase.
 
 ## Environments
 
@@ -71,6 +71,76 @@ If email confirmation is enabled, confirmation links must use the staging Site U
 - Create only the owner (and any intended testers) as users.
 - Do not rely on a custom allow-list in app code for Phase 1 — Supabase account control is enough.
 
+## Gym database schema (Phase 2 — manual)
+
+The Gym tables are defined in `supabase/gym.sql`. They are **not** applied automatically by Vercel or Cursor. Apply them in the Supabase SQL Editor.
+
+### Apply `gym.sql`
+
+1. Open **Supabase Dashboard → SQL Editor**.
+2. Confirm core `schema.sql` has already been applied (so `auth.users` exists).
+3. Open the file `supabase/gym.sql` from this repository.
+4. Paste the **entire** file into a new SQL query.
+5. Run it once. It is guarded with `if not exists` / `drop policy if exists` and is safe to re-run in most cases.
+6. In **Table Editor**, confirm these tables exist:
+   - `gym_profiles`
+   - `gym_workout_templates`
+   - `gym_workout_template_exercises`
+   - `gym_workout_sessions`
+   - `gym_exercise_performances`
+   - `gym_set_performances`
+   - `gym_progression_records`
+   - `gym_user_state`
+7. For each table, confirm **RLS is enabled**.
+
+Do **not** paste service-role keys into the app or disable RLS for convenience.
+
+### Verify cross-user isolation (two test users)
+
+Use two real Auth users (User A and User B). Prefer the Supabase Dashboard **Authentication** users list plus the SQL Editor with the appropriate session, or two browser profiles signed into the app once a repository layer exists. Until then, verify with the SQL Editor while carefully switching context — or create rows as each user via authenticated requests.
+
+**As User A (authenticated):**
+
+```sql
+-- Insert own profile (auth.uid() must equal User A's id)
+insert into gym_profiles (
+  user_id, primary_goal, experience,
+  training_days_per_week, session_duration_minutes,
+  preferred_split, tracking_mode
+) values (
+  auth.uid(), 'muscle_growth', 'intermediate',
+  4, 60, 'push_pull_legs', 'rpe'
+)
+on conflict (user_id) do nothing;
+
+insert into gym_workout_sessions (user_id, title, planned_date, status, completed)
+values (auth.uid(), 'A only session', current_date, 'planned', false);
+
+select count(*) as my_profiles from gym_profiles;          -- expect 1
+select count(*) as my_sessions from gym_workout_sessions;  -- expect >= 1 (only A's)
+```
+
+**As User B (authenticated):**
+
+```sql
+select count(*) as visible_profiles from gym_profiles
+  where user_id <> auth.uid();   -- expect 0
+
+select count(*) as visible_foreign_sessions from gym_workout_sessions
+  where user_id <> auth.uid();   -- expect 0
+
+-- Attempt to read sets belonging to A should return zero rows
+select count(*) from gym_set_performances;  -- only B's chain, normally 0
+```
+
+**Pass criteria:** User B never sees User A's profile, sessions, exercise performances, or sets. Child-table policies must fail closed when the parent session/template is owned by someone else.
+
+Local shape checks (no live Supabase):
+
+```bash
+npm run test:gym-schema
+```
+
 ## GitHub setup
 
 1. Ensure the FounderOS app lives in the GitHub repo you will connect to Vercel.
@@ -95,17 +165,20 @@ If email confirmation is enabled, confirmation links must use the staging Site U
 - [ ] Missing `OPENAI_API_KEY` does not crash the app shell; Founder AI uses deterministic fallback
 - [ ] No service-role key in client bundle or env templates
 - [ ] Staging badge only when `NEXT_PUBLIC_APP_ENV=staging`
+- [ ] `supabase/gym.sql` applied in Supabase SQL Editor
+- [ ] Gym RLS isolation verified with two test users
+- [ ] `npm run test:gym-schema` passes locally
 
 ## Rollback
 
 1. In Vercel, promote/redeploy the previous successful deployment.
 2. Revert Supabase Auth Site URL / redirects if they were changed incorrectly.
-3. Application data for Gym remains localStorage-only until a later persistence phase — rolling back Phase 1 does not require database migrations.
+3. Application Gym data remains localStorage-only until a later persistence phase — rolling back Phase 1–2 app code does not require dropping Gym tables, but unused tables can be left in place safely.
 
 ## What is intentionally out of scope (later phases)
 
-- Gym Supabase tables and RLS
-- `SupabaseGymRepository` and offline sync queue
+- `SupabaseGymRepository` and wiring `GymDataContext` to cloud storage
+- Offline pending-write sync queue
 - Local → cloud Gym import UI
 - Production launch and public sign-up
 
@@ -114,5 +187,6 @@ If email confirmation is enabled, confirmation links must use the staging Site U
 ```bash
 npm run typecheck
 npm run test:env
-npm run check   # typecheck + core tests + env tests + production build
+npm run test:gym-schema
+npm run check   # typecheck + core tests + env/schema tests + production build
 ```
