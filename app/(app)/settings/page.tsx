@@ -12,6 +12,7 @@ import FounderAISettingsSection from '@/components/settings/FounderAISettingsSec
 import FounderReliabilitySection from '@/components/settings/FounderReliabilitySection'
 import GymSettingsSection from '@/components/settings/GymSettingsSection'
 import LoadingScreen from '@/components/ui/LoadingScreen'
+import { isStagingEnvironment } from '@/lib/env/public'
 import type { MemoryIndexStatus } from '@/lib/types'
 
 const sections = [
@@ -152,10 +153,22 @@ export default function SettingsPage() {
     )
   }
 
+  const showStagingBadge = isStagingEnvironment()
+
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-zinc-900">Settings</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold text-zinc-900">Settings</h1>
+          {showStagingBadge && (
+            <span
+              className="inline-flex items-center rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800"
+              title="Private staging environment"
+            >
+              Staging
+            </span>
+          )}
+        </div>
         <p className="mt-0.5 text-sm text-zinc-500">
           Manage your account and how FounderOS works for you.
         </p>

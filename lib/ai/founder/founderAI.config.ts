@@ -2,8 +2,13 @@
 
 export const FOUNDER_AI_DEFAULT_MODEL = 'gpt-4o-mini'
 
+/**
+ * Model name for Founder AI. Reads optional OPENAI_FOUNDER_MODEL without importing
+ * server env helpers (this module is also imported by client settings for the default label).
+ */
 export function getFounderAIModel(): string {
-  return process.env.OPENAI_FOUNDER_MODEL?.trim() || FOUNDER_AI_DEFAULT_MODEL
+  const fromEnv = process.env.OPENAI_FOUNDER_MODEL?.trim()
+  return fromEnv || FOUNDER_AI_DEFAULT_MODEL
 }
 
 export const FOUNDER_AI_TIMEOUT_MS = 25_000

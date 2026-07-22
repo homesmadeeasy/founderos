@@ -7,10 +7,9 @@
  */
 
 import { createBrowserClient } from '@supabase/ssr'
+import { getPublicEnv } from '@/lib/env/public'
 
 export function createClient() {
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  )
+  const { supabaseUrl, supabaseAnonKey } = getPublicEnv()
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }

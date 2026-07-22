@@ -5,6 +5,7 @@
 
 import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
+import { getOptionalOpenAIApiKey } from '@/lib/env'
 import { getFounderAIModel, FOUNDER_AI_TIMEOUT_MS } from './founderAI.config'
 import { FOUNDER_AI_SYSTEM_PROMPT, buildFounderAIUserPrompt } from './founderAI.prompt'
 import { FounderAIResponseSchema } from './founderAI.schema'
@@ -19,8 +20,7 @@ export interface FounderAIServiceResult {
 }
 
 function readApiKey(): string | null {
-  const key = process.env.OPENAI_API_KEY?.trim()
-  return key || null
+  return getOptionalOpenAIApiKey()
 }
 
 function mapProviderError(err: unknown): { errorCode: FounderAIErrorCode; message: string } {

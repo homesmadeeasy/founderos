@@ -1,5 +1,5 @@
 /**
- * Session refresh + route protection used by the root middleware.
+ * Session refresh + route protection used by the root proxy.
  *
  * - Refreshes the Supabase auth cookie on every request (keeps sessions alive).
  * - Redirects unauthenticated users away from protected app routes to /login.
@@ -7,9 +7,10 @@
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getPublicEnv } from '@/lib/env/public'
+import { isProtectedPath } from '@/lib/supabase/protectedRoutes'
 
-// Routes that require a logged-in user.
-const PROTECTED_PREFIXES = ['/home', '/founder', '/dashboard', '/domains', '/inbox', '/signals', '/morning', '/evening', '/objects', '/memory', '/knowledge', '/executive', '/projects', '/goals', '/ideas', '/review', '/weekly-review', '/patterns', '/settings', '/onboarding', '/memory-search']
+export { PROTECTED_PREFIXES, isProtectedPath } from '@/lib/supabase/protectedRoutes'
 
 // Auth routes a logged-in user shouldn't see.
 const AUTH_ROUTES = ['/login', '/signup']
@@ -17,9 +18,11 @@ const AUTH_ROUTES = ['/login', '/signup']
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request })
 
+  const { supabaseUrl, supabaseAnonKey } = getPublicEnv()
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -40,9 +43,7 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
-  const isProtected = PROTECTED_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p + '/'),
-  )
+  const isProtected = isProtectedPath(pathname)
   const isAuthRoute = AUTH_ROUTES.includes(pathname)
 
   // Not logged in + visiting a protected route → send to /login

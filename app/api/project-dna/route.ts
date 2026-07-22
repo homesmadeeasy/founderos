@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { getOptionalOpenAIApiKey } from '@/lib/env'
 import { createClient } from '@/lib/supabase/server'
 import { loadProjectDnaContext, createProjectDna, createLink } from '@/lib/db'
 import { indexProjectDNA } from '@/lib/memory/indexing'
@@ -18,7 +19,7 @@ import {
 export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = getOptionalOpenAIApiKey()
   if (!apiKey) {
     return NextResponse.json(
       { error: 'OpenAI API key is not configured. Add OPENAI_API_KEY to .env.local.' },
