@@ -1,24 +1,17 @@
-import type { WorkoutSessionRecord } from './gymStorage/gymStorageTypes'
+import type {
+  WorkoutSessionRecord,
+  WorkoutSessionStatus,
+  WorkoutSkipReason,
+  ExerciseSkipReason,
+} from './gymStorage/gymStorageTypes'
 import type { WorkoutSession } from './gymTypes'
 
-export type WorkoutSessionStatus =
-  | 'planned'
-  | 'in_progress'
-  | 'completed'
-  | 'skipped'
-  | 'cancelled'
-
-export type WorkoutSkipReason =
-  | 'time'
-  | 'illness'
-  | 'busy'
-  | 'recovery'
-  | 'travel'
-  | 'other'
+export type { WorkoutSessionStatus, WorkoutSkipReason, ExerciseSkipReason }
 
 export const WORKOUT_STATUS_LABELS: Record<WorkoutSessionStatus, string> = {
   planned: 'Planned',
   in_progress: 'In Progress',
+  paused: 'Paused',
   completed: 'Completed',
   skipped: 'Skipped',
   cancelled: 'Cancelled',
@@ -33,12 +26,22 @@ export const WORKOUT_SKIP_REASON_LABELS: Record<WorkoutSkipReason, string> = {
   other: 'Other',
 }
 
+export const EXERCISE_SKIP_REASON_LABELS: Record<ExerciseSkipReason, string> = {
+  fatigue: 'Fatigue',
+  pain: 'Pain / discomfort',
+  equipment: 'Equipment unavailable',
+  time: 'Short on time',
+  preference: 'Preference',
+  other: 'Other',
+}
+
 /** Statuses that must never contribute to volume, progression, PRs, or recovery frequency. */
 export const NON_STATISTICAL_STATUSES: ReadonlySet<WorkoutSessionStatus> = new Set([
   'planned',
   'skipped',
   'cancelled',
   'in_progress',
+  'paused',
 ])
 
 export function normalizeWorkoutStatus(
@@ -80,10 +83,6 @@ export function addDaysISO(dateISO: string, days: number): string {
   return calendarDateISO(d)
 }
 
-/**
- * Next available training day after `fromDateISO` (exclusive).
- * Uses preferred days-per-week as a simple every-n-days rhythm when no weekday prefs exist.
- */
 export function nextAvailableTrainingDay(
   fromDateISO: string,
   trainingDaysPerWeek: number,

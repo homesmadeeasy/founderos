@@ -1,11 +1,12 @@
 import type { GymGoal, MuscleGroup, Equipment, SetPerformance } from '../gymTypes'
 
-export const GYM_STORAGE_VERSION = 2
+export const GYM_STORAGE_VERSION = 3
 export const MAX_SESSIONS = 200
 export const MAX_TEMPLATES = 20
 export const MAX_PROGRESSION_RECORDS = 100
 export const MAX_ACTIVE_SETS_PER_EXERCISE = 20
 export const MAX_EXERCISES_PER_SESSION = 24
+export const GYM_PENDING_WRITES_KEY = 'founderos-gym-pending-writes-v1'
 
 export type TrackingMode = 'rpe' | 'rir' | 'simple'
 export type FatLossGoal = 'fat_loss_maintain_muscle'
@@ -18,6 +19,7 @@ export type SetType = 'warmup' | 'working'
 export type WorkoutSessionStatus =
   | 'planned'
   | 'in_progress'
+  | 'paused'
   | 'completed'
   | 'skipped'
   | 'cancelled'
@@ -30,7 +32,19 @@ export type WorkoutSkipReason =
   | 'travel'
   | 'other'
 
+export type ExerciseSkipReason =
+  | 'fatigue'
+  | 'pain'
+  | 'equipment'
+  | 'time'
+  | 'preference'
+  | 'other'
+
+export type PersistStatus = 'saved' | 'syncing' | 'failed' | 'offline'
+
 export type FirstSessionIntent = 'today' | 'tomorrow'
+
+export type SessionEnergyAfter = 'low' | 'ok' | 'high'
 
 export interface GymProfile {
   id: string
@@ -77,6 +91,8 @@ export interface SetPerformanceRecord extends SetPerformance {
   rir?: number
   painFlag?: boolean
   discomfortNote?: string
+  /** True when the set was taken to failure (not the same as pain). */
+  failed?: boolean
 }
 
 export interface ExercisePerformanceRecord {
@@ -88,9 +104,21 @@ export interface ExercisePerformanceRecord {
   sets: SetPerformanceRecord[]
   notes?: string
   skipped?: boolean
+  skipReason?: ExerciseSkipReason
   /** User explicitly ended the exercise; incomplete sets remain incomplete. */
   finished?: boolean
   substitutedFromId?: string
+  /** Snapshot of the original prescription before substitutions / edits. */
+  originalPrescription?: {
+    exerciseId: string
+    exerciseName: string
+    sets: number
+    repRange: string
+    targetReps: number
+    targetRpe?: number
+    targetRir?: number
+    suggestedLoadKg?: number | null
+  }
 }
 
 export interface WorkoutSessionRecord {
@@ -120,6 +148,11 @@ export interface WorkoutSessionRecord {
   adherenceScore?: number
   totalVolumeKg?: number
   source: 'gym_logger'
+  /** Post-workout review — optional exertion / recovery inputs (not medical claims). */
+  sessionRpe?: number
+  energyAfter?: SessionEnergyAfter
+  discomfortReported?: boolean
+  bodyweightKg?: number
 }
 
 export interface ActiveWorkout {
@@ -131,8 +164,14 @@ export interface ActiveWorkout {
   exercises: ExercisePerformanceRecord[]
   sessionNotes: string
   restTimerEndsAt?: string | null
+  /** When the workout was paused, remaining rest ms to restore on resume. */
+  pausedRestRemainingMs?: number | null
   approvedAt?: string
   basedOnSnapshotTitle?: string
+  persistStatus?: PersistStatus
+  lastPersistError?: string | null
+  /** Focused exercise key for resume (plannedExerciseId or exerciseId::order). */
+  currentExerciseKey?: string | null
 }
 
 export interface ProgressionRecord {

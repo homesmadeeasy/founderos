@@ -62,7 +62,7 @@ function completedSession(partial: Partial<WorkoutSessionRecord> & Pick<WorkoutS
 
 function testMigrationAndCompaction() {
   const migrated = migrateDatastore({ version: 0, sessions: [] })
-  assert(migrated.version === 2, 'migrates to v2')
+  assert(migrated.version === 3, 'migrates to v3')
   const dup = completedSession({ id: 's1', title: 'Push' })
   const deduped = dedupeSessions([dup, { ...dup, id: 's2' }])
   assert(deduped.length === 1, 'dedupes sessions')

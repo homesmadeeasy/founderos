@@ -92,6 +92,10 @@ export function resetGymStorageForTests(): void {
   singleton = null
 }
 
+/** Stable gym entity id — UUID when available so Supabase cloud rows can share the same PK. */
 export function newGymId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
   return newConversationId()
 }

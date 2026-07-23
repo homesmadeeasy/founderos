@@ -67,7 +67,7 @@ function testLegacyMigrationSetsStatus() {
       source: 'gym_logger',
     }],
   })
-  assert(store.version === 2, 'version 2')
+  assert(store.version === 3, 'version 3')
   assert(store.sessions[0].status === 'completed', 'migrated status')
   console.log('PASS: legacy migration assigns workout status')
 }

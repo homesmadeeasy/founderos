@@ -72,10 +72,25 @@ export function exerciseKey(ex: ExercisePerformanceRecord): string {
 }
 
 export function findCurrentExerciseIndex(workout: ActiveWorkout): number {
+  if (workout.currentExerciseKey) {
+    const focused = workout.exercises.findIndex(ex => exerciseKey(ex) === workout.currentExerciseKey)
+    if (focused >= 0) return focused
+  }
   return workout.exercises.findIndex(ex => {
     if (ex.skipped || ex.finished) return false
     return ex.sets.some(s => !s.completed)
   })
+}
+
+export function findNextExercise(
+  workout: ActiveWorkout,
+  fromIndex: number,
+): ExercisePerformanceRecord | null {
+  for (let i = fromIndex + 1; i < workout.exercises.length; i += 1) {
+    const ex = workout.exercises[i]
+    if (!ex.skipped && !ex.finished) return ex
+  }
+  return null
 }
 
 export function findCurrentSet(ex: ExercisePerformanceRecord): SetPerformanceRecord | null {

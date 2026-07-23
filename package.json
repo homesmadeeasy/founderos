@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run test:providers && npm run test:founder-intelligence && npm run test:gym-evidence && npm run test:gym-personalisation && npm run test:gym-planned && npm run test:gym-status && npm run test:gym-schema && npm run test:gym-active && npm run test:env && npm run build",
+    "check": "npm run typecheck && npm run test:providers && npm run test:founder-intelligence && npm run test:gym-evidence && npm run test:gym-personalisation && npm run test:gym-planned && npm run test:gym-status && npm run test:gym-schema && npm run test:gym-active && npm run test:gym-active-v2 && npm run test:env && npm run build",
     "test:env": "npx tsx lib/env/envTests.ts",
     "test:conversation": "npx tsx lib/conversation/adaptiveDialogueTests.ts",
     "test:cognitive": "npx tsx lib/cognitive-model/cognitiveModelTests.ts",
@@ -23,7 +23,9 @@
     "test:gym-planned": "npx tsx lib/specialists/gym/gymPlannedExerciseTests.ts",
     "test:gym-status": "npx tsx lib/specialists/gym/gymStatusTests.ts",
     "test:gym-schema": "npx tsx lib/specialists/gym/gymSchemaSqlTests.ts",
-    "test:gym-active": "npx tsx lib/specialists/gym/gymActiveWorkoutEngineTests.ts"
+    "test:gym-active": "npx tsx lib/specialists/gym/gymActiveWorkoutEngineTests.ts",
+    "test:gym-active-v2": "npx tsx lib/specialists/gym/gymActiveWorkoutV2Tests.ts",
+    "test:gym-persistence": "npx tsx lib/specialists/gym/gymActiveWorkoutV2Tests.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

@@ -1,4 +1,12 @@
-import type { ActiveWorkout, ExercisePerformanceRecord, GymProfile, SetPerformanceRecord, WorkoutSessionRecord } from './gymStorageTypes'
+import type {
+  ActiveWorkout,
+  ExercisePerformanceRecord,
+  ExerciseSkipReason,
+  GymProfile,
+  SessionEnergyAfter,
+  SetPerformanceRecord,
+  WorkoutSessionRecord,
+} from './gymStorageTypes'
 import type { ApprovedWorkoutPlan } from './gymStorageTypes'
 import type { GymSnapshot, PlannedExercise } from '../gymTypes'
 import { getGymStorageRepository, newGymId } from './gymStorageRepository'
@@ -13,6 +21,8 @@ import {
   normalizeApprovedPlanExercises,
 } from '../gymPlannedExerciseUtils'
 import { buildWorkoutSummaryDetail, type WorkoutSummaryDetail } from '../gymActiveWorkoutEngine'
+import { getExerciseById, GYM_EXERCISE_LIBRARY } from '../gymExerciseLibrary'
+import { exerciseKey as buildExerciseKey } from '../gymActiveWorkoutEngine'
 
 export interface CompleteWorkoutResult {
   session: WorkoutSessionRecord
@@ -54,16 +64,27 @@ export function createActiveWorkoutFromPlan(
       completed: false,
     })),
     notes: '',
+    originalPrescription: {
+      exerciseId: ex.exerciseId,
+      exerciseName: ex.exerciseName,
+      sets: ex.sets,
+      repRange: ex.repRange,
+      targetReps: ex.targetReps,
+      targetRpe: ex.targetRpe,
+      targetRir: ex.targetRir,
+      suggestedLoadKg: ex.suggestedLoadKg,
+    },
   }))
   return {
     id: workoutId,
     startedAt: now,
     updatedAt: now,
-    status: 'active',
+    status: 'active' as const,
     title: plan.title,
     basedOnSnapshotTitle: snapshotTitle,
     approvedAt: plan.approvedAt,
     sessionNotes: '',
+    persistStatus: 'saved' as const,
     exercises: normalizeActiveWorkoutExercises(exercises, workoutId),
   }
 }
@@ -169,30 +190,55 @@ export function removeSet(workout: ActiveWorkout, exerciseKey: string, setId: st
   }
 }
 
+/** Remaining rest from an absolute end timestamp (background-safe). */
+export function remainingRestMs(
+  endsAt: string | null | undefined,
+  nowMs: number = Date.now(),
+): number {
+  if (!endsAt) return 0
+  const ends = Date.parse(endsAt)
+  if (!Number.isFinite(ends)) return 0
+  return Math.max(0, ends - nowMs)
+}
+
 export function pauseActiveWorkout(workout: ActiveWorkout): ActiveWorkout {
+  const remaining = remainingRestMs(workout.restTimerEndsAt)
   return {
     ...workout,
     status: 'paused',
+    pausedRestRemainingMs: remaining > 0 ? remaining : null,
     restTimerEndsAt: null,
     updatedAt: nowISO(),
   }
 }
 
 export function resumeActiveWorkout(workout: ActiveWorkout): ActiveWorkout {
+  const remaining = workout.pausedRestRemainingMs
   return {
     ...workout,
     status: 'active',
+    restTimerEndsAt: remaining != null && remaining > 0
+      ? new Date(Date.now() + remaining).toISOString()
+      : null,
+    pausedRestRemainingMs: null,
     updatedAt: nowISO(),
   }
 }
 
-export function skipExerciseInWorkout(workout: ActiveWorkout, exerciseKey: string): ActiveWorkout {
+export function skipExerciseInWorkout(
+  workout: ActiveWorkout,
+  exerciseKey: string,
+  reason?: ExerciseSkipReason,
+): ActiveWorkout {
   return {
     ...workout,
     updatedAt: nowISO(),
     restTimerEndsAt: null,
+    currentExerciseKey: null,
     exercises: workout.exercises.map(ex =>
-      matchesExercise(ex, exerciseKey) ? { ...ex, skipped: true } : ex,
+      matchesExercise(ex, exerciseKey)
+        ? { ...ex, skipped: true, skipReason: reason, finished: true }
+        : ex,
     ),
   }
 }
@@ -202,6 +248,7 @@ export function finishExerciseInWorkout(workout: ActiveWorkout, exerciseKey: str
     ...workout,
     updatedAt: nowISO(),
     restTimerEndsAt: null,
+    currentExerciseKey: null,
     exercises: workout.exercises.map(ex => {
       if (!matchesExercise(ex, exerciseKey)) return ex
       // Ending an exercise must never turn prescribed target values into logged data.
@@ -240,6 +287,7 @@ export function startRestTimer(workout: ActiveWorkout, restSeconds: number): Act
   return {
     ...workout,
     restTimerEndsAt: ends,
+    pausedRestRemainingMs: null,
     updatedAt: nowISO(),
   }
 }
@@ -248,6 +296,27 @@ export function clearRestTimer(workout: ActiveWorkout): ActiveWorkout {
   return {
     ...workout,
     restTimerEndsAt: null,
+    pausedRestRemainingMs: null,
+    updatedAt: nowISO(),
+  }
+}
+
+/** Add or subtract seconds from an active rest end timestamp. */
+export function adjustRestTimer(workout: ActiveWorkout, deltaSeconds: number): ActiveWorkout {
+  if (!workout.restTimerEndsAt) return workout
+  const nextEnds = Date.parse(workout.restTimerEndsAt) + deltaSeconds * 1000
+  if (!Number.isFinite(nextEnds)) return workout
+  return {
+    ...workout,
+    restTimerEndsAt: new Date(Math.max(Date.now(), nextEnds)).toISOString(),
+    updatedAt: nowISO(),
+  }
+}
+
+export function focusExercise(workout: ActiveWorkout, exerciseKeyValue: string): ActiveWorkout {
+  return {
+    ...workout,
+    currentExerciseKey: exerciseKeyValue,
     updatedAt: nowISO(),
   }
 }
@@ -279,6 +348,7 @@ export function completeWorkout(
   workout: ActiveWorkout,
   profile: GymProfile | null,
   existingSessions: WorkoutSessionRecord[],
+  review?: PostWorkoutReview,
 ): CompleteWorkoutResult {
   const completedAt = nowISO()
   const session: WorkoutSessionRecord = {
@@ -293,13 +363,17 @@ export function completeWorkout(
     durationMinutes: Math.round((Date.parse(completedAt) - Date.parse(workout.startedAt)) / 60000),
     completed: true,
     status: 'completed',
-    sessionNotes: workout.sessionNotes,
+    sessionNotes: review?.sessionNotes?.trim() || workout.sessionNotes,
     painFlags: workout.exercises.flatMap(e =>
       e.sets.filter(s => s.painFlag).map(() => `${e.exerciseName}: discomfort reported`),
     ),
     adherenceScore: computeAdherence(workout),
     totalVolumeKg: 0,
     source: 'gym_logger',
+    sessionRpe: review?.sessionRpe,
+    energyAfter: review?.energyAfter,
+    discomfortReported: review?.discomfortReported,
+    bodyweightKg: review?.bodyweightKg,
   }
   session.totalVolumeKg = totalSessionVolumeKg(session)
 
@@ -354,6 +428,145 @@ export function completeWorkout(
     memoryTitle: mem.title,
     memoryContent: mem.content,
     prs: summaryDetail.prs,
+  }
+}
+
+export interface PostWorkoutReview {
+  sessionRpe?: number
+  energyAfter?: SessionEnergyAfter
+  discomfortReported?: boolean
+  bodyweightKg?: number
+  sessionNotes?: string
+}
+
+/** Compatible substitutes share the same movement pattern. */
+export function listCompatibleSubstitutes(exerciseId: string) {
+  const source = getExerciseById(exerciseId)
+  if (!source) return []
+  return GYM_EXERCISE_LIBRARY.filter(e =>
+    e.id !== exerciseId && e.movementPattern === source.movementPattern,
+  )
+}
+
+export function substituteExercise(
+  workout: ActiveWorkout,
+  exerciseKeyValue: string,
+  replacementExerciseId: string,
+): ActiveWorkout {
+  const replacement = getExerciseById(replacementExerciseId)
+  if (!replacement) return workout
+  return {
+    ...workout,
+    updatedAt: nowISO(),
+    exercises: workout.exercises.map(ex => {
+      if (!matchesExercise(ex, exerciseKeyValue)) return ex
+      const original = ex.originalPrescription ?? {
+        exerciseId: ex.exerciseId,
+        exerciseName: ex.exerciseName,
+        sets: ex.sets.filter(s => s.setType === 'working').length,
+        repRange: replacement.repRange,
+        targetReps: Number.parseInt(replacement.repRange, 10) || 8,
+      }
+      return {
+        ...ex,
+        substitutedFromId: ex.substitutedFromId ?? ex.exerciseId,
+        exerciseId: replacement.id,
+        exerciseName: replacement.name,
+        originalPrescription: original,
+      }
+    }),
+  }
+}
+
+export function reorderExercise(
+  workout: ActiveWorkout,
+  exerciseKeyValue: string,
+  direction: 'up' | 'down',
+): ActiveWorkout {
+  const sorted = [...workout.exercises].sort((a, b) => a.order - b.order)
+  const idx = sorted.findIndex(ex => matchesExercise(ex, exerciseKeyValue))
+  if (idx < 0) return workout
+  const swapWith = direction === 'up' ? idx - 1 : idx + 1
+  if (swapWith < 0 || swapWith >= sorted.length) return workout
+  // Only reorder among exercises that are still open.
+  if (sorted[idx].skipped || sorted[idx].finished) return workout
+  if (sorted[swapWith].skipped || sorted[swapWith].finished) return workout
+  const a = sorted[idx]
+  const b = sorted[swapWith]
+  const aOrder = a.order
+  const nextList = workout.exercises.map(ex => {
+    if (matchesExercise(ex, buildExerciseKey(a))) return { ...ex, order: b.order }
+    if (matchesExercise(ex, buildExerciseKey(b))) return { ...ex, order: aOrder }
+    return ex
+  })
+  return {
+    ...workout,
+    updatedAt: nowISO(),
+    exercises: normalizeActiveWorkoutExercises(
+      nextList.sort((x, y) => x.order - y.order),
+      workout.id,
+    ),
+  }
+}
+
+export function addExerciseToWorkout(
+  workout: ActiveWorkout,
+  exerciseId: string,
+): ActiveWorkout {
+  const lib = getExerciseById(exerciseId)
+  if (!lib) return workout
+  if (workout.exercises.length >= 24) return workout
+  const order = workout.exercises.reduce((max, ex) => Math.max(max, ex.order), 0) + 1
+  const targetReps = Number.parseInt(lib.repRange, 10) || 8
+  const added: ExercisePerformanceRecord = {
+    plannedExerciseId: buildPlannedExerciseInstanceId(workout.id, lib.id, order),
+    exerciseId: lib.id,
+    exerciseName: lib.name,
+    order,
+    sets: Array.from({ length: 3 }, (_, si) => ({
+      id: newGymId(),
+      setNumber: si + 1,
+      setType: 'working' as const,
+      reps: targetReps,
+      weight: 0,
+      completed: false,
+    })),
+    notes: '',
+    originalPrescription: {
+      exerciseId: lib.id,
+      exerciseName: lib.name,
+      sets: 3,
+      repRange: lib.repRange,
+      targetReps,
+    },
+  }
+  return {
+    ...workout,
+    updatedAt: nowISO(),
+    currentExerciseKey: buildExerciseKey(added),
+    exercises: normalizeActiveWorkoutExercises([...workout.exercises, added], workout.id),
+  }
+}
+
+export function toggleSetWarmup(
+  workout: ActiveWorkout,
+  exerciseKeyValue: string,
+  setId: string,
+): ActiveWorkout {
+  return {
+    ...workout,
+    updatedAt: nowISO(),
+    exercises: workout.exercises.map(ex => {
+      if (!matchesExercise(ex, exerciseKeyValue)) return ex
+      return {
+        ...ex,
+        sets: ex.sets.map(s =>
+          s.id === setId
+            ? { ...s, setType: s.setType === 'warmup' ? 'working' : 'warmup' }
+            : s,
+        ),
+      }
+    }),
   }
 }
 

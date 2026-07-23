@@ -75,9 +75,9 @@ export function migrateDatastore(raw: unknown): GymDatastore {
   }
   const data = raw as Partial<GymDatastore>
   const version = data.version ?? 0
-  // v0 → v1 → v2: session status normalisation runs in sanitize for all versions
-  if (version < 2) {
-    return sanitizeDatastore({ ...data, version: 2 })
+  // v0 → v1 → v2 → v3: session status + active-workout v2 fields normalised in sanitize
+  if (version < 3) {
+    return sanitizeDatastore({ ...data, version: 3 })
   }
   return sanitizeDatastore(data)
 }

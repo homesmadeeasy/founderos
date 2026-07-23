@@ -32,8 +32,14 @@ import {
   createOrResumeActiveWorkoutFromPlan,
   hasCompletedValidWorkingSet,
   persistCompletedWorkout,
+  type PostWorkoutReview,
 } from '@/lib/specialists/gym/gymStorage/gymWorkoutService'
 import type { WorkoutSummaryDetail } from '@/lib/specialists/gym/gymActiveWorkoutEngine'
+import {
+  flushGymPendingOps,
+  persistActiveWorkoutWithSync,
+  syncCompletedWorkoutToCloud,
+} from '@/lib/specialists/gym/gymStorage/gymRepositoryFactory'
 import { suggestStartingWeight } from '@/lib/specialists/gym/gymStorage/gymDoubleProgression'
 import {
   scheduleFirstSessionTomorrow,
@@ -69,7 +75,7 @@ interface GymDataContextValue {
   startWorkoutFromPlan: () => ActiveWorkout | null
   saveActiveWorkout: (workout: ActiveWorkout) => void
   discardActiveWorkout: () => void
-  finishWorkout: () => { summary: string; summaryDetail: WorkoutSummaryDetail } | null
+  finishWorkout: (review?: PostWorkoutReview) => { summary: string; summaryDetail: WorkoutSummaryDetail } | null
   skipWorkout: (reason: WorkoutSkipReason, note?: string) => {
     skipped: WorkoutSessionRecord
     rescheduled: WorkoutSessionRecord | null
@@ -135,6 +141,14 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const flush = () => { void flushGymPendingOps() }
+    flush()
+    window.addEventListener('online', flush)
+    return () => window.removeEventListener('online', flush)
+  }, [])
 
   const saveProfile = useCallback((patch: Partial<GymProfile> & { complete?: boolean }) => {
     const repo = getGymStorageRepository()
@@ -208,7 +222,7 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     if (!plan) return null
     const workout = createOrResumeActiveWorkoutFromPlan(plan, current)
     repo.saveActiveWorkout(workout)
-    setActiveWorkout(workout)
+    setActiveWorkout({ ...workout, persistStatus: 'syncing' })
 
     // Mark / create in_progress session metadata without inventing completed sets.
     const today = calendarDateISO()
@@ -229,6 +243,15 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     repo.upsertSession(inProgress)
     setSessions(repo.listSessions())
 
+    void persistActiveWorkoutWithSync(workout).then(({ workout: synced, status }) => {
+      if (!synced) return
+      setActiveWorkout(prev =>
+        prev?.id === synced.id
+          ? { ...prev, persistStatus: status, lastPersistError: synced.lastPersistError ?? null }
+          : prev,
+      )
+    })
+
     void publish({
       type: 'WorkoutStarted',
       source: 'gym-ai',
@@ -239,28 +262,50 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
 
   const saveActiveWorkout = useCallback((workout: ActiveWorkout) => {
     const repo = getGymStorageRepository()
-    const next = { ...workout, updatedAt: nowISO() }
+    const next: ActiveWorkout = {
+      ...workout,
+      updatedAt: nowISO(),
+      persistStatus: 'syncing',
+    }
     repo.saveActiveWorkout(next)
     setActiveWorkout(next)
 
-    // Keep in_progress session exercises aligned for durable resume / history honesty.
+    // Keep durable session tree aligned for resume (in_progress or paused).
     const existing = repo.listSessions().find(s => s.id === next.id)
-    if (existing && existing.status === 'in_progress') {
+    if (existing && (existing.status === 'in_progress' || existing.status === 'paused')) {
       repo.upsertSession({
         ...existing,
         exercises: next.exercises,
         updatedAt: next.updatedAt,
         sessionNotes: next.sessionNotes,
+        status: next.status === 'paused' ? 'paused' : 'in_progress',
       })
       setSessions(repo.listSessions())
     }
+
+    void persistActiveWorkoutWithSync(next).then(({ workout: synced, status }) => {
+      if (!synced) return
+      const latest = getGymStorageRepository().getActiveWorkout()
+      if (!latest || latest.id !== synced.id) return
+      const withStatus: ActiveWorkout = {
+        ...latest,
+        persistStatus: status,
+        lastPersistError: synced.lastPersistError ?? null,
+      }
+      getGymStorageRepository().saveActiveWorkout(withStatus)
+      setActiveWorkout(prev =>
+        prev?.id === withStatus.id ? { ...prev, persistStatus: status, lastPersistError: withStatus.lastPersistError } : prev,
+      )
+    })
   }, [])
 
   const discardActiveWorkout = useCallback(() => {
     const repo = getGymStorageRepository()
     const current = repo.getActiveWorkout()
     if (current) {
-      const existing = repo.listSessions().find(s => s.id === current.id && s.status === 'in_progress')
+      const existing = repo.listSessions().find(s =>
+        s.id === current.id && (s.status === 'in_progress' || s.status === 'paused'),
+      )
       if (existing) {
         repo.upsertSession({ ...existing, status: 'cancelled', updatedAt: nowISO() })
         setSessions(repo.listSessions())
@@ -268,9 +313,10 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     }
     repo.saveActiveWorkout(null)
     setActiveWorkout(null)
+    void persistActiveWorkoutWithSync(null)
   }, [])
 
-  const finishWorkout = useCallback(() => {
+  const finishWorkout = useCallback((review?: PostWorkoutReview) => {
     const repo = getGymStorageRepository()
     // Read the repository as the completion lock. The first completion clears it,
     // so a repeated click cannot emit duplicate progression/memory side effects.
@@ -278,7 +324,8 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     if (!current) return null
     if (!hasCompletedValidWorkingSet(current)) return null
     const completedOnly = filterCompletedSessionRecords(sessions)
-    const result = completeWorkout(current, profile, completedOnly)
+    const result = completeWorkout(current, profile, completedOnly, review)
+    // Persist locally first so active state clears only after the session is durable.
     persistCompletedWorkout(result)
     recordMemory({
       type: 'health_log',
@@ -297,6 +344,8 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     repo.saveApprovedPlan(null)
     setProgressionRecords(repo.listProgressionRecords())
 
+    void syncCompletedWorkoutToCloud(result)
+
     void publish({
       type: 'WorkoutCompleted',
       source: 'gym-ai',
@@ -308,6 +357,8 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
         status: 'completed',
         musclesTrained: result.summaryDetail.musclesTrained,
         prCount: result.prs.length,
+        sessionRpe: result.session.sessionRpe,
+        energyAfter: result.session.energyAfter,
       },
     })
     // Cognitive / domain subscribers listen for WorkoutLogged.
@@ -326,12 +377,17 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
       source: 'gym-ai',
       payload: { sessionId: result.session.id },
     })
+    // Exertion inputs are published for the recovery engine — do not claim recovery changed.
     void publish({
       type: 'RecoveryUpdated',
       source: 'gym-ai',
       payload: {
         sessionId: result.session.id,
         prediction: result.summaryDetail.recoveryPrediction,
+        sessionRpe: result.session.sessionRpe,
+        energyAfter: result.session.energyAfter,
+        discomfortReported: result.session.discomfortReported,
+        note: 'Exertion inputs recorded; recovery engine interprets fatigue — not a medical claim.',
       },
     })
 

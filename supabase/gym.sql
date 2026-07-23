@@ -241,7 +241,7 @@ create table if not exists gym_workout_sessions (
   started_at              timestamptz,
   completed_at            timestamptz,
   status                  text not null check (
-    status in ('planned', 'in_progress', 'completed', 'skipped', 'cancelled')
+    status in ('planned', 'in_progress', 'paused', 'completed', 'skipped', 'cancelled')
   ),
   -- ActiveWorkout logger state when status = in_progress
   logger_status           text check (
@@ -263,6 +263,14 @@ create table if not exists gym_workout_sessions (
   total_volume_kg         numeric,
   source                  text not null default 'gym_logger',
   rest_timer_ends_at      timestamptz,
+  paused_rest_remaining_ms integer,
+  current_exercise_key    text,
+  session_rpe             numeric,
+  energy_after            text check (
+    energy_after is null or energy_after in ('low', 'ok', 'high')
+  ),
+  discomfort_reported     boolean not null default false,
+  bodyweight_kg           numeric,
   approved_at             timestamptz,
   based_on_snapshot_title text,
   -- Optional rollup / summary payload (not a replacement for set rows)
@@ -387,7 +395,13 @@ create table if not exists gym_exercise_performances (
   notes                 text,
   pain_flag             boolean not null default false,
   skipped               boolean not null default false,
+  finished              boolean not null default false,
+  skip_reason           text check (
+    skip_reason is null
+    or skip_reason in ('fatigue', 'pain', 'equipment', 'time', 'preference', 'other')
+  ),
   substituted_from_id   text,
+  original_prescription jsonb,
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
   constraint gym_exercise_performances_order_unique unique (session_id, exercise_order)
@@ -467,6 +481,7 @@ create table if not exists gym_set_performances (
   completed_at              timestamptz,
   notes                     text,
   pain_flag                 boolean not null default false,
+  failed                    boolean not null default false,
   discomfort_note           text,
   created_at                timestamptz not null default now(),
   updated_at                timestamptz not null default now(),
@@ -639,3 +654,45 @@ create policy "gym_user_state_delete_own" on gym_user_state
 --   select count(*) from gym_profiles;           -- expect 1 for own row only
 --   select count(*) from gym_workout_sessions;   -- expect only own sessions
 --   select count(*) from gym_set_performances;   -- expect only sets under own sessions
+
+-- ─── Active Workout Engine v2 additive columns (rerunnable) ───────────────────
+-- CREATE TABLE IF NOT EXISTS does not add columns to existing tables.
+
+alter table gym_workout_sessions
+  add column if not exists paused_rest_remaining_ms integer;
+alter table gym_workout_sessions
+  add column if not exists current_exercise_key text;
+alter table gym_workout_sessions
+  add column if not exists session_rpe numeric;
+alter table gym_workout_sessions
+  add column if not exists energy_after text;
+alter table gym_workout_sessions
+  add column if not exists discomfort_reported boolean not null default false;
+alter table gym_workout_sessions
+  add column if not exists bodyweight_kg numeric;
+
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conname = 'gym_workout_sessions_status_check'
+      and conrelid = 'gym_workout_sessions'::regclass
+  ) then
+    alter table gym_workout_sessions drop constraint gym_workout_sessions_status_check;
+  end if;
+  alter table gym_workout_sessions
+    add constraint gym_workout_sessions_status_check
+    check (status in ('planned', 'in_progress', 'paused', 'completed', 'skipped', 'cancelled'));
+exception
+  when duplicate_object then null;
+end $$;
+
+alter table gym_exercise_performances
+  add column if not exists finished boolean not null default false;
+alter table gym_exercise_performances
+  add column if not exists skip_reason text;
+alter table gym_exercise_performances
+  add column if not exists original_prescription jsonb;
+
+alter table gym_set_performances
+  add column if not exists failed boolean not null default false;
