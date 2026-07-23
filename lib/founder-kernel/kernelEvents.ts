@@ -77,6 +77,10 @@ export const FOUNDER_EVENT_TYPES: FounderEventType[] = [
   'IdentityFactConfirmed',
   'IdentityFactRejected',
   'IdentityUpdated',
+  'RealityEventRecorded',
+  'RealitySnapshotUpdated',
+  'RealityAggregationCreated',
+  'SnapshotUpdated',
 ]
 
 export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
@@ -156,6 +160,10 @@ export const EVENT_TYPE_LABELS: Record<FounderEventType, string> = {
   IdentityFactConfirmed: 'Identity fact confirmed',
   IdentityFactRejected: 'Identity fact rejected',
   IdentityUpdated: 'Identity updated',
+  RealityEventRecorded: 'Reality event recorded',
+  RealitySnapshotUpdated: 'Reality snapshot updated',
+  RealityAggregationCreated: 'Reality aggregation created',
+  SnapshotUpdated: 'Snapshot updated',
 }
 
 export function summarizeEventPayload(type: FounderEventType, payload: Record<string, unknown>): string {

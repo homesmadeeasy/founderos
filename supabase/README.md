@@ -25,6 +25,7 @@ Run these in the Supabase SQL Editor **in order** for a fresh project.
 | `goals.sql` | `goals`, `goal_links`, `goal_reviews` |
 | `gym.sql` | Gym profile, templates, sessions, sets, progression, user state + RLS |
 | `identity.sql` | Identity Engine profiles (JSONB datastore) + optional evidence index + RLS |
+| `reality.sql` | Reality Engine profiles (JSONB datastore) + optional event/evidence indexes + RLS |
 
 ## RLS
 

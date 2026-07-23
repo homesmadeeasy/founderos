@@ -75,6 +75,10 @@ export type FounderEventType =
   | 'IdentityFactConfirmed'
   | 'IdentityFactRejected'
   | 'IdentityUpdated'
+  | 'RealityEventRecorded'
+  | 'RealitySnapshotUpdated'
+  | 'RealityAggregationCreated'
+  | 'SnapshotUpdated'
 
 export type FounderEventStatus =
   | 'created'

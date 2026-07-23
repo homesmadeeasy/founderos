@@ -20,6 +20,7 @@ import {
   Command,
   HelpCircle,
   UserRound,
+  Activity,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCommandBar, commandShortcutLabel } from '@/components/command/CommandBarProvider'
@@ -35,6 +36,7 @@ const nav = [
   { label: 'Objects', href: '/objects', icon: Boxes },
   { label: 'Memory', href: '/memory', icon: History },
   { label: 'Identity', href: '/identity', icon: UserRound },
+  { label: 'Reality', href: '/reality', icon: Activity },
   { label: 'Knowledge', href: '/knowledge', icon: BookOpen },
   { label: 'Executive', href: '/executive', icon: Crown },
   { label: 'Settings', href: '/settings', icon: Settings },

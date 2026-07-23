@@ -25,6 +25,7 @@ If code and docs disagree, fix one of them in the same change. Feature milestone
 |---------|-----------|
 | **Gym** | [products/gym/OVERVIEW.md](./products/gym/OVERVIEW.md) — full engineering specification |
 | **Identity** | [identity/OVERVIEW.md](./identity/OVERVIEW.md) — shared foundation for every specialist |
+| **Reality** | [reality/OVERVIEW.md](./reality/OVERVIEW.md) — live operating state for every specialist |
 
 ---
 

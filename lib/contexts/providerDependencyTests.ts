@@ -49,6 +49,9 @@ function testLayoutProviderOrder() {
   assert(morningIdx >= 0 && morningIdx < cognitiveIdx, 'MorningExecutionProvider must wrap CognitiveModelProvider')
   assert(actionIdx > cognitiveIdx, 'ActionEngineProvider must be inside CognitiveModelProvider')
   assert(conversationIdx > actionIdx, 'ConversationProvider must be inside ActionEngineProvider')
+  assert(src.includes('<RealityProvider>'), 'layout must mount RealityProvider')
+  const realityIdx = src.indexOf('<RealityProvider>')
+  assert(realityIdx > kernelIdx, 'RealityProvider must be inside FounderKernelProvider')
   console.log('PASS: layout provider order is acyclic')
 }
 

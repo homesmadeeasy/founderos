@@ -5,6 +5,7 @@ import type { GymSnapshot } from '@/lib/specialists/gym/gymTypes'
 import { GYM_QUESTION_CHIPS, answerGymQuestion } from '@/lib/specialists/gym/gymConversation'
 import { useActionEngine } from '@/contexts/ActionEngineContext'
 import { useIdentity } from '@/contexts/IdentityContext'
+import { useReality } from '@/contexts/RealityContext'
 import { buildActionPreview } from '@/lib/action-engine/actionProposal'
 import GymCard from './GymCard'
 
@@ -19,12 +20,14 @@ export default function GymConversationCard({ snapshot }: Props) {
   const [proposalPreview, setProposalPreview] = useState<string | null>(null)
   const { proposeAction, approveAction, rejectActionProposal } = useActionEngine()
   const { getViewForSpecialist } = useIdentity()
+  const { getViewForSpecialist: getRealityView } = useReality()
 
   const ask = useCallback((text: string) => {
     setPrompt(text)
     const hints = getViewForSpecialist('gym').narrativeHints
-    setAnswer(answerGymQuestion(snapshot, text, hints))
-  }, [snapshot, getViewForSpecialist])
+    const realityHints = getRealityView('gym').snapshot.narrativeHints
+    setAnswer(answerGymQuestion(snapshot, text, hints, realityHints))
+  }, [snapshot, getViewForSpecialist, getRealityView])
 
   const proposeQuickWorkout = useCallback(async () => {
     const first = snapshot.todaysWorkout.exercises[0]

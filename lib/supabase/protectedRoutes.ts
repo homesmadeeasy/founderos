@@ -27,6 +27,7 @@ export const PROTECTED_PREFIXES = [
   '/memory-search',
   '/gym',
   '/identity',
+  '/reality',
   '/evaluation',
 ] as const
 

@@ -19,14 +19,18 @@ export function answerGymQuestion(
   snapshot: GymSnapshot,
   prompt: string,
   identityHints?: string[],
+  realityHints?: string[],
 ): string {
   const lower = prompt.trim().toLowerCase()
   const identityPrefix = identityHints && identityHints.length > 0
     ? `**What FounderOS already knows about you**\n${identityHints.slice(0, 6).map(h => `• ${h}`).join('\n')}\n\n`
     : ''
+  const realityPrefix = realityHints && realityHints.length > 0
+    ? `**What is happening now**\n${realityHints.slice(0, 6).map(h => `• ${h}`).join('\n')}\n\n`
+    : ''
 
   const answer = answerGymQuestionCore(snapshot, lower, prompt)
-  return identityPrefix + answer
+  return identityPrefix + realityPrefix + answer
 }
 
 function answerGymQuestionCore(snapshot: GymSnapshot, lower: string, prompt: string): string {

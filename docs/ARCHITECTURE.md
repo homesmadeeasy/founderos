@@ -69,6 +69,7 @@ Root `app/layout.tsx` is fonts/styles only. Authenticated UX mounts in `app/(app
 | **Kernel** | `lib/founder-kernel/`, `contexts/FounderKernelContext.tsx` | Event bus only — no domain rules |
 | **Memory Engine** | `lib/memory-engine/` | Historical Layer-2 records (local-first) |
 | **Identity Engine** | `lib/identity/`, `contexts/IdentityContext.tsx` | Shared declared/observed user model for all specialists |
+| **Reality Engine** | `lib/reality/`, `contexts/RealityContext.tsx` | Shared live events, timeline, and operating snapshot for all specialists |
 | **Vector memory** | `lib/memory/`, `supabase/vector_memory.sql` | Embeddings / semantic search (Supabase) |
 | **Object / Knowledge / Executive** | `lib/*-engine/` | Structured reality, principles, priority |
 | **Signals / Sync / Capture** | `lib/` + related contexts | Reality ingestion |

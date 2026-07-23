@@ -5,6 +5,7 @@ import { ExecutiveEngineProvider } from '@/contexts/ExecutiveEngineContext'
 import { KnowledgeEngineProvider } from '@/contexts/KnowledgeEngineContext'
 import { MemoryEngineProvider } from '@/contexts/MemoryEngineContext'
 import { IdentityProvider } from '@/contexts/IdentityContext'
+import { RealityProvider } from '@/contexts/RealityContext'
 import { EveningReviewProvider } from '@/contexts/EveningReviewContext'
 import { MorningExecutionProvider } from '@/contexts/MorningExecutionContext'
 import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
@@ -37,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <SyncEngineProvider>
                   <UniversalCaptureProvider>
                     <FounderKernelProvider>
+                      <RealityProvider>
                       <MorningExecutionProvider>
                         <EveningReviewProvider>
                           <CognitiveModelProvider>
@@ -59,6 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                           </CognitiveModelProvider>
                         </EveningReviewProvider>
                       </MorningExecutionProvider>
+                      </RealityProvider>
                     </FounderKernelProvider>
                   </UniversalCaptureProvider>
                 </SyncEngineProvider>
