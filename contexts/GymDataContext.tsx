@@ -29,7 +29,8 @@ import {
 import { createDefaultGymProfile } from '@/lib/specialists/gym/gymProfileUtils'
 import {
   completeWorkout,
-  createActiveWorkoutFromPlan,
+  createOrResumeActiveWorkoutFromPlan,
+  hasCompletedValidWorkingSet,
   persistCompletedWorkout,
 } from '@/lib/specialists/gym/gymStorage/gymWorkoutService'
 import type { WorkoutSummaryDetail } from '@/lib/specialists/gym/gymActiveWorkoutEngine'
@@ -130,6 +131,8 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    // Hydrate the provider from the external repository after client mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 
@@ -196,9 +199,14 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
 
   const startWorkoutFromPlan = useCallback(() => {
     const repo = getGymStorageRepository()
+    const current = repo.getActiveWorkout()
+    if (current) {
+      setActiveWorkout(current)
+      return current
+    }
     const plan = repo.getApprovedPlan()
     if (!plan) return null
-    const workout = createActiveWorkoutFromPlan(plan, plan.title)
+    const workout = createOrResumeActiveWorkoutFromPlan(plan, current)
     repo.saveActiveWorkout(workout)
     setActiveWorkout(workout)
 
@@ -263,10 +271,14 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const finishWorkout = useCallback(() => {
-    if (!activeWorkout) return null
     const repo = getGymStorageRepository()
+    // Read the repository as the completion lock. The first completion clears it,
+    // so a repeated click cannot emit duplicate progression/memory side effects.
+    const current = repo.getActiveWorkout()
+    if (!current) return null
+    if (!hasCompletedValidWorkingSet(current)) return null
     const completedOnly = filterCompletedSessionRecords(sessions)
-    const result = completeWorkout(activeWorkout, profile, completedOnly)
+    const result = completeWorkout(current, profile, completedOnly)
     persistCompletedWorkout(result)
     recordMemory({
       type: 'health_log',
@@ -343,7 +355,7 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     }
 
     return { summary: result.summary, summaryDetail: result.summaryDetail }
-  }, [activeWorkout, profile, sessions, publish, recordMemory])
+  }, [profile, sessions, publish, recordMemory])
 
   const skipWorkout = useCallback((reason: WorkoutSkipReason, note?: string) => {
     const repo = getGymStorageRepository()

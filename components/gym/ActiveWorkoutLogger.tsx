@@ -27,6 +27,7 @@ import {
   skipExerciseInWorkout,
   startRestTimer,
   updateSet,
+  validateCompletedSetInput,
 } from '@/lib/specialists/gym/gymStorage/gymWorkoutService'
 import GymCard from './GymCard'
 
@@ -53,15 +54,22 @@ export default function ActiveWorkoutLogger() {
   const [showDiscard, setShowDiscard] = useState(false)
   const [completedDetail, setCompletedDetail] = useState<WorkoutSummaryDetail | null>(null)
   const [lastAdvice, setLastAdvice] = useState<ReturnType<typeof adviseNextSet> | null>(null)
-  const [timerTick, setTimerTick] = useState(0)
+  const [nowMs, setNowMs] = useState(0)
   const [draft, setDraft] = useState({ weight: '', reps: '', rpe: '', rir: '', notes: '' })
+  const [setError, setSetError] = useState<string | null>(null)
+  const [completionError, setCompletionError] = useState<string | null>(null)
 
   const workout = activeWorkout
 
   useEffect(() => {
     if (!workout?.restTimerEndsAt) return
-    const id = window.setInterval(() => setTimerTick(t => t + 1), 500)
-    return () => window.clearInterval(id)
+    const updateClock = () => setNowMs(Date.now())
+    const initialId = window.setTimeout(updateClock, 0)
+    const id = window.setInterval(updateClock, 500)
+    return () => {
+      window.clearTimeout(initialId)
+      window.clearInterval(id)
+    }
   }, [workout?.restTimerEndsAt])
 
   const persist = useCallback((next: ActiveWorkout) => {
@@ -85,6 +93,8 @@ export default function ActiveWorkoutLogger() {
 
   useEffect(() => {
     if (!currentSet) {
+      // Repository-backed selection changed; reset the controlled form atomically.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraft({ weight: '', reps: '', rpe: '', rir: '', notes: current?.notes ?? '' })
       return
     }
@@ -95,7 +105,7 @@ export default function ActiveWorkoutLogger() {
       rir: currentSet.rir != null ? String(currentSet.rir) : '',
       notes: current?.notes ?? '',
     })
-  }, [currentSet?.id, current?.plannedExerciseId, current?.notes])
+  }, [currentSet, current?.plannedExerciseId, current?.notes])
 
   const metrics = useMemo(() => {
     if (!workout || !current) return null
@@ -107,10 +117,10 @@ export default function ActiveWorkoutLogger() {
       profile,
       historySessions: completedSessions,
     })
-  }, [workout, current, targetRepRange, profile, completedSessions, timerTick])
+  }, [workout, current, targetRepRange, profile, completedSessions])
 
   const restMsLeft = workout?.restTimerEndsAt
-    ? Date.parse(workout.restTimerEndsAt) - Date.now()
+    ? Date.parse(workout.restTimerEndsAt) - nowMs
     : 0
   const resting = Boolean(workout?.restTimerEndsAt && restMsLeft > 0)
 
@@ -127,16 +137,25 @@ export default function ActiveWorkoutLogger() {
 
   const handleLogSet = () => {
     if (!current || !currentSet || paused) return
-    const weight = Number(draft.weight) || 0
-    const reps = Number(draft.reps) || 0
+    const weight = Number(draft.weight)
+    const reps = Number(draft.reps)
+    const rpe = tracking === 'rpe' && draft.rpe !== '' ? Number(draft.rpe) : undefined
+    const rir = tracking === 'rir' && draft.rir !== '' ? Number(draft.rir) : undefined
+    const validationError = validateCompletedSetInput({ weight, reps, rpe, rir })
+    if (validationError) {
+      setSetError(validationError)
+      return
+    }
+    setSetError(null)
     const patch: Partial<SetPerformanceRecord> = {
       weight,
       reps,
       completed: true,
+      completedAt: new Date().toISOString(),
       notes: draft.notes || undefined,
     }
-    if (tracking === 'rpe' && draft.rpe !== '') patch.rpe = Number(draft.rpe)
-    if (tracking === 'rir' && draft.rir !== '') patch.rir = Number(draft.rir)
+    if (rpe != null) patch.rpe = rpe
+    if (rir != null) patch.rir = rir
 
     let next = updateSet(workout, currentKey, currentSet.id, patch)
     const updatedEx = next.exercises.find(e => exerciseKey(e) === currentKey)!
@@ -185,7 +204,12 @@ export default function ActiveWorkoutLogger() {
 
   const handleComplete = () => {
     const result = finishWorkout()
-    if (result) setCompletedDetail(result.summaryDetail)
+    if (result) {
+      setCompletionError(null)
+      setCompletedDetail(result.summaryDetail)
+    } else {
+      setCompletionError('Log at least one valid working set before finishing the workout.')
+    }
   }
 
   if (completedDetail) {
@@ -277,6 +301,8 @@ export default function ActiveWorkoutLogger() {
           </div>
         </div>
       </GymCard>
+
+      {completionError && <p role="alert" className="text-xs text-red-600 px-1">{completionError}</p>}
 
       {current && (
         <GymCard className="p-5 space-y-4">
@@ -427,6 +453,7 @@ export default function ActiveWorkoutLogger() {
               >
                 Complete set
               </button>
+              {setError && <p role="alert" className="text-xs text-red-600">{setError}</p>}
             </div>
           ) : (
             <p className="text-sm text-zinc-500">

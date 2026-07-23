@@ -72,11 +72,10 @@ export function exerciseKey(ex: ExercisePerformanceRecord): string {
 }
 
 export function findCurrentExerciseIndex(workout: ActiveWorkout): number {
-  const idx = workout.exercises.findIndex(ex => {
-    if (ex.skipped) return false
+  return workout.exercises.findIndex(ex => {
+    if (ex.skipped || ex.finished) return false
     return ex.sets.some(s => !s.completed)
   })
-  return idx >= 0 ? idx : Math.max(0, workout.exercises.findIndex(ex => !ex.skipped))
 }
 
 export function findCurrentSet(ex: ExercisePerformanceRecord): SetPerformanceRecord | null {
@@ -84,7 +83,7 @@ export function findCurrentSet(ex: ExercisePerformanceRecord): SetPerformanceRec
 }
 
 export function isExerciseFinished(ex: ExercisePerformanceRecord): boolean {
-  if (ex.skipped) return true
+  if (ex.skipped || ex.finished) return true
   return ex.sets.length > 0 && ex.sets.every(s => s.completed)
 }
 
@@ -442,4 +441,3 @@ export function buildWorkoutSummaryDetail(params: {
     totalVolumeKg: session.totalVolumeKg ?? 0,
   }
 }
-

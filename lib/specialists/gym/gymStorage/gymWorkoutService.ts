@@ -5,6 +5,7 @@ import { getGymStorageRepository, newGymId } from './gymStorageRepository'
 import { totalSessionVolumeKg } from './gymMuscleMapping'
 import { computeDoubleProgression, buildProgressionRecord } from './gymDoubleProgression'
 import { nowISO } from '@/lib/conversation/conversationUtils'
+import { calendarDateISO } from '../gymSessionStatus'
 import { buildWorkoutLogMemory } from '../gymWorkoutLogger'
 import {
   buildPlannedExerciseInstanceId,
@@ -65,6 +66,14 @@ export function createActiveWorkoutFromPlan(
     sessionNotes: '',
     exercises: normalizeActiveWorkoutExercises(exercises, workoutId),
   }
+}
+
+/** Starting is idempotent: an existing active workout always wins. */
+export function createOrResumeActiveWorkoutFromPlan(
+  plan: ApprovedWorkoutPlan,
+  current: ActiveWorkout | null,
+): ActiveWorkout {
+  return current ?? createActiveWorkoutFromPlan(plan, plan.title)
 }
 
 export function createActiveWorkoutFromSnapshot(snapshot: GymSnapshot): ActiveWorkout {
@@ -195,12 +204,35 @@ export function finishExerciseInWorkout(workout: ActiveWorkout, exerciseKey: str
     restTimerEndsAt: null,
     exercises: workout.exercises.map(ex => {
       if (!matchesExercise(ex, exerciseKey)) return ex
-      return {
-        ...ex,
-        sets: ex.sets.map(s => (s.completed ? s : { ...s, completed: true })),
-      }
+      // Ending an exercise must never turn prescribed target values into logged data.
+      return { ...ex, finished: true }
     }),
   }
+}
+
+export function validateCompletedSetInput(input: {
+  weight: number
+  reps: number
+  rpe?: number
+  rir?: number
+}): string | null {
+  if (!Number.isFinite(input.weight) || input.weight < 0) return 'Weight must be zero or greater.'
+  if (!Number.isInteger(input.reps) || input.reps <= 0) return 'Reps must be a positive whole number.'
+  if (input.rpe != null && (!Number.isFinite(input.rpe) || input.rpe < 1 || input.rpe > 10)) {
+    return 'RPE must be between 1 and 10.'
+  }
+  if (input.rir != null && (!Number.isInteger(input.rir) || input.rir < 0 || input.rir > 10)) {
+    return 'RIR must be a whole number between 0 and 10.'
+  }
+  return null
+}
+
+export function hasCompletedValidWorkingSet(workout: ActiveWorkout): boolean {
+  return workout.exercises.some(ex => !ex.skipped && ex.sets.some(set =>
+    set.completed
+    && set.setType === 'working'
+    && validateCompletedSetInput(set) === null,
+  ))
 }
 
 export function startRestTimer(workout: ActiveWorkout, restSeconds: number): ActiveWorkout {
@@ -252,7 +284,7 @@ export function completeWorkout(
   const session: WorkoutSessionRecord = {
     id: workout.id,
     date: completedAt,
-    scheduledFor: completedAt.slice(0, 10),
+    scheduledFor: calendarDateISO(new Date(completedAt)),
     startedAt: workout.startedAt,
     completedAt,
     updatedAt: completedAt,
@@ -288,12 +320,6 @@ export function completeWorkout(
       targetRepRange: targetRange,
       profile,
     }, result)
-  })
-
-  const lines = session.exercises.map(ex => {
-    const working = ex.sets.filter(s => s.completed && s.setType === 'working')
-    const setStr = working.map(s => `${s.weight}kg×${s.reps}`).join(', ')
-    return `${ex.exerciseName}: ${setStr || 'no working sets'}`
   })
 
   const summaryDetail = buildWorkoutSummaryDetail({

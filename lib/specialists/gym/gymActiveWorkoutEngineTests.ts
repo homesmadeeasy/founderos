@@ -19,6 +19,13 @@ import type {
   WorkoutSessionRecord,
 } from './gymStorage/gymStorageTypes'
 import { resetGymStorageForTests } from './gymStorage/gymStorageRepository'
+import {
+  createOrResumeActiveWorkoutFromPlan,
+  finishExerciseInWorkout,
+  hasCompletedValidWorkingSet,
+  validateCompletedSetInput,
+} from './gymStorage/gymWorkoutService'
+import type { ApprovedWorkoutPlan } from './gymStorage/gymStorageTypes'
 
 function makeProfile(): GymProfile {
   return {
@@ -71,6 +78,39 @@ function makeActive(exercises: ExercisePerformanceRecord[]): ActiveWorkout {
 
 resetGymStorageForTests()
 console.log('Active workout engine tests\n')
+
+{
+  const plan: ApprovedWorkoutPlan = {
+    id: 'plan-1', approvedAt: '2026-07-01T09:00:00.000Z', title: 'Push', whySummary: 'Test',
+    exercises: [{
+      exerciseId: 'barbell-bench-press', exerciseName: 'Bench', sets: 2,
+      repRange: '8-10', targetReps: 8, prescriptionConfidence: 0.8,
+    }],
+  }
+  const existing = makeActive([makeExercise()])
+  assert.equal(createOrResumeActiveWorkoutFromPlan(plan, existing), existing)
+  console.log('PASS: repeated start resumes the existing active workout')
+}
+
+{
+  const workout = makeActive([makeExercise()])
+  const finished = finishExerciseInWorkout(workout, 'w1::barbell-bench-press::1')
+  assert.equal(finished.exercises[0].finished, true)
+  assert.equal(finished.exercises[0].sets[1].completed, false)
+  assert.equal(findCurrentExerciseIndex(finished), -1)
+  console.log('PASS: finish exercise never invents completion for unlogged sets')
+}
+
+{
+  assert.equal(validateCompletedSetInput({ weight: 60, reps: 8, rpe: 8 }), null)
+  assert.match(validateCompletedSetInput({ weight: 60, reps: 0 }) ?? '', /Reps/)
+  assert.match(validateCompletedSetInput({ weight: 60, reps: 8, rpe: 11 }) ?? '', /RPE/)
+  assert.equal(hasCompletedValidWorkingSet(makeActive([makeExercise({
+    sets: [{ id: 'empty', setNumber: 1, setType: 'working', weight: 0, reps: 8, completed: false }],
+  })])), false)
+  assert.equal(hasCompletedValidWorkingSet(makeActive([makeExercise()])), true)
+  console.log('PASS: completed-set input rejects corrupt values')
+}
 
 {
   const workout = makeActive([

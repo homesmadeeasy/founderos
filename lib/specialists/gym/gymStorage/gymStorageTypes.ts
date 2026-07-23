@@ -1,4 +1,4 @@
-import type { GymGoal, MuscleGroup, Equipment, SetPerformance, ExercisePerformance } from '../gymTypes'
+import type { GymGoal, MuscleGroup, Equipment, SetPerformance } from '../gymTypes'
 
 export const GYM_STORAGE_VERSION = 2
 export const MAX_SESSIONS = 200
@@ -73,6 +73,7 @@ export interface WorkoutTemplate {
 export interface SetPerformanceRecord extends SetPerformance {
   id: string
   setType: SetType
+  completedAt?: string
   rir?: number
   painFlag?: boolean
   discomfortNote?: string
@@ -87,6 +88,8 @@ export interface ExercisePerformanceRecord {
   sets: SetPerformanceRecord[]
   notes?: string
   skipped?: boolean
+  /** User explicitly ended the exercise; incomplete sets remain incomplete. */
+  finished?: boolean
   substitutedFromId?: string
 }
 
