@@ -28,6 +28,7 @@ export const PROTECTED_PREFIXES = [
   '/gym',
   '/identity',
   '/reality',
+  '/intelligence-inspector',
   '/evaluation',
 ] as const
 

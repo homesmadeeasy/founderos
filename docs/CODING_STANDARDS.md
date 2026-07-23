@@ -58,6 +58,7 @@ Do not invent new top-level trees without updating [ARCHITECTURE.md](./ARCHITECT
 
 - Hooks compose contexts and pure builders; keep them free of Supabase clients for specialist data.
 - Pattern: `useXBaseInput` (no cognitive) → `useXInput` (base + cognitive) → `useXSnapshot`.
+- Specialist Q&A: prefer `useIntelligencePipeline().run()` over calling Identity/Reality/Memory separately.
 - Do not put heavy business rules in hooks — call domain modules.
 
 ---

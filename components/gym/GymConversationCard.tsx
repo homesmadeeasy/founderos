@@ -4,8 +4,9 @@ import { useState, useCallback } from 'react'
 import type { GymSnapshot } from '@/lib/specialists/gym/gymTypes'
 import { GYM_QUESTION_CHIPS, answerGymQuestion } from '@/lib/specialists/gym/gymConversation'
 import { useActionEngine } from '@/contexts/ActionEngineContext'
-import { useIdentity } from '@/contexts/IdentityContext'
+import { useIntelligencePipeline } from '@/contexts/IntelligencePipelineContext'
 import { useReality } from '@/contexts/RealityContext'
+import { useIdentity } from '@/contexts/IdentityContext'
 import { buildActionPreview } from '@/lib/action-engine/actionProposal'
 import GymCard from './GymCard'
 
@@ -19,15 +20,30 @@ export default function GymConversationCard({ snapshot }: Props) {
   const [pendingProposalId, setPendingProposalId] = useState<string | null>(null)
   const [proposalPreview, setProposalPreview] = useState<string | null>(null)
   const { proposeAction, approveAction, rejectActionProposal } = useActionEngine()
-  const { getViewForSpecialist } = useIdentity()
-  const { getViewForSpecialist: getRealityView } = useReality()
+  const { run } = useIntelligencePipeline()
+  const { recordEvent } = useReality()
+  const { ingestSignals } = useIdentity()
 
-  const ask = useCallback((text: string) => {
+  const ask = useCallback(async (text: string) => {
     setPrompt(text)
-    const hints = getViewForSpecialist('gym').narrativeHints
-    const realityHints = getRealityView('gym').snapshot.narrativeHints
-    setAnswer(answerGymQuestion(snapshot, text, hints, realityHints))
-  }, [snapshot, getViewForSpecialist, getRealityView])
+    const result = await run(
+      { specialistId: 'gym', question: text, conversationContext: 'gym-ai' },
+      {
+        produceResponse: (partial) =>
+          answerGymQuestion(snapshot, text, partial.identityHints, partial.realityHints),
+        onIdentityObservation: async () => {
+          await ingestSignals([{
+            id: `gym-ask-${Date.now()}`,
+            domain: 'training',
+            signalType: 'conversation_turn',
+            occurredAt: new Date().toISOString(),
+            payload: { question: text.slice(0, 120) },
+          }])
+        },
+      },
+    )
+    setAnswer(result.response)
+  }, [snapshot, run, ingestSignals])
 
   const proposeQuickWorkout = useCallback(async () => {
     const first = snapshot.todaysWorkout.exercises[0]
@@ -58,13 +74,35 @@ export default function GymConversationCard({ snapshot }: Props) {
 
   const approvePending = useCallback(async () => {
     if (!pendingProposalId) return
-    const result = await approveAction(pendingProposalId)
+    const proposalId = pendingProposalId
+    const result = await approveAction(proposalId)
     setPendingProposalId(null)
     setProposalPreview(null)
-    setAnswer(result.success
-      ? 'Workout approved and logged. All subscribers refreshed via kernel events.'
-      : `Failed to log workout: ${result.error ?? 'unknown error'}`)
-  }, [pendingProposalId, approveAction])
+    if (result.success) {
+      await run(
+        { specialistId: 'gym', question: 'Workout logged', conversationContext: 'gym-action' },
+        {
+          produceResponse: () =>
+            'Workout approved and logged. All subscribers refreshed via kernel events.',
+          onRealityUpdate: async (intel) => {
+            await recordEvent({
+              domain: 'gym',
+              eventType: 'workout_logged',
+              title: snapshot.todaysWorkout.title,
+              summary: intel.response.slice(0, 160),
+              source: { kind: 'gym', label: 'Gym Action' },
+              importance: 0.8,
+              specialistTags: ['gym'],
+              idempotencyKey: `gym-action:${proposalId}`,
+            })
+          },
+        },
+      )
+      setAnswer('Workout approved and logged. All subscribers refreshed via kernel events.')
+    } else {
+      setAnswer(`Failed to log workout: ${result.error ?? 'unknown error'}`)
+    }
+  }, [pendingProposalId, approveAction, run, recordEvent, snapshot.todaysWorkout.title])
 
   const rejectPending = useCallback(async () => {
     if (!pendingProposalId) return
@@ -82,7 +120,7 @@ export default function GymConversationCard({ snapshot }: Props) {
           <button
             key={chip.id}
             type="button"
-            onClick={() => ask(chip.prompt)}
+            onClick={() => { void ask(chip.prompt) }}
             className="text-[10px] px-2 py-1 rounded-full border border-emerald-100 bg-emerald-50/60 text-emerald-800 hover:bg-emerald-100/80 transition-colors"
           >
             {chip.label}
@@ -90,7 +128,7 @@ export default function GymConversationCard({ snapshot }: Props) {
         ))}
       </div>
       <form
-        onSubmit={(e) => { e.preventDefault(); if (prompt.trim()) ask(prompt.trim()) }}
+        onSubmit={(e) => { e.preventDefault(); if (prompt.trim()) void ask(prompt.trim()) }}
         className="flex gap-2"
       >
         <input
@@ -113,10 +151,10 @@ export default function GymConversationCard({ snapshot }: Props) {
           <p className="text-[10px] font-semibold tracking-[0.16em] uppercase text-emerald-600 mb-1">Action proposal</p>
           <pre className="text-xs text-zinc-700 whitespace-pre-wrap font-sans">{proposalPreview}</pre>
           <div className="flex gap-2 mt-2">
-            <button type="button" onClick={approvePending} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white">
+            <button type="button" onClick={() => { void approvePending() }} className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-600 text-white">
               Approve
             </button>
-            <button type="button" onClick={rejectPending} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600">
+            <button type="button" onClick={() => { void rejectPending() }} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600">
               Dismiss
             </button>
           </div>
@@ -125,7 +163,7 @@ export default function GymConversationCard({ snapshot }: Props) {
       {!pendingProposalId && (
         <button
           type="button"
-          onClick={proposeQuickWorkout}
+          onClick={() => { void proposeQuickWorkout() }}
           className="mt-3 text-xs font-medium text-emerald-700 hover:underline"
         >
           Propose logging today&apos;s workout

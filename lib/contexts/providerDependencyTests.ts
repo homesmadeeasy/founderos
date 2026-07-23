@@ -52,6 +52,10 @@ function testLayoutProviderOrder() {
   assert(src.includes('<RealityProvider>'), 'layout must mount RealityProvider')
   const realityIdx = src.indexOf('<RealityProvider>')
   assert(realityIdx > kernelIdx, 'RealityProvider must be inside FounderKernelProvider')
+  assert(src.includes('<IntelligencePipelineProvider>'), 'layout must mount IntelligencePipelineProvider')
+  const intelIdx = src.indexOf('<IntelligencePipelineProvider>')
+  assert(intelIdx > cognitiveIdx, 'IntelligencePipelineProvider must be inside CognitiveModelProvider')
+  assert(actionIdx > intelIdx, 'ActionEngineProvider must be inside IntelligencePipelineProvider')
   console.log('PASS: layout provider order is acyclic')
 }
 
@@ -90,6 +94,7 @@ function testUseCognitiveModelCallSites() {
     'components/gym/useGymInput.ts',
     'contexts/ConversationContext.tsx',
     'contexts/CognitiveModelContext.tsx',
+    'contexts/IntelligencePipelineContext.tsx',
     'components/kernel/KernelSubscriberBootstrap.tsx',
     'lib/contexts/providerTreeTests.ts',
   ])

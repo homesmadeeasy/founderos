@@ -60,6 +60,26 @@ Root `app/layout.tsx` is fonts/styles only. Authenticated UX mounts in `app/(app
 
 ---
 
+## Intelligence pipeline (canonical)
+
+Every specialist AI request must follow the **Intelligence Pipeline** — orchestration over existing engines, not a new engine.
+
+```
+Question → Conversation → Identity → Reality → Memory → Knowledge → Beliefs → Goals
+  → Evidence → Reasoning → Decision → Recommendation → Response
+  → Memory/Reality/Identity write-back hooks
+```
+
+- Spec: [architecture/INTELLIGENCE_PIPELINE.md](./architecture/INTELLIGENCE_PIPELINE.md)
+- Code: `lib/intelligence-pipeline/` · `contexts/IntelligencePipelineContext.tsx`
+- Inspector (dev): `/intelligence-inspector`
+
+**Deprecated:** specialists manually fan-out Identity + Reality + Memory + Cognitive for answers. Use `useIntelligencePipeline().run()` / `runIntelligencePipeline()`.
+
+Morning Execution still runs its own daily `runPipeline` (context → reasoning → plan → domain → decision) for the morning loop — that is complementary, not a second chat stack.
+
+---
+
 ## Domain separation
 
 | Domain | Code home | Notes |
@@ -254,7 +274,7 @@ Event names are PascalCase verbs. Payloads stay JSON-serialisable and minimal.
 
 Approximate order in `app/(app)/layout.tsx` (outer → inner):
 
-`AppProvider` → Memory → Object → Knowledge → Executive → Signal → Sync → UniversalCapture → **FounderKernel** → Morning → Evening → CognitiveModel → ActionEngine → Conversation → CommandBar → KernelSubscriberBootstrap + chrome.
+`AppProvider` → Memory → Identity → Object → Knowledge → Executive → Signal → Sync → UniversalCapture → **FounderKernel** → Reality → Morning → Evening → CognitiveModel → **IntelligencePipeline** → ActionEngine → Conversation → CommandBar → KernelSubscriberBootstrap + chrome.
 
 **Mounted elsewhere:**
 
@@ -269,6 +289,7 @@ When adding providers, keep the graph acyclic. Provider dependency tests live un
 ## Related reading
 
 - [VISION.md](./VISION.md)
+- [architecture/INTELLIGENCE_PIPELINE.md](./architecture/INTELLIGENCE_PIPELINE.md) — **canonical AI lifecycle**
 - [DOMAIN_FRAMEWORK.md](./DOMAIN_FRAMEWORK.md)
 - [CODING_STANDARDS.md](./CODING_STANDARDS.md)
-- Feature docs: kernel, cognitive model, gym, founder AI (see [README.md](./README.md))
+- Feature docs: kernel, cognitive model, identity, reality, gym, founder AI (see [README.md](./README.md))

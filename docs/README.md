@@ -12,6 +12,7 @@ If code and docs disagree, fix one of them in the same change. Feature milestone
 |----------|---------|
 | [VISION.md](./VISION.md) | Mission, philosophy, what we are / are not, success principles |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | System layers, kernel, memory, repositories, AI, Supabase, events |
+| [architecture/INTELLIGENCE_PIPELINE.md](./architecture/INTELLIGENCE_PIPELINE.md) | **Canonical specialist AI lifecycle** + engine audit |
 | [DOMAIN_FRAMEWORK.md](./DOMAIN_FRAMEWORK.md) | Blueprint every specialist AI must follow (Gym = reference) |
 | [CODING_STANDARDS.md](./CODING_STANDARDS.md) | TypeScript, folders, hooks, repos, tests, a11y, no UI→DB |
 | [WORKFLOW.md](./WORKFLOW.md) | Idea → release pipeline, branches, commits, review, checklists |

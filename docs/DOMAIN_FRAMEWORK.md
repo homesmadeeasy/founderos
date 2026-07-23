@@ -114,9 +114,11 @@ On durable completions (finished workout, major decision, …):
 
 ## Conversation
 
-- Build context from snapshot + recent history + profile.
-- Prefer read-mostly assistance; mutations go through context/repository.
+- Build answers through the **Intelligence Pipeline** (`useIntelligencePipeline().run()`), not ad-hoc Identity/Reality/Memory fan-out.
+- Pipeline returns the standard `IntelligenceResult` (summaries, evidence, reasoning, confidence, actions, trace).
+- Prefer read-mostly assistance; mutations go through context/repository / Action Engine.
 - Keep prompts and deterministic replies testable where practical.
+- See [architecture/INTELLIGENCE_PIPELINE.md](./architecture/INTELLIGENCE_PIPELINE.md).
 
 ---
 

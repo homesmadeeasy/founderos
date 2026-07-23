@@ -31,6 +31,8 @@ import {
 import { newConversationId, nowISO } from '@/lib/conversation/conversationUtils'
 import { useFounderInput, useUserDisplayName } from '@/components/founder/useFounderInput'
 import { useCognitiveModel } from '@/contexts/CognitiveModelContext'
+import { useIntelligencePipeline } from '@/contexts/IntelligencePipelineContext'
+import { useIdentity } from '@/contexts/IdentityContext'
 import { processFounderAIMessage } from '@/lib/ai/founder/founderAI.integration'
 import {
   getPendingProposals,
@@ -87,6 +89,8 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
   const { createKnowledge } = useKnowledgeEngine()
   const { updatePrimaryMission } = useMorningExecution()
   const { publish } = useFounderKernel()
+  const { run: runIntelligence } = useIntelligencePipeline()
+  const { ingestSignals } = useIdentity()
   const [session, setSession] = useState<ConversationSession | null>(null)
   const [store, setStore] = useState<ConversationStore>(() => loadConversationStore())
   const [isTyping, setIsTyping] = useState(false)
@@ -285,6 +289,27 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
         payload: { sessionId: session.id, questionId },
       })
 
+      // Canonical intelligence pipeline — specialists must not fan out engines themselves.
+      await runIntelligence(
+        {
+          specialistId: session.topic || 'founder',
+          question: trimmed,
+          conversationContext: `conversation:${session.topic}`,
+        },
+        {
+          produceResponse: () => '',
+          onIdentityObservation: async () => {
+            await ingestSignals([{
+              id: `founder-ask-${userTurnId}`,
+              domain: session.topic || 'founder',
+              signalType: 'conversation_turn',
+              occurredAt: new Date().toISOString(),
+              payload: { question: trimmed.slice(0, 120), sessionId: session.id },
+            }])
+          },
+        },
+      )
+
       const useLlm = session.topic === 'founder' && isFounderAILlmEnabled()
 
       if (useLlm) {
@@ -386,6 +411,7 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
   }, [
     session, founderInput, userName, worldModel, cognitiveStore,
     publish, recordMemory, appendSystemTurn, refreshCognitive,
+    runIntelligence, ingestSignals,
   ])
 
   const approveActionProposalFn = useCallback(async (

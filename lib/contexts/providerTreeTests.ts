@@ -12,6 +12,7 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??= 'test-anon-key'
 
 import { AppProvider } from '@/contexts/AppContext'
 import { MemoryEngineProvider } from '@/contexts/MemoryEngineContext'
+import { IdentityProvider } from '@/contexts/IdentityContext'
 import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
 import { KnowledgeEngineProvider } from '@/contexts/KnowledgeEngineContext'
 import { ExecutiveEngineProvider } from '@/contexts/ExecutiveEngineContext'
@@ -19,9 +20,11 @@ import { SignalEngineProvider } from '@/contexts/SignalEngineContext'
 import { SyncEngineProvider } from '@/contexts/SyncEngineContext'
 import { UniversalCaptureProvider } from '@/contexts/UniversalCaptureContext'
 import { FounderKernelProvider } from '@/contexts/FounderKernelContext'
+import { RealityProvider } from '@/contexts/RealityContext'
 import { MorningExecutionProvider } from '@/contexts/MorningExecutionContext'
 import { EveningReviewProvider } from '@/contexts/EveningReviewContext'
 import { CognitiveModelProvider } from '@/contexts/CognitiveModelContext'
+import { IntelligencePipelineProvider } from '@/contexts/IntelligencePipelineContext'
 import { ActionEngineProvider } from '@/contexts/ActionEngineContext'
 import { ConversationProvider } from '@/contexts/ConversationContext'
 import { useFounderInput } from '@/components/founder/useFounderInput'
@@ -36,15 +39,19 @@ function AppProviderTree({ children }: { children: ReactNode }) {
   return createElement(AppProvider, {
     userId: 'provider-tree-test-user',
     children: nest(MemoryEngineProvider,
-      nest(ObjectEngineProvider,
-        nest(KnowledgeEngineProvider,
-          nest(ExecutiveEngineProvider,
-            nest(SignalEngineProvider,
-              nest(SyncEngineProvider,
-                nest(UniversalCaptureProvider,
-                  nest(FounderKernelProvider,
-                    nest(MorningExecutionProvider,
-                      nest(EveningReviewProvider, children),
+      nest(IdentityProvider,
+        nest(ObjectEngineProvider,
+          nest(KnowledgeEngineProvider,
+            nest(ExecutiveEngineProvider,
+              nest(SignalEngineProvider,
+                nest(SyncEngineProvider,
+                  nest(UniversalCaptureProvider,
+                    nest(FounderKernelProvider,
+                      nest(RealityProvider,
+                        nest(MorningExecutionProvider,
+                          nest(EveningReviewProvider, children),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -102,9 +109,11 @@ function testActionAndConversationProvidersMount() {
     renderToString(
       createElement(AppProviderTree, {
         children: createElement(CognitiveModelProvider, {
-          children: createElement(ActionEngineProvider, {
-            children: createElement(ConversationProvider, {
-              children: createElement('span', null, 'mounted'),
+          children: createElement(IntelligencePipelineProvider, {
+            children: createElement(ActionEngineProvider, {
+              children: createElement(ConversationProvider, {
+                children: createElement('span', null, 'mounted'),
+              }),
             }),
           }),
         }),
