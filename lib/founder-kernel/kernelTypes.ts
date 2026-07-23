@@ -70,6 +70,11 @@ export type FounderEventType =
   | 'GymPrescriptionExplained'
   | 'GymResearchSourceAdded'
   | 'GymPrescriptionAdjusted'
+  | 'IdentityFactDeclared'
+  | 'IdentityObservationCreated'
+  | 'IdentityFactConfirmed'
+  | 'IdentityFactRejected'
+  | 'IdentityUpdated'
 
 export type FounderEventStatus =
   | 'created'

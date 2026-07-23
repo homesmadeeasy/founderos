@@ -26,6 +26,7 @@ export const PROTECTED_PREFIXES = [
   '/onboarding',
   '/memory-search',
   '/gym',
+  '/identity',
   '/evaluation',
 ] as const
 

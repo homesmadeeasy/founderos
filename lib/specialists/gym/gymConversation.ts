@@ -15,9 +15,22 @@ export const GYM_QUESTION_CHIPS: { id: GymQuestionId; label: string; prompt: str
   { id: 'chest_volume', label: 'Chest volume', prompt: 'How much chest volume am I doing?' },
 ]
 
-export function answerGymQuestion(snapshot: GymSnapshot, prompt: string): string {
+export function answerGymQuestion(
+  snapshot: GymSnapshot,
+  prompt: string,
+  identityHints?: string[],
+): string {
   const lower = prompt.trim().toLowerCase()
+  const identityPrefix = identityHints && identityHints.length > 0
+    ? `**What FounderOS already knows about you**\n${identityHints.slice(0, 6).map(h => `• ${h}`).join('\n')}\n\n`
+    : ''
 
+  const answer = answerGymQuestionCore(snapshot, lower, prompt)
+  return identityPrefix + answer
+}
+
+function answerGymQuestionCore(snapshot: GymSnapshot, lower: string, prompt: string): string {
+  void prompt
   if (lower.includes('train today') || lower.includes('what should i train')) {
     if (!snapshot.hasStructuredHistory) {
       return [

@@ -4,6 +4,7 @@ import { AppProvider } from '@/contexts/AppContext'
 import { ExecutiveEngineProvider } from '@/contexts/ExecutiveEngineContext'
 import { KnowledgeEngineProvider } from '@/contexts/KnowledgeEngineContext'
 import { MemoryEngineProvider } from '@/contexts/MemoryEngineContext'
+import { IdentityProvider } from '@/contexts/IdentityContext'
 import { EveningReviewProvider } from '@/contexts/EveningReviewContext'
 import { MorningExecutionProvider } from '@/contexts/MorningExecutionContext'
 import { ObjectEngineProvider } from '@/contexts/ObjectEngineContext'
@@ -28,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <AppProvider userId={user.id}>
       <MemoryEngineProvider>
+        <IdentityProvider>
         <ObjectEngineProvider>
           <KnowledgeEngineProvider>
             <ExecutiveEngineProvider>
@@ -64,6 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </ExecutiveEngineProvider>
           </KnowledgeEngineProvider>
         </ObjectEngineProvider>
+        </IdentityProvider>
       </MemoryEngineProvider>
     </AppProvider>
   )

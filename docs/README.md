@@ -24,6 +24,7 @@ If code and docs disagree, fix one of them in the same change. Feature milestone
 | Product | Spec pack |
 |---------|-----------|
 | **Gym** | [products/gym/OVERVIEW.md](./products/gym/OVERVIEW.md) — full engineering specification |
+| **Identity** | [identity/OVERVIEW.md](./identity/OVERVIEW.md) — shared foundation for every specialist |
 
 ---
 
