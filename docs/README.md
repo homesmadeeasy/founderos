@@ -19,6 +19,14 @@ If code and docs disagree, fix one of them in the same change. Feature milestone
 
 ---
 
+## Product specifications (vertical slices)
+
+| Product | Spec pack |
+|---------|-----------|
+| **Gym** | [products/gym/OVERVIEW.md](./products/gym/OVERVIEW.md) — full engineering specification |
+
+---
+
 ## How to use this handbook
 
 **New engineer**
@@ -95,6 +103,7 @@ These are historical and deep-dive design records. Prefer them for implementatio
 
 | Doc |
 |-----|
+| **[products/gym/](./products/gym/OVERVIEW.md) — product specification pack** |
 | [gym-personalisation-v1.md](./gym-personalisation-v1.md) |
 | [gym-evidence-intelligence-v1.md](./gym-evidence-intelligence-v1.md) |
 | [active-workout-engine-v2.md](./active-workout-engine-v2.md) |
