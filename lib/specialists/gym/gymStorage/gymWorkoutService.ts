@@ -11,13 +11,16 @@ import {
   normalizeActiveWorkoutExercises,
   normalizeApprovedPlanExercises,
 } from '../gymPlannedExerciseUtils'
+import { buildWorkoutSummaryDetail, type WorkoutSummaryDetail } from '../gymActiveWorkoutEngine'
 
 export interface CompleteWorkoutResult {
   session: WorkoutSessionRecord
   summary: string
+  summaryDetail: WorkoutSummaryDetail
   progressionRecords: ReturnType<typeof buildProgressionRecord>[]
   memoryTitle: string
   memoryContent: string
+  prs: WorkoutSummaryDetail['prs']
 }
 
 export function createActiveWorkoutFromPlan(
@@ -96,12 +99,20 @@ export function createActiveWorkoutFromSnapshot(snapshot: GymSnapshot): ActiveWo
   }
 }
 
-export function addSetToExercise(workout: ActiveWorkout, exerciseId: string, setType: 'warmup' | 'working' = 'working'): ActiveWorkout {
+function matchesExercise(ex: ExercisePerformanceRecord, key: string): boolean {
+  return (ex.plannedExerciseId ?? ex.exerciseId) === key || ex.exerciseId === key
+}
+
+export function addSetToExercise(
+  workout: ActiveWorkout,
+  exerciseKey: string,
+  setType: 'warmup' | 'working' = 'working',
+): ActiveWorkout {
   return {
     ...workout,
     updatedAt: nowISO(),
     exercises: workout.exercises.map(ex => {
-      if (ex.exerciseId !== exerciseId) return ex
+      if (!matchesExercise(ex, exerciseKey)) return ex
       const last = ex.sets[ex.sets.length - 1]
       const newSet: SetPerformanceRecord = {
         id: newGymId(),
@@ -109,6 +120,8 @@ export function addSetToExercise(workout: ActiveWorkout, exerciseId: string, set
         setType,
         reps: last?.reps ?? 8,
         weight: last?.weight ?? 0,
+        rpe: last?.rpe,
+        rir: last?.rir,
         completed: false,
       }
       return { ...ex, sets: [...ex.sets, newSet] }
@@ -118,7 +131,7 @@ export function addSetToExercise(workout: ActiveWorkout, exerciseId: string, set
 
 export function updateSet(
   workout: ActiveWorkout,
-  exerciseId: string,
+  exerciseKey: string,
   setId: string,
   patch: Partial<SetPerformanceRecord>,
 ): ActiveWorkout {
@@ -126,7 +139,7 @@ export function updateSet(
     ...workout,
     updatedAt: nowISO(),
     exercises: workout.exercises.map(ex => {
-      if (ex.exerciseId !== exerciseId) return ex
+      if (!matchesExercise(ex, exerciseKey)) return ex
       return {
         ...ex,
         sets: ex.sets.map(s => s.id === setId ? { ...s, ...patch } : s),
@@ -135,14 +148,97 @@ export function updateSet(
   }
 }
 
-export function removeSet(workout: ActiveWorkout, exerciseId: string, setId: string): ActiveWorkout {
+export function removeSet(workout: ActiveWorkout, exerciseKey: string, setId: string): ActiveWorkout {
   return {
     ...workout,
     updatedAt: nowISO(),
     exercises: workout.exercises.map(ex => {
-      if (ex.exerciseId !== exerciseId) return ex
+      if (!matchesExercise(ex, exerciseKey)) return ex
       const sets = ex.sets.filter(s => s.id !== setId).map((s, i) => ({ ...s, setNumber: i + 1 }))
       return { ...ex, sets }
+    }),
+  }
+}
+
+export function pauseActiveWorkout(workout: ActiveWorkout): ActiveWorkout {
+  return {
+    ...workout,
+    status: 'paused',
+    restTimerEndsAt: null,
+    updatedAt: nowISO(),
+  }
+}
+
+export function resumeActiveWorkout(workout: ActiveWorkout): ActiveWorkout {
+  return {
+    ...workout,
+    status: 'active',
+    updatedAt: nowISO(),
+  }
+}
+
+export function skipExerciseInWorkout(workout: ActiveWorkout, exerciseKey: string): ActiveWorkout {
+  return {
+    ...workout,
+    updatedAt: nowISO(),
+    restTimerEndsAt: null,
+    exercises: workout.exercises.map(ex =>
+      matchesExercise(ex, exerciseKey) ? { ...ex, skipped: true } : ex,
+    ),
+  }
+}
+
+export function finishExerciseInWorkout(workout: ActiveWorkout, exerciseKey: string): ActiveWorkout {
+  return {
+    ...workout,
+    updatedAt: nowISO(),
+    restTimerEndsAt: null,
+    exercises: workout.exercises.map(ex => {
+      if (!matchesExercise(ex, exerciseKey)) return ex
+      return {
+        ...ex,
+        sets: ex.sets.map(s => (s.completed ? s : { ...s, completed: true })),
+      }
+    }),
+  }
+}
+
+export function startRestTimer(workout: ActiveWorkout, restSeconds: number): ActiveWorkout {
+  const ends = new Date(Date.now() + Math.max(0, restSeconds) * 1000).toISOString()
+  return {
+    ...workout,
+    restTimerEndsAt: ends,
+    updatedAt: nowISO(),
+  }
+}
+
+export function clearRestTimer(workout: ActiveWorkout): ActiveWorkout {
+  return {
+    ...workout,
+    restTimerEndsAt: null,
+    updatedAt: nowISO(),
+  }
+}
+
+export function applySuggestedLoadToNextSet(
+  workout: ActiveWorkout,
+  exerciseKey: string,
+  weight: number,
+): ActiveWorkout {
+  return {
+    ...workout,
+    updatedAt: nowISO(),
+    exercises: workout.exercises.map(ex => {
+      if (!matchesExercise(ex, exerciseKey)) return ex
+      let applied = false
+      return {
+        ...ex,
+        sets: ex.sets.map(s => {
+          if (applied || s.completed) return s
+          applied = true
+          return { ...s, weight }
+        }),
+      }
     }),
   }
 }
@@ -200,13 +296,14 @@ export function completeWorkout(
     return `${ex.exerciseName}: ${setStr || 'no working sets'}`
   })
 
-  const summary = [
-    `Completed ${session.title}`,
-    `${workingSetCount(session)} working sets`,
-    session.totalVolumeKg ? `${session.totalVolumeKg} kg total volume` : '',
-    session.painFlags.length ? `Pain flags: ${session.painFlags.length}` : '',
-    progressionRecords[0] ? `Next: ${progressionRecords[0].recommendation}` : '',
-  ].filter(Boolean).join(' · ')
+  const summaryDetail = buildWorkoutSummaryDetail({
+    session,
+    progressionRecords,
+    historySessions: existingSessions,
+    profile,
+  })
+
+  const summary = summaryDetail.summaryText
 
   const mem = buildWorkoutLogMemory({
     exercises: session.exercises.map(e => ({
@@ -226,15 +323,12 @@ export function completeWorkout(
   return {
     session,
     summary,
+    summaryDetail,
     progressionRecords,
     memoryTitle: mem.title,
     memoryContent: mem.content,
+    prs: summaryDetail.prs,
   }
-}
-
-function workingSetCount(session: WorkoutSessionRecord): number {
-  return session.exercises.reduce((n, ex) =>
-    n + ex.sets.filter(s => s.completed && s.setType === 'working').length, 0)
 }
 
 function computeAdherence(workout: ActiveWorkout): number {

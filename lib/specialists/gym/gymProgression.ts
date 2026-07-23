@@ -1,7 +1,8 @@
 import type { StrengthEstimate, WorkoutSession } from './gymTypes'
 import { getExerciseById } from './gymExerciseLibrary'
 
-function estimateE1RM(weight: number, reps: number): number {
+/** Epley-style estimate — exported for live Active Workout Engine use. */
+export function estimateE1RM(weight: number, reps: number): number {
   if (weight <= 0 || reps <= 0) return 0
   return Math.round(weight * (1 + reps / 30))
 }

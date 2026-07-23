@@ -32,6 +32,8 @@ import {
   createActiveWorkoutFromPlan,
   persistCompletedWorkout,
 } from '@/lib/specialists/gym/gymStorage/gymWorkoutService'
+import type { WorkoutSummaryDetail } from '@/lib/specialists/gym/gymActiveWorkoutEngine'
+import { suggestStartingWeight } from '@/lib/specialists/gym/gymStorage/gymDoubleProgression'
 import {
   scheduleFirstSessionTomorrow,
   skipWorkoutSession,
@@ -66,7 +68,7 @@ interface GymDataContextValue {
   startWorkoutFromPlan: () => ActiveWorkout | null
   saveActiveWorkout: (workout: ActiveWorkout) => void
   discardActiveWorkout: () => void
-  finishWorkout: () => { summary: string } | null
+  finishWorkout: () => { summary: string; summaryDetail: WorkoutSummaryDetail } | null
   skipWorkout: (reason: WorkoutSkipReason, note?: string) => {
     skipped: WorkoutSessionRecord
     rescheduled: WorkoutSessionRecord | null
@@ -78,7 +80,13 @@ interface GymDataContextValue {
 
 const GymDataContext = createContext<GymDataContextValue | null>(null)
 
-function planFromTodaysWorkout(workout: TodaysWorkout, whySummary: string): ApprovedWorkoutPlan {
+function planFromTodaysWorkout(
+  workout: TodaysWorkout,
+  whySummary: string,
+  sessions: WorkoutSessionRecord[],
+  profile: GymProfile | null,
+): ApprovedWorkoutPlan {
+  const completed = filterCompletedSessionRecords(sessions)
   return {
     id: workout.workoutInstanceId,
     approvedAt: nowISO(),
@@ -93,7 +101,7 @@ function planFromTodaysWorkout(workout: TodaysWorkout, whySummary: string): Appr
       repRange: ex.prescription.repRange,
       targetReps: ex.prescription.targetReps,
       targetRpe: ex.targetRpe,
-      suggestedLoadKg: null,
+      suggestedLoadKg: suggestStartingWeight(ex.exerciseId, completed, profile),
       prescriptionConfidence: ex.prescription.prescriptionConfidence,
     })),
   }
@@ -174,11 +182,11 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
 
   const approveWorkoutPlan = useCallback((workout: TodaysWorkout, whySummary: string) => {
     const repo = getGymStorageRepository()
-    const plan = planFromTodaysWorkout(workout, whySummary)
+    const plan = planFromTodaysWorkout(workout, whySummary, sessions, profile)
     repo.saveApprovedPlan(plan)
     setApprovedPlan(plan)
     return plan
-  }, [])
+  }, [sessions, profile])
 
   const clearApprovedPlan = useCallback(() => {
     const repo = getGymStorageRepository()
@@ -204,7 +212,7 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
       completedAt: '',
       updatedAt: nowISO(),
       title: workout.title,
-      exercises: [],
+      exercises: workout.exercises,
       completed: false,
       status: 'in_progress',
       painFlags: [],
@@ -226,10 +234,30 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     const next = { ...workout, updatedAt: nowISO() }
     repo.saveActiveWorkout(next)
     setActiveWorkout(next)
+
+    // Keep in_progress session exercises aligned for durable resume / history honesty.
+    const existing = repo.listSessions().find(s => s.id === next.id)
+    if (existing && existing.status === 'in_progress') {
+      repo.upsertSession({
+        ...existing,
+        exercises: next.exercises,
+        updatedAt: next.updatedAt,
+        sessionNotes: next.sessionNotes,
+      })
+      setSessions(repo.listSessions())
+    }
   }, [])
 
   const discardActiveWorkout = useCallback(() => {
     const repo = getGymStorageRepository()
+    const current = repo.getActiveWorkout()
+    if (current) {
+      const existing = repo.listSessions().find(s => s.id === current.id && s.status === 'in_progress')
+      if (existing) {
+        repo.upsertSession({ ...existing, status: 'cancelled', updatedAt: nowISO() })
+        setSessions(repo.listSessions())
+      }
+    }
     repo.saveActiveWorkout(null)
     setActiveWorkout(null)
   }, [])
@@ -266,6 +294,19 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
         volumeKg: result.session.totalVolumeKg,
         adherence: result.session.adherenceScore,
         status: 'completed',
+        musclesTrained: result.summaryDetail.musclesTrained,
+        prCount: result.prs.length,
+      },
+    })
+    // Cognitive / domain subscribers listen for WorkoutLogged.
+    void publish({
+      type: 'WorkoutLogged',
+      source: 'gym-ai',
+      payload: {
+        sessionId: result.session.id,
+        title: result.session.title,
+        volumeKg: result.session.totalVolumeKg,
+        adherence: result.session.adherenceScore,
       },
     })
     void publish({
@@ -273,6 +314,22 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
       source: 'gym-ai',
       payload: { sessionId: result.session.id },
     })
+    void publish({
+      type: 'RecoveryUpdated',
+      source: 'gym-ai',
+      payload: {
+        sessionId: result.session.id,
+        prediction: result.summaryDetail.recoveryPrediction,
+      },
+    })
+
+    for (const pr of result.prs) {
+      void publish({
+        type: 'ExercisePR',
+        source: 'gym-ai',
+        payload: { exerciseName: pr.exerciseName, detail: pr.detail, e1rm: pr.e1rm },
+      })
+    }
 
     for (const ex of result.session.exercises) {
       const pain = ex.sets.some(s => s.painFlag)
@@ -285,7 +342,7 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    return { summary: result.summary }
+    return { summary: result.summary, summaryDetail: result.summaryDetail }
   }, [activeWorkout, profile, sessions, publish, recordMemory])
 
   const skipWorkout = useCallback((reason: WorkoutSkipReason, note?: string) => {
