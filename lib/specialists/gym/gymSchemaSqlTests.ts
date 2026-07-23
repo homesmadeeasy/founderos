@@ -78,6 +78,14 @@ assert.match(sql, /idx_gym_workout_sessions_status/i)
 assert.match(sql, /idx_gym_workout_sessions_template/i)
 assert.match(sql, /gym_set_performances_number_unique/i)
 assert.match(sql, /idx_gym_workout_sessions_one_in_progress/i)
+assert.match(
+  sql,
+  /foreign key \(template_id, user_id\)[\s\S]*?references gym_workout_templates\(id, user_id\)/i,
+)
+assert.match(
+  sql,
+  /foreign key \(rescheduled_from_id, user_id\)[\s\S]*?references gym_workout_sessions\(id, user_id\)/i,
+)
 assert.match(sql, /approved_plan\s+jsonb/i)
 assert.match(sql, /research_claim_ids\s+jsonb/i)
 assert.doesNotMatch(sql, /service_role/i)

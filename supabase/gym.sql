@@ -113,7 +113,8 @@ create table if not exists gym_workout_templates (
   estimated_minutes   integer,
   metadata            jsonb not null default '{}'::jsonb,
   created_at          timestamptz not null default now(),
-  updated_at          timestamptz not null default now()
+  updated_at          timestamptz not null default now(),
+  constraint gym_workout_templates_id_user_unique unique (id, user_id)
 );
 
 comment on table gym_workout_templates is
@@ -271,8 +272,66 @@ create table if not exists gym_workout_sessions (
   constraint gym_sessions_completed_flag_consistent check (
     (status = 'completed' and completed = true)
     or (status <> 'completed' and completed = false)
-  )
+  ),
+  constraint gym_workout_sessions_id_user_unique unique (id, user_id),
+  constraint gym_workout_sessions_template_owner_fkey
+    foreign key (template_id, user_id)
+    references gym_workout_templates(id, user_id)
+    on delete set null (template_id),
+  constraint gym_workout_sessions_rescheduled_owner_fkey
+    foreign key (rescheduled_from_id, user_id)
+    references gym_workout_sessions(id, user_id)
+    on delete set null (rescheduled_from_id)
 );
+
+-- CREATE TABLE IF NOT EXISTS does not add new constraints to an existing
+-- installation. Add the same-owner keys separately when upgrading/re-running.
+-- These fail closed if pre-existing rows contain cross-user references.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'gym_workout_templates_id_user_unique'
+      and conrelid = 'gym_workout_templates'::regclass
+  ) then
+    alter table gym_workout_templates
+      add constraint gym_workout_templates_id_user_unique unique (id, user_id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'gym_workout_sessions_id_user_unique'
+      and conrelid = 'gym_workout_sessions'::regclass
+  ) then
+    alter table gym_workout_sessions
+      add constraint gym_workout_sessions_id_user_unique unique (id, user_id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'gym_workout_sessions_template_owner_fkey'
+      and conrelid = 'gym_workout_sessions'::regclass
+  ) then
+    alter table gym_workout_sessions
+      add constraint gym_workout_sessions_template_owner_fkey
+      foreign key (template_id, user_id)
+      references gym_workout_templates(id, user_id)
+      on delete set null (template_id);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'gym_workout_sessions_rescheduled_owner_fkey'
+      and conrelid = 'gym_workout_sessions'::regclass
+  ) then
+    alter table gym_workout_sessions
+      add constraint gym_workout_sessions_rescheduled_owner_fkey
+      foreign key (rescheduled_from_id, user_id)
+      references gym_workout_sessions(id, user_id)
+      on delete set null (rescheduled_from_id);
+  end if;
+end
+$$;
 
 comment on table gym_workout_sessions is
   'User workout sessions including ActiveWorkout (in_progress). Exercise/set detail is normalised into child tables.';
