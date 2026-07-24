@@ -292,9 +292,14 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
       // Canonical intelligence pipeline — specialists must not fan out engines themselves.
       await runIntelligence(
         {
+          requestId: `founder-${session.id}-${userTurnId}`,
+          specialist: session.topic || 'founder',
           specialistId: session.topic || 'founder',
+          userMessage: trimmed,
           question: trimmed,
+          conversationId: session.id,
           conversationContext: `conversation:${session.topic}`,
+          intent: 'general_question',
         },
         {
           produceResponse: () => '',

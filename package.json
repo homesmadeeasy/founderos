@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run test:providers && npm run test:founder-intelligence && npm run test:gym-evidence && npm run test:gym-personalisation && npm run test:gym-planned && npm run test:gym-status && npm run test:gym-schema && npm run test:gym-active && npm run test:gym-active-v2 && npm run test:identity && npm run test:reality && npm run test:intelligence-pipeline && npm run test:env && npm run build",
+    "check": "npm run typecheck && npm run test:providers && npm run test:founder-intelligence && npm run test:gym-evidence && npm run test:gym-personalisation && npm run test:gym-planned && npm run test:gym-status && npm run test:gym-schema && npm run test:gym-active && npm run test:gym-active-v2 && npm run test:identity && npm run test:reality && npm run test:intelligence-pipeline && npm run test:gym-intelligence-eval && npm run test:env && npm run build",
     "test:env": "npx tsx lib/env/envTests.ts",
     "test:conversation": "npx tsx lib/conversation/adaptiveDialogueTests.ts",
     "test:cognitive": "npx tsx lib/cognitive-model/cognitiveModelTests.ts",
@@ -28,7 +28,8 @@
     "test:gym-persistence": "npx tsx lib/specialists/gym/gymActiveWorkoutV2Tests.ts",
     "test:identity": "npx tsx lib/identity/identityTests.ts",
     "test:reality": "npx tsx lib/reality/RealityTests.ts",
-    "test:intelligence-pipeline": "npx tsx lib/intelligence-pipeline/intelligenceTests.ts"
+    "test:intelligence-pipeline": "npx tsx lib/intelligence-pipeline/intelligenceTests.ts",
+    "test:gym-intelligence-eval": "npx tsx lib/specialists/gym/gymIntelligenceEvalTests.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

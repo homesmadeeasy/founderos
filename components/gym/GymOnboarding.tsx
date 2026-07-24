@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useGymData } from '@/contexts/GymDataContext'
 import { createDefaultGymProfile } from '@/lib/specialists/gym/gymProfileUtils'
+import { useIdentity } from '@/contexts/IdentityContext'
 import type {
   FirstSessionIntent,
   GymProfile,
@@ -30,6 +31,7 @@ const SPLITS: { id: PreferredSplit; label: string }[] = [
 
 export default function GymOnboarding() {
   const { saveProfile, chooseFirstSession, profile, onboardingComplete } = useGymData()
+  const { declareFact, setEnabledSpecialists } = useIdentity()
   const needsFirstChoice = Boolean(profile?.complete) && !profile?.firstSessionChoiceComplete && !onboardingComplete
   const [step, setStep] = useState(needsFirstChoice ? 4 : 0)
   const [form, setForm] = useState<GymProfile>(profile ?? createDefaultGymProfile())
@@ -37,8 +39,18 @@ export default function GymOnboarding() {
 
   const update = (patch: Partial<GymProfile>) => setForm(prev => ({ ...prev, ...patch }))
 
-  const finishProfile = () => {
-    saveProfile({ ...form, complete: true })
+  const finishProfile = async () => {
+    const next = { ...form, complete: true }
+    saveProfile(next)
+    try {
+      const { declareInputsFromGymProfile } = await import('@/lib/specialists/gym/gymIdentityBootstrap')
+      for (const input of declareInputsFromGymProfile(next)) {
+        await declareFact(input)
+      }
+      await setEnabledSpecialists(['gym'])
+    } catch {
+      // Identity sync is best-effort; GymProfile remains planner source of truth.
+    }
     setStep(4)
   }
 
@@ -209,7 +221,7 @@ export default function GymOnboarding() {
             <button type="button" onClick={() => setStep(s => s + 1)}
               className="text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 text-white">Continue</button>
           ) : (
-            <button type="button" onClick={finishProfile}
+            <button type="button" onClick={() => { void finishProfile() }}
               className="text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 text-white">Continue</button>
           )}
         </div>

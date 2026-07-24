@@ -56,8 +56,10 @@ export function IntelligencePipelineProvider({ children }: { children: ReactNode
     request: IntelligenceRequest,
     overrides: Partial<IntelligenceSources> = {},
   ) => {
-    const identity = getIdentityView(request.specialistId)
-    const reality = getRealitySnapshot(request.specialistId)
+    const specialist = String(request.specialist || request.specialistId || 'unknown')
+    const question = (request.userMessage || request.question || '').trim()
+    const identity = getIdentityView(specialist)
+    const reality = getRealitySnapshot(specialist)
     const decisionSummary = decisionOutput
       ? `${decisionOutput.primaryDecision.title}: ${decisionOutput.primaryDecision.reason}`
       : null
@@ -74,7 +76,7 @@ export function IntelligencePipelineProvider({ children }: { children: ReactNode
       .map(r => r.title)
 
     const base = sourcesFromEngines({
-      question: request.question,
+      question,
       identity,
       reality,
       memories,
@@ -91,8 +93,16 @@ export function IntelligencePipelineProvider({ children }: { children: ReactNode
       executiveRecommendations,
     })
 
-    return runIntelligencePipeline(request, {
+    return runIntelligencePipeline({
+      ...request,
+      specialist,
+      specialistId: specialist,
+      userMessage: question,
+      question,
+    }, {
       ...base,
+      realityMomentumLabel: reality.momentum?.label,
+      realityEventCountToday: reality.eventCountToday,
       ...overrides,
     })
   }, [

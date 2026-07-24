@@ -1,6 +1,7 @@
 export * from './intelligenceTypes'
 export {
   runIntelligencePipeline,
+  runIntelligencePipelineIdempotent,
   getCanonicalStageOrder,
   createDuplicateStageGuard,
   getLastIntelligenceResult,
