@@ -33,6 +33,9 @@ Internal APIs for Gym (no public HTTP gym CRUD today). External callers are Reac
 | `approveWorkoutPlan(workout, whySummary)` | Persist `ApprovedWorkoutPlan` |
 | `clearApprovedPlan()` | Clear approval |
 | `startWorkoutFromPlan()` | Idempotent create/resume + `WorkoutStarted` + sync |
+| `startWorkoutTodayInstead(workout, why)` | Clear deferred tomorrow intent, cancel planned placeholder, approve if needed, then start (one active) |
+| `keepWorkoutForTomorrow()` | Ack only — no completed history |
+| `changeFirstSessionSchedule(title)` | Cancel deferred tomorrow planned; offer `pendingReschedule` |
 | `saveActiveWorkout(workout)` | Local + mirror session + async sync status |
 | `discardActiveWorkout()` | Cancel + clear + sync clear attempt |
 | `finishWorkout(review?)` | Complete if valid working set; memory; events; cloud sync |

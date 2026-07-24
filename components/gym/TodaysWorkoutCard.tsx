@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { GymSnapshot } from '@/lib/specialists/gym/gymTypes'
@@ -8,9 +8,9 @@ import { MUSCLE_GROUP_LABELS } from '@/lib/specialists/gym/gymTypes'
 import { plannedExerciseListKey } from '@/lib/specialists/gym/gymPlannedExerciseUtils'
 import {
   WORKOUT_SKIP_REASON_LABELS,
-  WORKOUT_STATUS_LABELS,
   type WorkoutSkipReason,
 } from '@/lib/specialists/gym/gymSessionStatus'
+import { buildWorkoutCardPresentation } from '@/lib/specialists/gym/gymFirstSessionPresentation'
 import { useGymData, buildWhyWorkoutSummary } from '@/contexts/GymDataContext'
 import GymCard from './GymCard'
 
@@ -27,6 +27,9 @@ export default function TodaysWorkoutCard({ snapshot, onExplainPrescription }: P
     approvedPlan,
     approveWorkoutPlan,
     startWorkoutFromPlan,
+    startWorkoutTodayInstead,
+    keepWorkoutForTomorrow,
+    changeFirstSessionSchedule,
     activeWorkout,
     todayStatus,
     skipWorkout,
@@ -34,6 +37,7 @@ export default function TodaysWorkoutCard({ snapshot, onExplainPrescription }: P
     confirmReschedule,
     dismissReschedule,
     profile,
+    sessions,
   } = useGymData()
   const [showWhy, setShowWhy] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -41,11 +45,18 @@ export default function TodaysWorkoutCard({ snapshot, onExplainPrescription }: P
   const [skipReason, setSkipReason] = useState<WorkoutSkipReason>('busy')
   const [skipNote, setSkipNote] = useState('')
   const [skipAck, setSkipAck] = useState<string | null>(null)
+  const [keepAck, setKeepAck] = useState<string | null>(null)
 
   const w = snapshot.todaysWorkout
-  const deferredTomorrow = profile?.firstSessionIntent === 'tomorrow' && todayStatus.status === 'not_started'
-  const plannedTomorrow = todayStatus.status === 'not_started'
-    && profile?.firstSessionIntent === 'tomorrow'
+  const presentation = useMemo(
+    () => buildWorkoutCardPresentation({
+      profile,
+      sessions,
+      todayStatus,
+      hasActiveWorkout: Boolean(activeWorkout),
+    }),
+    [profile, sessions, todayStatus, activeWorkout],
+  )
 
   const isApproved = approvedPlan?.title === w.title
     || approvedPlan?.workoutInstanceId === w.workoutInstanceId
@@ -61,6 +72,21 @@ export default function TodaysWorkoutCard({ snapshot, onExplainPrescription }: P
     router.push('/gym/workout')
   }
 
+  const handleStartTodayInstead = () => {
+    startWorkoutTodayInstead(w, whySummary)
+    router.push('/gym/workout')
+  }
+
+  const handleKeepForTomorrow = () => {
+    keepWorkoutForTomorrow()
+    setKeepAck('Kept for tomorrow — nothing logged as completed. Come back then to approve and start.')
+  }
+
+  const handleChangeSchedule = () => {
+    changeFirstSessionSchedule(w.title)
+    setKeepAck(null)
+  }
+
   const handleSkip = () => {
     const { rescheduled } = skipWorkout(skipReason, skipNote || undefined)
     setShowSkip(false)
@@ -71,18 +97,14 @@ export default function TodaysWorkoutCard({ snapshot, onExplainPrescription }: P
     )
   }
 
-  const statusLabel = deferredTomorrow
-    ? 'Not Started'
-    : todayStatus.status === 'not_started'
-      ? 'Not Started'
-      : WORKOUT_STATUS_LABELS[todayStatus.status]
-
   return (
     <GymCard className="p-4 sm:p-5">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-[10px] font-semibold tracking-[0.22em] uppercase text-emerald-600/80">Today&apos;s workout</p>
+        <p className="text-[10px] font-semibold tracking-[0.22em] uppercase text-emerald-600/80">
+          {presentation.heading}
+        </p>
         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600">
-          {statusLabel}
+          {presentation.statusLabel}
         </span>
       </div>
       <h3 className="text-lg font-semibold text-zinc-900">{w.title}</h3>
@@ -90,17 +112,21 @@ export default function TodaysWorkoutCard({ snapshot, onExplainPrescription }: P
         ~{w.estimatedMinutes} min · {w.musclesTrained.map(m => MUSCLE_GROUP_LABELS[m]).join(', ')}
       </p>
 
-      {plannedTomorrow && (
+      {presentation.mode === 'planned_tomorrow' && (
         <p className="text-xs text-zinc-600 bg-zinc-50 border border-zinc-100 rounded-lg px-3 py-2 mt-3 leading-relaxed">
-          Today is <span className="font-medium">Not Started</span>. Your first session is{' '}
-          <span className="font-medium">Planned</span> for tomorrow — no sets have been completed.
+          Your first session is <span className="font-medium">planned for tomorrow</span> (local date).
+          It is not today&apos;s training day unless you choose to start early. No sets have been completed.
         </p>
       )}
 
-      {!snapshot.hasStructuredHistory && !plannedTomorrow && (
+      {!snapshot.hasStructuredHistory && presentation.mode === 'today_actionable' && (
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-3">
           No completed workout history yet — approve and log real sets to unlock accurate volume and progression. Planned or skipped sessions do not count.
         </p>
+      )}
+
+      {keepAck && (
+        <p className="text-xs text-zinc-600 bg-zinc-50 border border-zinc-100 rounded-lg px-3 py-2 mt-3">{keepAck}</p>
       )}
 
       {skipAck && (
@@ -150,35 +176,58 @@ export default function TodaysWorkoutCard({ snapshot, onExplainPrescription }: P
       {showWhy && <p className="text-xs text-zinc-600 mt-2 leading-relaxed">{whySummary}</p>}
 
       <div className="flex flex-wrap gap-2 mt-4">
-        {activeWorkout ? (
+        {presentation.showResume && (
           <Link href="/gym/workout"
             className="text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
             Resume workout
           </Link>
-        ) : todayStatus.status !== 'skipped' && todayStatus.status !== 'completed' && !plannedTomorrow ? (
+        )}
+
+        {presentation.mode === 'planned_tomorrow' && (
           <>
-            {!isApproved && (
+            <button type="button" onClick={handleStartTodayInstead}
+              className="text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+              Start today instead
+            </button>
+            <button type="button" onClick={handleKeepForTomorrow}
+              className="text-sm font-medium px-4 py-2 rounded-lg border border-emerald-200 text-emerald-800 bg-emerald-50">
+              Keep for tomorrow
+            </button>
+            <button type="button" onClick={handleChangeSchedule}
+              className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600">
+              Change schedule
+            </button>
+          </>
+        )}
+
+        {presentation.mode === 'today_actionable' && (
+          <>
+            {presentation.showApprove && !isApproved && (
               <button type="button" onClick={handleApprove}
                 className="text-sm font-medium px-4 py-2 rounded-lg border border-emerald-200 text-emerald-800 bg-emerald-50">
                 Approve workout
               </button>
             )}
-            <button type="button" onClick={handleStart}
-              className="text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
-              {isApproved ? 'Start workout' : 'Approve & start'}
-            </button>
-            <button type="button" onClick={() => setShowSkip(true)}
-              className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600">
-              Skip workout
-            </button>
+            {presentation.showStart && (
+              <button type="button" onClick={handleStart}
+                className="text-sm font-semibold px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+                {isApproved ? 'Start workout' : 'Approve & start'}
+              </button>
+            )}
+            {presentation.showSkip && (
+              <button type="button" onClick={() => setShowSkip(true)}
+                className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600">
+                Skip workout
+              </button>
+            )}
           </>
-        ) : null}
+        )}
       </div>
-      {isApproved && !activeWorkout && todayStatus.status === 'not_started' && !plannedTomorrow && (
+      {isApproved && presentation.mode === 'today_actionable' && !activeWorkout && (
         <p className="text-[10px] text-emerald-600 mt-2">Workout approved — ready to start</p>
       )}
 
-      {showSkip && (
+      {showSkip && presentation.mode === 'today_actionable' && (
         <div className="mt-4 rounded-lg border border-zinc-200 p-3 space-y-2">
           <p className="text-xs font-medium text-zinc-800">Why are you skipping?</p>
           <p className="text-[10px] text-zinc-400">This is stored as real metadata. We will not mark exercises completed.</p>

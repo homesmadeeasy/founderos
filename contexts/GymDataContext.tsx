@@ -42,13 +42,19 @@ import {
 } from '@/lib/specialists/gym/gymStorage/gymRepositoryFactory'
 import { suggestStartingWeight } from '@/lib/specialists/gym/gymStorage/gymDoubleProgression'
 import {
+  createPlannedWorkoutSession,
   scheduleFirstSessionTomorrow,
   skipWorkoutSession,
 } from '@/lib/specialists/gym/gymScheduleService'
 import {
   calendarDateISO,
+  nextAvailableTrainingDay,
   todayWorkoutCalendarStatus,
 } from '@/lib/specialists/gym/gymSessionStatus'
+import {
+  cancelDeferredTomorrowSessions,
+  resolveFirstSessionIntent,
+} from '@/lib/specialists/gym/gymFirstSessionPresentation'
 import { useFounderKernel } from '@/contexts/FounderKernelContext'
 import { useMemoryEngine } from '@/contexts/MemoryEngineContext'
 import { nowISO } from '@/lib/conversation/conversationUtils'
@@ -73,6 +79,12 @@ interface GymDataContextValue {
   approveWorkoutPlan: (workout: TodaysWorkout, whySummary: string) => ApprovedWorkoutPlan
   clearApprovedPlan: () => void
   startWorkoutFromPlan: () => ActiveWorkout | null
+  /** Move deferred first session to today, approve if needed, create/resume one active session. */
+  startWorkoutTodayInstead: (workout: TodaysWorkout, whySummary: string) => ActiveWorkout | null
+  /** Acknowledge keep-for-tomorrow; creates no completed history. */
+  keepWorkoutForTomorrow: () => void
+  /** Offer a different planned day via pending reschedule UI. */
+  changeFirstSessionSchedule: (title: string) => WorkoutSessionRecord | null
   saveActiveWorkout: (workout: ActiveWorkout) => void
   discardActiveWorkout: () => void
   finishWorkout: (review?: PostWorkoutReview) => { summary: string; summaryDetail: WorkoutSummaryDetail } | null
@@ -128,8 +140,21 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
   const load = useCallback(() => {
     const repo = getGymStorageRepository()
     const store = repo.load()
-    setProfile(store.profile)
-    setSessions(repo.listSessions())
+    let nextProfile = store.profile
+    const listed = repo.listSessions()
+    if (nextProfile) {
+      const resolved = resolveFirstSessionIntent(nextProfile, listed)
+      if (resolved.profilePatch) {
+        nextProfile = {
+          ...nextProfile,
+          ...resolved.profilePatch,
+          updatedAt: nowISO(),
+        }
+        repo.saveProfile(nextProfile)
+      }
+    }
+    setProfile(nextProfile)
+    setSessions(listed)
     setActiveWorkout(repo.getActiveWorkout())
     setApprovedPlan(repo.getApprovedPlan())
     setProgressionRecords(repo.listProgressionRecords())
@@ -259,6 +284,106 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     })
     return workout
   }, [publish])
+
+  const startWorkoutTodayInstead = useCallback((workout: TodaysWorkout, whySummary: string) => {
+    const repo = getGymStorageRepository()
+    const today = calendarDateISO()
+
+    // 1. Clear deferred intent (local calendar).
+    const base = profile ?? createDefaultGymProfile()
+    const savedProfile: GymProfile = {
+      ...base,
+      firstSessionIntent: 'today',
+      firstSessionChoiceComplete: true,
+      updatedAt: nowISO(),
+    }
+    repo.saveProfile(savedProfile)
+    setProfile(savedProfile)
+
+    // 2. Cancel tomorrow planned placeholder(s) — no completed sets.
+    const { sessions: nextSessions, cancelledIds } = cancelDeferredTomorrowSessions(
+      repo.listSessions(),
+      today,
+      nowISO(),
+    )
+    for (const s of nextSessions) {
+      if (cancelledIds.includes(s.id)) repo.upsertSession(s)
+    }
+    setSessions(repo.listSessions())
+
+    // 3. Approve plan if needed, then start (idempotent — one active session).
+    const existingPlan = repo.getApprovedPlan()
+    const alreadyApproved = existingPlan
+      && (existingPlan.title === workout.title
+        || existingPlan.workoutInstanceId === workout.workoutInstanceId)
+    if (!alreadyApproved) {
+      const plan = planFromTodaysWorkout(workout, whySummary, repo.listSessions(), savedProfile)
+      repo.saveApprovedPlan(plan)
+      setApprovedPlan(plan)
+    }
+
+    const started = startWorkoutFromPlan()
+    void publish({
+      type: 'RoutineGenerated',
+      source: 'gym-ai',
+      payload: {
+        title: workout.title,
+        status: 'in_progress',
+        startedTodayInstead: true,
+        cancelledDeferredIds: cancelledIds,
+      },
+    })
+    return started
+  }, [profile, startWorkoutFromPlan, publish])
+
+  const keepWorkoutForTomorrow = useCallback(() => {
+    // Explicit no-op on history: deferred planned session stays planned.
+    void publish({
+      type: 'RoutineGenerated',
+      source: 'gym-ai',
+      payload: {
+        status: 'planned',
+        keptForTomorrow: true,
+        note: 'User kept first session for tomorrow — no completed sets.',
+      },
+    })
+  }, [publish])
+
+  const changeFirstSessionSchedule = useCallback((title: string) => {
+    const repo = getGymStorageRepository()
+    const today = calendarDateISO()
+    const { sessions: nextSessions, cancelledIds } = cancelDeferredTomorrowSessions(
+      repo.listSessions(),
+      today,
+      nowISO(),
+    )
+    for (const s of nextSessions) {
+      if (cancelledIds.includes(s.id)) repo.upsertSession(s)
+    }
+
+    const nextDay = nextAvailableTrainingDay(today, profile?.trainingDaysPerWeek ?? 3)
+    const offered = createPlannedWorkoutSession({
+      title,
+      scheduledFor: nextDay,
+      plan: repo.getApprovedPlan(),
+      notes: 'Reschedule offer after changing first-session schedule. Not completed.',
+    })
+    setSessions(repo.listSessions())
+    setPendingReschedule(offered)
+
+    // Keep intent deferred until confirm; confirmReschedule will add the planned day.
+    if (profile) {
+      const saved = {
+        ...profile,
+        firstSessionIntent: 'tomorrow' as const,
+        updatedAt: nowISO(),
+      }
+      repo.saveProfile(saved)
+      setProfile(saved)
+    }
+
+    return offered
+  }, [profile])
 
   const saveActiveWorkout = useCallback((workout: ActiveWorkout) => {
     const repo = getGymStorageRepository()
@@ -506,6 +631,9 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     approveWorkoutPlan,
     clearApprovedPlan,
     startWorkoutFromPlan,
+    startWorkoutTodayInstead,
+    keepWorkoutForTomorrow,
+    changeFirstSessionSchedule,
     saveActiveWorkout,
     discardActiveWorkout,
     finishWorkout,
@@ -517,7 +645,9 @@ export function GymDataProvider({ children }: { children: ReactNode }) {
     ready, profile, sessions, completedSessions, activeWorkout, approvedPlan,
     progressionRecords, todayStatus, pendingReschedule,
     saveProfile, chooseFirstSession, approveWorkoutPlan, clearApprovedPlan,
-    startWorkoutFromPlan, saveActiveWorkout, discardActiveWorkout, finishWorkout,
+    startWorkoutFromPlan, startWorkoutTodayInstead, keepWorkoutForTomorrow,
+    changeFirstSessionSchedule,
+    saveActiveWorkout, discardActiveWorkout, finishWorkout,
     skipWorkout, confirmReschedule, dismissReschedule, load,
   ])
 

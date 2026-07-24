@@ -11,12 +11,16 @@ Enter /gym (incomplete profile)
   → GymOnboarding steps (goal, experience, schedule, equipment/tracking)
   → saveProfile({ complete: true })
   → First session choice: Today | Tomorrow
-       Today  → home, todayStatus Not Started
-       Tomorrow → planned session scheduled; today not started as training
+       Today  → home, todayStatus Not Started, card = Today's workout (Approve / Approve & start / Skip)
+       Tomorrow → planned session for local tomorrow; home card = **Planned for tomorrow**
+            Actions: Start today instead | Keep for tomorrow | Change schedule
+            Start today instead → intent=today, cancel deferred planned, approve plan, one active session → /gym/workout
 ```
 
 **Success:** `onboardingComplete` true; profile validates.  
 **Failure:** Validation errors block complete flag.
+
+**Migration:** Profiles with `firstSessionIntent = tomorrow` whose planned session is already due (local today or overdue), or who already have completed history, are safely migrated to `today` on Gym data load.
 
 ---
 
@@ -121,8 +125,9 @@ TodaysWorkoutCard → Skip
 
 ```
 /gym/research → browse sources/claims (read-only library)
-Gym home conversation chips → answers from snapshot (deterministic)
-Optional action proposals → approve/reject via action handlers (must not invent completions)
+Gym home conversation chips → answers from snapshot / intelligence pipeline (deterministic grounding)
+Gym AI does **not** offer “log today’s workout” shortcuts that invent completed sets
+To train → TodaysWorkoutCard → Active Workout Engine (/gym/workout)
 ```
 
 ---

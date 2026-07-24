@@ -5,10 +5,11 @@ Mobile-first live workout logging for FounderOS Gym AI. Extends the existing gym
 ## Architecture
 
 ```
-TodaysWorkoutCard (Approve & Start)
+TodaysWorkoutCard (Approve & Start | Start today instead)
         │
         ▼
-GymDataContext.startWorkoutFromPlan()
+GymDataContext.startWorkoutFromPlan() / startWorkoutTodayInstead()
+  · startWorkoutTodayInstead: firstSessionIntent→today, cancel deferred planned, approve if needed
   · resume existing active workout if present (idempotent)
   · else createActiveWorkoutFromPlan → ActiveWorkout + in_progress session
   · local persist + optional cloud sync via GymRepository
